@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { type FamilyStatus, type Gender, GENDERS } from '../constants';
 import { personNameSchema } from './auth';
+import { GOTRA_IDS, type GotraId } from '../gotras';
 import { phoneSchema } from './common';
 
 /** Relation to the family head. Exactly one member of a family is the head. */
@@ -74,9 +75,16 @@ export const memberInputSchema = z.object({
 export type MemberInput = z.input<typeof memberInputSchema>;
 export type MemberInputParsed = z.output<typeof memberInputSchema>;
 
+/** One of the fixed gotras, or blank (null) for "not listed / not sure". */
+export const gotraSchema = z
+  .string()
+  .nullish()
+  .transform((v) => (typeof v === 'string' ? v.trim() : '') || null)
+  .pipe(z.enum(GOTRA_IDS, { error: 'validation.gotra' }).nullable());
+
 export const familyUpdateSchema = z.object({
   place: z.string().trim().min(2, 'validation.placeMin').max(60, 'validation.tooLong'),
-  gotra: optionalText(40),
+  gotra: gotraSchema,
   address: optionalText(200),
 });
 export type FamilyUpdateInput = z.input<typeof familyUpdateSchema>;
@@ -117,7 +125,7 @@ export interface FamilyDetail {
   rejectionReason: string | null;
   headName: string;
   place: string;
-  gotra: string | null;
+  gotra: GotraId | null;
   /** Present only when the viewer may see contact details. */
   address?: string | null;
   branch: { id: string; name: string; nameMr: string };

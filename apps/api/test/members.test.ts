@@ -22,9 +22,9 @@ const names = (body: { items: Member[] }) => body.items.map((m) => m.name).filte
 beforeEach(async () => {
   await clearDb();
   branches = await seedBranches();
-  await createFamily(branches.bhusawal, { gotra: 'Kashyap', people: [{ name: 'Anil Wagh', occupation: 'Oil mill owner' }, { name: 'Rohit Wagh' }] });
-  await createFamily(branches.amalner, { gotra: 'Atri', people: [{ name: 'Kavita Dhole' }] });
-  await createFamily(branches.pune, { gotra: 'Kashyap', people: [{ name: 'Ramesh Karale' }] });
+  await createFamily(branches.bhusawal, { gotra: 'kashyap', people: [{ name: 'Anil Wagh', occupation: 'Oil mill owner' }, { name: 'Rohit Wagh' }] });
+  await createFamily(branches.amalner, { gotra: 'atri', people: [{ name: 'Kavita Dhole' }] });
+  await createFamily(branches.pune, { gotra: 'kashyap', people: [{ name: 'Ramesh Karale' }] });
   await createFamily(branches.bhusawal, { status: 'pending', people: [{ name: 'Pending Person' }] });
   await createFamily(branches.bhusawal, { status: 'rejected', people: [{ name: 'Rejected Person' }] });
 });
@@ -103,9 +103,9 @@ describe('GET /api/members', () => {
     expect(new Set(seen).size).toBe(5);
   });
 
-  it('lists gotras of verified families', async () => {
+  it('rejects a gotra that is not on the list', async () => {
     const cookie = await viewer('member', branches.pune);
-    const res = await api.get('/api/members/gotras').set('Cookie', cookie);
-    expect(res.body.items).toEqual(['Atri', 'Kashyap']);
+    const res = await api.get('/api/members?gotra=Kashyapa').set('Cookie', cookie);
+    expect(res.status).toBe(400);
   });
 });

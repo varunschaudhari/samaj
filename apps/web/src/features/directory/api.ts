@@ -1,5 +1,5 @@
-import type { GotraList, MemberPage } from '@samaj/shared';
-import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import type { MemberPage } from '@samaj/shared';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 export interface DirectoryFilters {
@@ -20,10 +20,3 @@ export function useMembers(filters: DirectoryFilters) {
   });
 }
 
-export function useGotras() {
-  return useQuery({
-    queryKey: ['gotras'],
-    queryFn: async () => (await api.get<GotraList>('/members/gotras')).items,
-    staleTime: 10 * 60_000,
-  });
-}

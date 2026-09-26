@@ -4,7 +4,7 @@
  * Wipes existing data first. Every name and number below is invented.
  */
 import argon2 from 'argon2';
-import type { BranchKind, FamilyStatus, Gender, Relation, Role } from '@samaj/shared';
+import type { BranchKind, FamilyStatus, Gender, GotraId, Relation, Role } from '@samaj/shared';
 import { Types } from 'mongoose';
 import { env } from '../config/env';
 import { connectDb, disconnectDb } from '../config/db';
@@ -72,8 +72,8 @@ const WOMEN = ['Sunita', 'Kavita', 'Meena', 'Vaishali', 'Asha', 'Rekha', 'Pooja'
 const BOYS = ['Rohit', 'Amit', 'Sagar', 'Akash', 'Omkar', 'Tushar', 'Yash'];
 const GIRLS = ['Priya', 'Neha', 'Sneha', 'Komal', 'Gauri', 'Tanvi', 'Rutuja'];
 const SURNAMES = ['Chaudhari', 'Karale', 'Dhole', 'Bagul', 'Wagh', 'Sonawane', 'Mahale', 'Shinde'];
-// Placeholder gotras for development. Replace with the samaj's actual list.
-const GOTRAS = ['Kashyap', 'Bharadwaj', 'Vasishtha', 'Gautam', 'Atri', 'Jamadagni', null];
+// Ids from packages/shared/src/gotras.ts; null is "not listed / not sure".
+const GOTRAS: (GotraId | null)[] = ['kashyap', 'bharadwaj', 'vasishtha', 'gautam', 'atri', 'jamadagni', null];
 const OCCUPATIONS = ['Oil mill (ghani) owner', 'Farmer', 'Teacher', 'Shopkeeper', 'Engineer', 'Government service', 'Accountant', 'Nurse'];
 const EDUCATION = ['B.Com', 'B.A.', 'B.E.', '12th', 'M.Sc.', 'D.Ed.', null];
 
@@ -94,7 +94,7 @@ interface PersonSeed {
 
 interface FamilySeed {
   branch: BranchDoc;
-  gotra: string | null;
+  gotra: GotraId | null;
   status: FamilyStatus;
   rejectionReason?: string;
   people: PersonSeed[];
@@ -210,7 +210,7 @@ async function main() {
   // Two families written in Devanagari.
   families.push({
     branch: await byName('Bhusawal'),
-    gotra: 'Kashyap',
+    gotra: 'kashyap',
     status: 'verified',
     people: [
       { name: 'रमेश चौधरी', relation: 'head', gender: 'male', birthYear: 1962, occupation: 'घाणी व्यवसाय', education: 'बी.कॉम', phone: nextPhone() },
@@ -220,7 +220,7 @@ async function main() {
   });
   families.push({
     branch: await byName('Amalner'),
-    gotra: 'Atri',
+    gotra: 'atri',
     status: 'verified',
     people: [
       { name: 'प्रकाश कराळे', relation: 'head', gender: 'male', birthYear: 1970, occupation: 'शेती', phone: nextPhone() },
@@ -229,12 +229,12 @@ async function main() {
     ],
   });
   // Waiting for the Jalgaon committee.
-  families.push({ branch: await byName('Chopda'), gotra: 'Gautam', status: 'pending', people: household(20).slice(0, 3) });
+  families.push({ branch: await byName('Chopda'), gotra: 'gautam', status: 'pending', people: household(20).slice(0, 3) });
   families.push({ branch: await byName('Jalgaon'), gotra: null, status: 'pending', people: household(21).slice(0, 2) });
   // Sent back with a reason.
   families.push({
     branch: await byName('Amalner'),
-    gotra: 'Bharadwaj',
+    gotra: 'bharadwaj',
     status: 'rejected',
     rejectionReason: 'Please add the family head’s father and the correct village name.',
     people: household(22).slice(0, 2),
@@ -249,7 +249,7 @@ async function main() {
   for (const a of accounts) {
     families.push({
       branch: await byName(a.branch),
-      gotra: 'Kashyap',
+      gotra: 'kashyap',
       status: a.status,
       account: { role: a.role, phone: a.phone },
       people: [

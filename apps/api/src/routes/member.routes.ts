@@ -8,6 +8,5 @@ export const memberRouter = Router();
 
 memberRouter.use(requireAuth);
 memberRouter.get('/', requirePermission('directory:read'), members.list);
-memberRouter.get('/gotras', members.gotras);
 // Access is checked per photo: the viewer must be able to see the member's family.
 memberRouter.get('/:memberId/photo', families.getPhoto);

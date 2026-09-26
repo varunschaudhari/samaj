@@ -1,4 +1,4 @@
-import { can } from '@samaj/shared';
+import { can, isGotraId } from '@samaj/shared';
 import { Info, RotateCw, Search, SearchX, Users, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -9,7 +9,8 @@ import { VerificationNotice } from '@/features/families/VerificationNotice';
 import { branchName, groupBranches, useBranches } from '@/features/branches/api';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
-import { type DirectoryFilters, useGotras, useMembers } from './api';
+import { gotraOptions } from '@/features/families/gotra-options';
+import { type DirectoryFilters, useMembers } from './api';
 import { MemberCard, MemberCardSkeleton } from './MemberCard';
 
 const SKELETON_COUNT = 6;
@@ -20,7 +21,8 @@ function useFilterParams() {
   const filters: DirectoryFilters = {
     q: params.get('q') ?? '',
     branchId: params.get('branch') ?? '',
-    gotra: params.get('gotra') ?? '',
+    // An old link may carry a gotra that is no longer on the list; ignore it rather than fail.
+    gotra: isGotraId(params.get('gotra') ?? '') ? (params.get('gotra') ?? '') : '',
   };
   const update = (patch: Partial<DirectoryFilters>) => {
     const next = { ...filters, ...patch };
@@ -47,7 +49,6 @@ function Filters({ filters, update, onClear }: FiltersProps) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
   const branches = useBranches();
-  const gotras = useGotras();
   const [search, setSearch] = useState(filters.q);
   const debounced = useDebouncedValue(search.trim());
 
@@ -98,25 +99,20 @@ function Filters({ filters, update, onClear }: FiltersProps) {
             ))}
           </Select>
         )}
-        {gotras.isPending ? (
-          <Skeleton className="h-touch rounded-sm md:w-40" />
-        ) : (
-          <Select
-            label={t('directory.filterGotra')}
-            hideLabel
-            value={filters.gotra}
-            onChange={(e) => update({ gotra: e.target.value })}
-            disabled={gotras.isError}
-            fieldClassName="md:w-40"
-          >
-            <option value="">{t('directory.allGotras')}</option>
-            {(gotras.data ?? []).map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </Select>
-        )}
+        <Select
+          label={t('directory.filterGotra')}
+          hideLabel
+          value={filters.gotra}
+          onChange={(e) => update({ gotra: e.target.value })}
+          fieldClassName="md:w-40"
+        >
+          <option value="">{t('directory.allGotras')}</option>
+          {gotraOptions(language).map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </Select>
       </div>
       {hasFilters && (
         <Button variant="ghost" leadingIcon={X} onClick={onClear} className="self-start md:self-auto">

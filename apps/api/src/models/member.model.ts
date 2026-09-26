@@ -1,4 +1,4 @@
-import { FAMILY_STATUSES, GENDERS, RELATIONS } from '@samaj/shared';
+import { FAMILY_STATUSES, GENDERS, GOTRA_IDS, RELATIONS } from '@samaj/shared';
 import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
 
 /**
@@ -30,7 +30,7 @@ const memberSchema = new Schema(
     branchId: { type: Schema.Types.ObjectId, ref: 'Branch', required: true },
     branchAncestors: { type: [Schema.Types.ObjectId], default: [] },
     place: { type: String, required: true, trim: true },
-    gotra: { type: String, default: null, trim: true },
+    gotra: { type: String, enum: GOTRA_IDS, default: null },
     familyStatus: { type: String, enum: FAMILY_STATUSES, default: 'pending', required: true },
   },
   { timestamps: true },

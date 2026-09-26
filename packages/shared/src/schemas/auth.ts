@@ -58,6 +58,7 @@ export const VALIDATION_KEYS = [
   'validation.gender',
   'validation.placeMin',
   'validation.reasonMin',
+  'validation.gotra',
   // Produced by the API rather than a schema, but translated the same way.
   'validation.phoneTaken',
   'validation.relationHead',

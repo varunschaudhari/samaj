@@ -68,10 +68,19 @@ describe('editing a family', () => {
 
   it('keeps members in sync when the family place or gotra changes', async () => {
     const own = await createFamily(branches.bhusawal, { account: 'member', people: [{ name: 'Anil Wagh' }, { name: 'Rohit Wagh' }] });
-    const res = await api.put(`/api/families/${own.familyId}`).set('Cookie', own.cookie).send({ place: 'Varangaon', gotra: 'Kashyap', address: 'Near the temple' });
+    const res = await api.put(`/api/families/${own.familyId}`).set('Cookie', own.cookie).send({ place: 'Varangaon', gotra: 'kashyap', address: 'Near the temple' });
     expect(res.status).toBe(200);
-    expect(res.body.family).toMatchObject({ place: 'Varangaon', gotra: 'Kashyap', address: 'Near the temple' });
-    expect(await MemberModel.countDocuments({ familyId: own.familyId, place: 'Varangaon', gotra: 'Kashyap' })).toBe(2);
+    expect(res.body.family).toMatchObject({ place: 'Varangaon', gotra: 'kashyap', address: 'Near the temple' });
+    expect(await MemberModel.countDocuments({ familyId: own.familyId, place: 'Varangaon', gotra: 'kashyap' })).toBe(2);
+  });
+
+  it('only accepts gotras from the fixed list', async () => {
+    const own = await createFamily(branches.bhusawal, { account: 'member' });
+    const res = await api.put(`/api/families/${own.familyId}`).set('Cookie', own.cookie).send({ place: 'Bhusawal', gotra: 'Kashyapa' });
+    expect(res.status).toBe(400);
+    expect(res.body.error.issues).toEqual([{ path: 'gotra', message: 'validation.gotra' }]);
+    const cleared = await api.put(`/api/families/${own.familyId}`).set('Cookie', own.cookie).send({ place: 'Bhusawal', gotra: '' });
+    expect(cleared.body.family.gotra).toBeNull();
   });
 
   it('refuses a second head, and removing the head', async () => {

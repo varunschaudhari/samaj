@@ -93,7 +93,7 @@ const SAMPLE_MEMBER: Member = {
   photoUrl: null,
   name: 'सुनीता चौधरी',
   familyHead: 'रमेश चौधरी',
-  gotra: 'Kashyap',
+  gotra: 'kashyap',
   place: 'Bhusawal',
   occupation: 'Teacher',
   branch: { id: 'b', name: 'Jalgaon District', nameMr: 'जळगाव जिल्हा' },

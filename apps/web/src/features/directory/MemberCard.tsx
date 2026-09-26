@@ -1,4 +1,4 @@
-import { type Member, formatPhone } from '@samaj/shared';
+import { type Member, formatPhone, gotraName } from '@samaj/shared';
 import { MapPin, Phone } from 'lucide-react';
 import { Link } from 'react-router';
 import { Avatar, Badge, Card, Icon, Skeleton, SkeletonText, buttonVariants } from '@/components/ui';
@@ -34,7 +34,7 @@ export function MemberCard({ member }: { member: Member }) {
 
       <div className="flex flex-wrap items-center gap-1.5">
         {member.relation !== 'head' && <Badge tone="primary">{t(`relation.${member.relation}`)}</Badge>}
-        {member.gotra && <Badge tone="zari">{member.gotra}</Badge>}
+        {member.gotra && <Badge tone="zari">{gotraName(member.gotra, language)}</Badge>}
         {member.occupation && <Badge>{member.occupation}</Badge>}
       </div>
 

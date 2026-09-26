@@ -26,7 +26,6 @@ function useFamilyMutation<TVars>(familyId: string, run: (vars: TVars) => Promis
       queryClient.setQueryData(familyKey(familyId), family);
       void queryClient.invalidateQueries({ queryKey: ['members'] });
       void queryClient.invalidateQueries({ queryKey: ['verifications'] });
-      void queryClient.invalidateQueries({ queryKey: ['gotras'] });
     },
   });
 }

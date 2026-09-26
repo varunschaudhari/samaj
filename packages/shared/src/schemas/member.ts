@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import { MEMBER_PAGE_SIZE } from '../constants';
+import { GOTRA_IDS, type GotraId } from '../gotras';
 import { objectIdSchema } from './common';
 import type { Relation } from './family';
 
 export const memberListQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
   branchId: objectIdSchema.optional(),
-  gotra: z.string().trim().max(40).optional(),
+  gotra: z.enum(GOTRA_IDS).optional(),
   cursor: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(MEMBER_PAGE_SIZE),
 });
@@ -19,7 +20,7 @@ export interface Member {
   name: string;
   relation: Relation;
   familyHead: string | null;
-  gotra: string | null;
+  gotra: GotraId | null;
   place: string;
   occupation: string | null;
   branch: { id: string; name: string; nameMr: string };
@@ -32,10 +33,6 @@ export interface MemberPage {
   items: Member[];
   nextCursor: string | null;
   total: number;
-}
-
-export interface GotraList {
-  items: string[];
 }
 
 export const pageQuerySchema = z.object({

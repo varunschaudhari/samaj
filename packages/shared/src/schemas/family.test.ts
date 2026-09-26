@@ -39,4 +39,11 @@ describe('familyUpdateSchema', () => {
     expect(once).toEqual({ place: 'Bhusawal', gotra: null, address: null });
     expect(familyUpdateSchema.parse(once)).toEqual(once);
   });
+
+  it('accepts only gotras from the fixed list', () => {
+    expect(familyUpdateSchema.parse({ place: 'Bhusawal', gotra: 'kashyap' }).gotra).toBe('kashyap');
+    const typo = familyUpdateSchema.safeParse({ place: 'Bhusawal', gotra: 'Kashyapa' });
+    expect(typo.success).toBe(false);
+    expect(typo.error?.issues[0]?.message).toBe('validation.gotra');
+  });
 });

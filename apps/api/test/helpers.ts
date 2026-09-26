@@ -1,5 +1,5 @@
 import argon2 from 'argon2';
-import { ACCESS_COOKIE, CSRF_HEADER, CSRF_HEADER_VALUE, type FamilyStatus, REFRESH_COOKIE, type Relation, type Role } from '@samaj/shared';
+import { ACCESS_COOKIE, CSRF_HEADER, CSRF_HEADER_VALUE, type FamilyStatus, type GotraId, REFRESH_COOKIE, type Relation, type Role } from '@samaj/shared';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose, { Types } from 'mongoose';
 import request from 'supertest';
@@ -77,13 +77,12 @@ const uniquePhone = () => `+9199${String(10000000 + ++phoneSeq).padStart(8, '0')
 interface PersonFixture {
   name: string;
   relation?: Relation;
-  gotra?: string;
   occupation?: string;
 }
 
 interface FamilyFixture {
   status?: FamilyStatus;
-  gotra?: string | null;
+  gotra?: GotraId | null;
   /** The first person is the head. */
   people?: PersonFixture[];
   /** Give the head an account with this role, and sign them in. */

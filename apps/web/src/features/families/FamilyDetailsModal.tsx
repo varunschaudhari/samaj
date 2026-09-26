@@ -1,13 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type FamilyDetail, type FamilyUpdateInput, familyUpdateSchema } from '@samaj/shared';
-import { useEffect, useId } from 'react';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Button, Input, Modal, Textarea, toast } from '@/components/ui';
+import { Button, Input, Modal, Select, Textarea, toast } from '@/components/ui';
 import { FormAlert } from '@/features/auth/FormAlert';
 import { applyServerIssues, fieldError } from '@/features/auth/form-errors';
-import { useGotras } from '@/features/directory/api';
-import { useErrorMessage, useT } from '@/i18n';
+import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { useUpdateFamily } from './api';
+import { gotraOptions } from './gotra-options';
 
 const FIELDS = ['place', 'gotra', 'address'] as const;
 
@@ -21,9 +21,7 @@ export function FamilyDetailsModal({ family, open, onClose }: { family: FamilyDe
   const t = useT();
   const errorMessage = useErrorMessage();
   const update = useUpdateFamily(family.id);
-  // Suggestions only: a gotra not in the list can still be typed.
-  const gotras = useGotras();
-  const gotraListId = useId();
+  const language = useLanguageStore((s) => s.language);
   const form = useForm({ resolver: zodResolver(familyUpdateSchema), defaultValues: toFormValues(family) });
   const { errors } = form.formState;
 
@@ -64,19 +62,14 @@ export function FamilyDetailsModal({ family, open, onClose }: { family: FamilyDe
       <form id="family-form" onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         {update.isError && !FIELDS.some((f) => errors[f]?.type === 'server') && <FormAlert message={errorMessage(update.error)} />}
         <Input label={t('family.place')} error={fieldError(t, errors.place?.message)} {...form.register('place')} />
-        <Input
-          label={t('family.gotra')}
-          labelSuffix={t('common.optional')}
-          list={gotraListId}
-          autoComplete="off"
-          error={fieldError(t, errors.gotra?.message)}
-          {...form.register('gotra')}
-        />
-        <datalist id={gotraListId}>
-          {(gotras.data ?? []).map((g) => (
-            <option key={g} value={g} />
+        <Select label={t('family.gotra')} hint={t('family.gotraHint')} error={fieldError(t, errors.gotra?.message)} {...form.register('gotra')}>
+          <option value="">{t('family.gotraNone')}</option>
+          {gotraOptions(language).map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
           ))}
-        </datalist>
+        </Select>
         <Textarea
           label={t('family.address')}
           labelSuffix={t('common.optional')}

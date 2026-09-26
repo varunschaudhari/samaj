@@ -1,4 +1,4 @@
-import type { FamilyDetail, FamilyMember } from '@samaj/shared';
+import { type FamilyDetail, type FamilyMember, gotraName } from '@samaj/shared';
 import { Clock, MapPin, Pencil, SearchX, Send, TriangleAlert, UserPlus } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
@@ -200,7 +200,7 @@ export function FamilyPage() {
         <dl className="divide-y divide-line">
           <Detail label={t('family.place')}>{data.place}</Detail>
           <Detail label={t('family.branch')}>{branchName(data.branch, language)}</Detail>
-          <Detail label={t('family.gotra')}>{data.gotra ?? '–'}</Detail>
+          <Detail label={t('family.gotra')}>{gotraName(data.gotra, language) ?? t('family.gotraNone')}</Detail>
           {data.address !== undefined && <Detail label={t('family.address')}>{data.address ?? '–'}</Detail>}
         </dl>
         {canEdit && (

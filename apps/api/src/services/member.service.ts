@@ -2,7 +2,6 @@ import { type Member, type MemberPage, type memberListQuerySchema } from '@samaj
 import { type QueryFilter, Types } from 'mongoose';
 import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
-import { FamilyModel } from '../models/family.model';
 import { type MemberDoc, MemberModel } from '../models/member.model';
 import { AppError } from '../utils/app-error';
 import { escapeRegex } from '../utils/regex';
@@ -41,9 +40,7 @@ export async function listMembers(viewer: Viewer, query: ListQuery): Promise<Mem
     const branchId = new Types.ObjectId(query.branchId);
     conditions.push({ $or: [{ branchId }, { branchAncestors: branchId }] });
   }
-  if (query.gotra) {
-    conditions.push({ gotra: new RegExp(`^${escapeRegex(query.gotra)}$`, 'i') });
-  }
+  if (query.gotra) conditions.push({ gotra: query.gotra });
   if (query.q) {
     // Match the start of any word, so "cha" finds "Sunita Chaudhari".
     const rx = new RegExp(`(^|\\s)${escapeRegex(query.q)}`, 'i');
@@ -94,10 +91,4 @@ export async function listMembers(viewer: Viewer, query: ListQuery): Promise<Mem
 
   const last = pageDocs.at(-1);
   return { items, total, nextCursor: hasMore && last ? encodeCursor(last) : null };
-}
-
-/** Gotras in use by verified families, for the directory filter and the family form's suggestions. */
-export async function listGotras(): Promise<string[]> {
-  const values: unknown[] = await FamilyModel.distinct('gotra', { status: 'verified', gotra: { $ne: null } });
-  return values.filter((v): v is string => typeof v === 'string' && v.length > 0).sort((a, b) => a.localeCompare(b));
 }

@@ -1,4 +1,4 @@
-import { FAMILY_STATUSES, HISTORY_ACTIONS } from '@samaj/shared';
+import { FAMILY_STATUSES, GOTRA_IDS, HISTORY_ACTIONS } from '@samaj/shared';
 import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
 
 const historySchema = new Schema(
@@ -23,7 +23,8 @@ const familySchema = new Schema(
     branchAncestors: { type: [Schema.Types.ObjectId], default: [] },
     /** Village, town or city the family lives in, as they write it. */
     place: { type: String, required: true, trim: true },
-    gotra: { type: String, default: null, trim: true },
+    /** An id from the fixed list in packages/shared/src/gotras.ts, or null. */
+    gotra: { type: String, enum: GOTRA_IDS, default: null },
     address: { type: String, default: null, trim: true },
     status: { type: String, enum: FAMILY_STATUSES, default: 'pending', required: true },
     rejectionReason: { type: String, default: null },
