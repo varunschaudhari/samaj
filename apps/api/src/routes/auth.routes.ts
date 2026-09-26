@@ -2,10 +2,11 @@ import { Router } from 'express';
 import * as auth from '../controllers/auth.controller';
 import * as users from '../controllers/user.controller';
 import { requireAuth } from '../middleware/auth';
-import { authLimiter } from '../middleware/rate-limit';
+import { authIpLimiter, authLimiter } from '../middleware/rate-limit';
 
 export const authRouter = Router();
 
+authRouter.use(['/signup', '/join', '/login', '/reset-password'], authIpLimiter);
 authRouter.post('/signup', authLimiter, auth.signup);
 authRouter.post('/join', authLimiter, auth.join);
 authRouter.post('/login', authLimiter, auth.login);

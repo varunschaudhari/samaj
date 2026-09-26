@@ -1,4 +1,5 @@
 import { CSRF_HEADER } from '@samaj/shared';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -16,6 +17,8 @@ export function createApp() {
   app.set('trust proxy', env.TRUST_PROXY);
   app.use(requestLogger);
   app.use(helmet());
+  // JSON shrinks five to ten times; photos are already compressed.
+  app.use(compression({ filter: (req, res) => !req.path.endsWith('/photo') && compression.filter(req, res) }));
   app.use(
     cors({
       origin: (origin, callback) => callback(null, !origin || env.CORS_ORIGINS.includes(origin)),

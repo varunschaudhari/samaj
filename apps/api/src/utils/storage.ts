@@ -1,10 +1,12 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve, sep } from 'node:path';
+import mongoose from 'mongoose';
 import { env } from '../config/env';
 
 /**
- * File storage for uploads. Local disk for now, behind this small interface
- * so moving to object storage later only changes this file.
+ * File storage for uploads, behind this small interface so moving to object
+ * storage (S3, R2) later only changes this file. Local disk suits a single
+ * server; GridFS keeps photos in MongoDB, shared by every API server.
  */
 export interface Storage {
   put(key: string, data: Buffer): Promise<void>;
@@ -41,4 +43,33 @@ function localDisk(rootDir: string): Storage {
   };
 }
 
-export const storage: Storage = localDisk(env.UPLOAD_DIR);
+/** Photos in MongoDB GridFS, one file per key. */
+export function mongoGrid(bucketName = 'photos'): Storage {
+  const bucket = () => {
+    const db = mongoose.connection.db;
+    if (!db) throw new Error('MongoDB is not connected');
+    return new mongoose.mongo.GridFSBucket(db, { bucketName });
+  };
+  const find = async (key: string) => bucket().find({ filename: key }, { projection: { _id: 1 } }).toArray();
+
+  return {
+    async put(key, data) {
+      const old = await find(key);
+      await new Promise<void>((done, fail) => {
+        bucket().openUploadStream(key).on('finish', () => done()).on('error', fail).end(data);
+      });
+      await Promise.all(old.map((f) => bucket().delete(f._id)));
+    },
+    async read(key) {
+      if ((await find(key)).length === 0) return null;
+      const chunks: Buffer[] = [];
+      for await (const chunk of bucket().openDownloadStreamByName(key)) chunks.push(chunk as Buffer);
+      return Buffer.concat(chunks);
+    },
+    async remove(key) {
+      await Promise.all((await find(key)).map((f) => bucket().delete(f._id)));
+    },
+  };
+}
+
+export const storage: Storage = env.PHOTO_STORAGE === 'mongodb' ? mongoGrid() : localDisk(env.UPLOAD_DIR);

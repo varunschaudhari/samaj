@@ -12,9 +12,13 @@ import { userRouter } from './user.routes';
 
 export const apiRouter = Router();
 
+/** Set while the process shuts down, so the load balancer stops sending traffic first. */
+export const lifecycle = { draining: false };
+
 apiRouter.get('/health', (_req, res) => {
   const dbUp = mongoose.connection.readyState === mongoose.ConnectionStates.connected;
-  res.status(dbUp ? 200 : 503).json({ status: dbUp ? 'ok' : 'degraded', db: dbUp });
+  const ok = dbUp && !lifecycle.draining;
+  res.status(ok ? 200 : 503).json({ status: lifecycle.draining ? 'draining' : dbUp ? 'ok' : 'degraded', db: dbUp });
 });
 
 apiRouter.use('/auth', authRouter);

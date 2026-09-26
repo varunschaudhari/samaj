@@ -1,7 +1,8 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/server.ts'],
+  // migrate.js ships with the server so a deployment can build indexes before it starts.
+  entry: ['src/server.ts', 'src/scripts/migrate.ts'],
   format: 'esm',
   target: 'node20',
   platform: 'node',

@@ -8,5 +8,7 @@ process.env.JWT_ACCESS_SECRET = 'test-access-secret-that-is-long-enough-123';
 process.env.CORS_ORIGINS = 'http://localhost:5173';
 process.env.COOKIE_SECURE = 'false';
 process.env.RATE_LIMIT_MAX = '10000';
+process.env.ANON_RATE_LIMIT_MAX = '10000';
 process.env.AUTH_RATE_LIMIT_MAX = '10000';
+process.env.AUTH_IP_RATE_LIMIT_MAX = '10000';
 process.env.UPLOAD_DIR = join(tmpdir(), `samaj-test-uploads-${process.pid}`);

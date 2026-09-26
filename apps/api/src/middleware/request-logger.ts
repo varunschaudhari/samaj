@@ -18,5 +18,6 @@ export const requestLogger = pinoHttp({
     if (res.statusCode >= 400) return 'warn';
     return 'info';
   },
-  autoLogging: { ignore: (req) => req.url === '/api/health' },
+  // Health checks and photo loads are most of the traffic and say little.
+  autoLogging: { ignore: (req) => req.url === '/api/health' || (req.method === 'GET' && /\/photo(\?|$)/.test(req.url ?? '')) },
 });

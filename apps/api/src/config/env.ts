@@ -36,9 +36,14 @@ const envSchema = z
     COOKIE_SECURE: booleanString.default(false),
     TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(0),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
-    RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
-    AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+    RATE_LIMIT_MAX: z.coerce.number().int().positive().default(1000),
+    ANON_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
+    AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+    AUTH_IP_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
+    PHOTO_STORAGE: z.enum(['disk', 'mongodb']).default('disk'),
     UPLOAD_DIR: z.string().min(1).default('uploads'),
+    DB_POOL_SIZE: z.coerce.number().int().min(1).max(500).default(20),
+    WEB_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(1),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && !env.COOKIE_SECURE) {
