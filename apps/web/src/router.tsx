@@ -7,6 +7,7 @@ import { useMe } from '@/features/auth/api';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { RedirectIfAuthed, RequireAuth } from '@/features/auth/RequireAuth';
 import { SignupPage } from '@/features/auth/SignupPage';
+import { BranchesPage } from '@/features/branches/BranchesPage';
 import { DirectoryPage } from '@/features/directory/DirectoryPage';
 import { NotFoundPage } from '@/features/errors/NotFoundPage';
 import { FamilyPage, MyFamilyRedirect } from '@/features/families/FamilyPage';
@@ -37,6 +38,7 @@ export const router = createBrowserRouter([
           { path: '/family', element: <MyFamilyRedirect /> },
           { path: '/families/:familyId', element: <FamilyPage /> },
           { path: '/review', element: <RequirePermission permission="member:verify"><ReviewPage /></RequirePermission> },
+          { path: '/branches', element: <RequirePermission permission="branch:manage"><BranchesPage /></RequirePermission> },
           { path: '/profile', element: <ProfilePage /> },
         ],
       },

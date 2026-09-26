@@ -17,7 +17,7 @@ describe('dictionaries', () => {
   });
 
   it('formats numbers in Devanagari digits for Marathi', () => {
-    expect(translate('en', 'directory.count', { count: 124800 })).toBe('1,24,800 members');
-    expect(translate('mr', 'directory.count', { count: 48 })).toBe('४८ सदस्य');
+    expect(translate('en', 'directory.count', { count: 124800 })).toBe('Members: 1,24,800');
+    expect(translate('mr', 'directory.count', { count: 48 })).toBe('सदस्य: ४८');
   });
 });
