@@ -13,6 +13,7 @@ import { FamilyDetailsModal } from './FamilyDetailsModal';
 import { FamilyMemberRow, FamilyMemberRowSkeleton } from './FamilyMemberRow';
 import { FamilyStatusBadge } from './FamilyStatusBadge';
 import { MemberFormModal } from './MemberFormModal';
+import { ResetCodeModal } from '@/features/users/ResetCodeModal';
 import { ReviewPanel } from './ReviewPanel';
 
 /** /family: the signed-in user's own family. */
@@ -131,6 +132,7 @@ export function FamilyPage() {
   const [editing, setEditing] = useState<{ member: FamilyMember | null } | null>(null);
   const [removing, setRemoving] = useState<FamilyMember | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [resetTarget, setResetTarget] = useState<{ userId: string; name: string } | null>(null);
 
   if (family.isPending) return <FamilySkeleton />;
 
@@ -166,7 +168,14 @@ export function FamilyPage() {
     <div className="flex flex-col gap-3">
       <ul className="divide-y divide-line">
         {data.members.map((m) => (
-          <FamilyMemberRow key={m.id} member={m} canEdit={canEdit} onEdit={() => setEditing({ member: m })} onRemove={() => setRemoving(m)} />
+          <FamilyMemberRow
+            key={m.id}
+            member={m}
+            canEdit={canEdit}
+            onEdit={() => setEditing({ member: m })}
+            onRemove={() => setRemoving(m)}
+            onResetPassword={() => m.accountId && setResetTarget({ userId: m.accountId, name: m.name })}
+          />
         ))}
       </ul>
       {canEdit && data.members.length === 1 && (
@@ -224,6 +233,7 @@ export function FamilyPage() {
 
       <MemberFormModal familyId={data.id} member={editing?.member ?? null} open={editing !== null} onClose={() => setEditing(null)} />
       <FamilyDetailsModal family={data} open={detailsOpen} onClose={() => setDetailsOpen(false)} />
+      <ResetCodeModal target={resetTarget} onClose={() => setResetTarget(null)} />
       <Modal
         open={removing !== null}
         onClose={() => setRemoving(null)}

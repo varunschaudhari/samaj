@@ -102,7 +102,7 @@ export function AppShell() {
           aria-label={t('nav.primary')}
           className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
         >
-          {items.map((item) => (
+          {items.filter((item) => !item.devOnly).map((item) => (
             <NavLink
               key={item.to}
               to={hrefFor(item)}

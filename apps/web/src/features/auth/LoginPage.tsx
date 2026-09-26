@@ -66,6 +66,9 @@ export function LoginPage() {
         <Button type="submit" size="lg" fullWidth loading={login.isPending}>
           {t('auth.login.submit')}
         </Button>
+        <Link to="/reset-password" className="inline-flex min-h-touch items-center self-center text-sm font-semibold text-primary underline-offset-4 hover:underline">
+          {t('reset.forgot')}
+        </Link>
       </form>
     </AuthLayout>
   );

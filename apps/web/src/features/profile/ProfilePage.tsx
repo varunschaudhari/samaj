@@ -1,5 +1,5 @@
 import { formatPhone } from '@samaj/shared';
-import { House, LogOut, Pencil } from 'lucide-react';
+import { House, KeyRound, LogOut, Pencil } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
 import { LanguageSwitch } from '@/components/layout/LanguageSwitch';
@@ -11,6 +11,7 @@ import { useFamily } from '@/features/families/api';
 import { FamilyStatusBadge } from '@/features/families/FamilyStatusBadge';
 import { MemberFormModal } from '@/features/families/MemberFormModal';
 import { useLanguageStore, useT } from '@/i18n';
+import { ChangePasswordModal } from './ChangePasswordModal';
 
 function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -29,6 +30,7 @@ export function ProfilePage() {
   const logout = useLogout();
   const family = useFamily(me.data?.familyId);
   const [editing, setEditing] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   // RequireAuth guarantees a user here.
   const user = me.data;
@@ -79,6 +81,14 @@ export function ProfilePage() {
         <LanguageSwitch className="self-start" />
       </Card>
 
+      <Card padding="lg" className="flex flex-col gap-3">
+        <CardTitle>{t('password.title')}</CardTitle>
+        <p className="max-w-prose text-sm text-fg-muted">{t('password.cardBody')}</p>
+        <Button variant="secondary" leadingIcon={KeyRound} className="self-start" onClick={() => setChangingPassword(true)}>
+          {t('password.change')}
+        </Button>
+      </Card>
+
       <Button
         variant="secondary"
         leadingIcon={LogOut}
@@ -89,6 +99,7 @@ export function ProfilePage() {
         {t('auth.logout')}
       </Button>
 
+      <ChangePasswordModal open={changingPassword} onClose={() => setChangingPassword(false)} />
       {self && <MemberFormModal familyId={user.familyId} member={self} open={editing} onClose={() => setEditing(false)} />}
     </div>
   );

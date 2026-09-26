@@ -7,7 +7,10 @@ import { useMe } from '@/features/auth/api';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { RedirectIfAuthed, RequireAuth } from '@/features/auth/RequireAuth';
 import { SignupPage } from '@/features/auth/SignupPage';
+import { AdminIndex, AdminLayout } from '@/features/admin/AdminLayout';
+import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
 import { BranchesPage } from '@/features/branches/BranchesPage';
+import { PeoplePage } from '@/features/users/PeoplePage';
 import { DirectoryPage } from '@/features/directory/DirectoryPage';
 import { NotFoundPage } from '@/features/errors/NotFoundPage';
 import { FamilyPage, MyFamilyRedirect } from '@/features/families/FamilyPage';
@@ -28,6 +31,7 @@ export const router = createBrowserRouter([
     children: [
       { path: '/login', element: <RedirectIfAuthed><LoginPage /></RedirectIfAuthed> },
       { path: '/signup', element: <RedirectIfAuthed><SignupPage /></RedirectIfAuthed> },
+      { path: '/reset-password', element: <RedirectIfAuthed><ResetPasswordPage /></RedirectIfAuthed> },
       // Public so the design system can be reviewed without an account.
       { path: '/styleguide', element: <StyleguidePage /> },
       {
@@ -38,7 +42,17 @@ export const router = createBrowserRouter([
           { path: '/family', element: <MyFamilyRedirect /> },
           { path: '/families/:familyId', element: <FamilyPage /> },
           { path: '/review', element: <RequirePermission permission="member:verify"><ReviewPage /></RequirePermission> },
-          { path: '/branches', element: <RequirePermission permission="branch:manage"><BranchesPage /></RequirePermission> },
+          {
+            path: '/admin',
+            element: <AdminLayout />,
+            children: [
+              { index: true, element: <AdminIndex /> },
+              { path: 'people', element: <RequirePermission permission="user:assign-role"><PeoplePage /></RequirePermission> },
+              { path: 'branches', element: <RequirePermission permission="branch:manage"><BranchesPage /></RequirePermission> },
+            ],
+          },
+          // Old address from before People and Branches were grouped under Admin.
+          { path: '/branches', element: <Navigate to="/admin/branches" replace /> },
           { path: '/profile', element: <ProfilePage /> },
         ],
       },

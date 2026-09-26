@@ -23,7 +23,7 @@ function isErrorBody(value: unknown): value is ApiErrorBody {
 }
 
 // Auth endpoints that must never trigger a refresh-and-retry.
-const NO_REFRESH = new Set(['/auth/login', '/auth/signup', '/auth/refresh', '/auth/logout']);
+const NO_REFRESH = new Set(['/auth/login', '/auth/signup', '/auth/refresh', '/auth/logout', '/auth/reset-password']);
 
 let refreshInFlight: Promise<boolean> | null = null;
 let onSessionExpired: (() => void) | null = null;

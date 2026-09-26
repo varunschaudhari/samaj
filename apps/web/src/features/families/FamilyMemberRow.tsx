@@ -1,5 +1,5 @@
 import { type FamilyMember, formatPhone } from '@samaj/shared';
-import { GraduationCap, Pencil, Phone, Trash2 } from 'lucide-react';
+import { GraduationCap, KeyRound, Pencil, Phone, Trash2 } from 'lucide-react';
 import { Avatar, Badge, Icon, IconButton, Skeleton, buttonVariants } from '@/components/ui';
 import { useT } from '@/i18n';
 import { cn } from '@/lib/cn';
@@ -9,9 +9,10 @@ interface FamilyMemberRowProps {
   canEdit: boolean;
   onEdit: () => void;
   onRemove: () => void;
+  onResetPassword: () => void;
 }
 
-export function FamilyMemberRow({ member, canEdit, onEdit, onRemove }: FamilyMemberRowProps) {
+export function FamilyMemberRow({ member, canEdit, onEdit, onRemove, onResetPassword }: FamilyMemberRowProps) {
   const t = useT();
   const age = member.birthYear ? new Date().getFullYear() - member.birthYear : null;
   const removable = canEdit && !member.isHead && !member.hasAccount;
@@ -43,9 +44,10 @@ export function FamilyMemberRow({ member, canEdit, onEdit, onRemove }: FamilyMem
           </a>
         )}
       </div>
-      {canEdit && (
+      {(canEdit || member.canResetPassword) && (
         <div className="flex shrink-0">
-          <IconButton icon={Pencil} label={t('family.editMember', { name: member.name })} onClick={onEdit} />
+          {member.canResetPassword && <IconButton icon={KeyRound} label={t('reset.createFor', { name: member.name })} onClick={onResetPassword} />}
+          {canEdit && <IconButton icon={Pencil} label={t('family.editMember', { name: member.name })} onClick={onEdit} />}
           {removable && <IconButton icon={Trash2} label={t('family.removeMember', { name: member.name })} onClick={onRemove} />}
         </div>
       )}

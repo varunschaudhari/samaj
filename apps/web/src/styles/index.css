@@ -53,6 +53,8 @@
 @theme inline {
   --font-sans: var(--font-body-stack);
   --font-display: var(--font-display-stack);
+  /* For codes people read aloud, like password reset codes. */
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, 'Liberation Mono', monospace;
 
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);

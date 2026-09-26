@@ -1,7 +1,6 @@
 import type { BranchSummary } from '@samaj/shared';
 import { Network, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge, Button, Card, EmptyState, ErrorState, IconButton, Modal, Skeleton, toast } from '@/components/ui';
 import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { branchName } from './api';
@@ -121,18 +120,15 @@ export function BranchesPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5">
-      <PageHeader
-        title={t('branches.title')}
-        description={
-          summaries.data ? (
-            <span className="tabular-nums">{t('branches.subtitle', { districts: districts.length, places: all.length - districts.length })}</span>
-          ) : (
-            <Skeleton className="h-4 w-40" />
-          )
-        }
-        actions={districts.length > 0 ? addDistrict : undefined}
-      />
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {summaries.data ? (
+          <p className="text-sm text-fg-muted tabular-nums">{t('branches.subtitle', { districts: districts.length, places: all.length - districts.length })}</p>
+        ) : (
+          <Skeleton className="h-4 w-40" />
+        )}
+        {districts.length > 0 && addDistrict}
+      </div>
       {body}
 
       <BranchFormModal target={formTarget} onClose={() => setFormTarget(null)} />
