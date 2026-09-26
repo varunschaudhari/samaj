@@ -8,7 +8,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "node ../../scripts/vitest.mjs run"
   },
   "dependencies": {
     "zod": "^4.6.5"
