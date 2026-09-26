@@ -1,11 +1,12 @@
 import { can } from '@samaj/shared';
-import { LogOut, UserRound } from 'lucide-react';
+import { LogOut, UserRound, WifiOff } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router';
 import { Avatar, Button, Icon, Tooltip, toast } from '@/components/ui';
 import { useLogout, useMe } from '@/features/auth/api';
 import { usePendingCount } from '@/features/families/api';
 import { formatNumber, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
+import { useOnline } from '@/lib/offline';
 import { BrandMark } from './BrandMark';
 import { LanguageSwitch } from './LanguageSwitch';
 import { type NavItem, visibleNavItems } from './nav-items';
@@ -36,6 +37,7 @@ export function AppShell() {
   const t = useT();
   const logout = useLogout();
   const me = useMe();
+  const online = useOnline();
   const role = me.data?.role;
   const items = visibleNavItems(role);
   const pending = usePendingCount(Boolean(role && can(role, 'member:verify')));
@@ -97,6 +99,12 @@ export function AppShell() {
           </div>
         </header>
 
+        {!online && (
+          <p role="status" className="sticky top-15 z-20 flex items-center justify-center gap-2 bg-warning-soft px-4 py-2 text-center text-sm text-fg md:top-0">
+            <Icon icon={WifiOff} size="sm" className="text-warning" />
+            {t('offline.banner')}
+          </p>
+        )}
         <main id="main" tabIndex={-1} className="flex-1 px-4 pt-5 pb-28 focus:outline-none sm:px-6 md:px-8 md:pt-8 md:pb-12">
           <Outlet />
         </main>

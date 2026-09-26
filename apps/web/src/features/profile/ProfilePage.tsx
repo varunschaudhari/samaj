@@ -1,5 +1,5 @@
 import { formatPhone } from '@samaj/shared';
-import { House, KeyRound, LogOut, Pencil } from 'lucide-react';
+import { Download, House, KeyRound, LogOut, Pencil } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
 import { LanguageSwitch } from '@/components/layout/LanguageSwitch';
@@ -11,6 +11,7 @@ import { useFamily } from '@/features/families/api';
 import { FamilyStatusBadge } from '@/features/families/FamilyStatusBadge';
 import { MemberFormModal } from '@/features/families/MemberFormModal';
 import { useLanguageStore, useT } from '@/i18n';
+import { promptInstall, useInstallStore } from '@/lib/offline';
 import { ChangePasswordModal } from './ChangePasswordModal';
 
 function Detail({ label, children }: { label: string; children: ReactNode }) {
@@ -31,6 +32,7 @@ export function ProfilePage() {
   const family = useFamily(me.data?.familyId);
   const [editing, setEditing] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const canInstall = useInstallStore((s) => s.prompt !== null && !s.installed);
 
   // RequireAuth guarantees a user here.
   const user = me.data;
@@ -80,6 +82,16 @@ export function ProfilePage() {
         <p className="max-w-prose text-sm text-fg-muted">{t('profile.languageHint')}</p>
         <LanguageSwitch className="self-start" />
       </Card>
+
+      {canInstall && (
+        <Card padding="lg" className="flex flex-col gap-3 border-primary">
+          <CardTitle>{t('install.title')}</CardTitle>
+          <p className="max-w-prose text-sm text-fg-muted">{t('install.body')}</p>
+          <Button leadingIcon={Download} className="self-start" onClick={() => void promptInstall().then((ok) => ok && toast.success(t('install.done')))}>
+            {t('install.button')}
+          </Button>
+        </Card>
+      )}
 
       <Card padding="lg" className="flex flex-col gap-3">
         <CardTitle>{t('password.title')}</CardTitle>

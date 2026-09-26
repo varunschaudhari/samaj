@@ -2,6 +2,7 @@ import type { Language, LoginInput, PublicUser, SignupInput } from '@samaj/share
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLanguageStore } from '@/i18n';
 import { ApiError, api } from '@/lib/api';
+import { clearOfflineData } from '@/lib/offline';
 
 export const meKey = ['me'] as const;
 
@@ -27,6 +28,7 @@ function useOnSignedIn() {
   const setLanguage = useLanguageStore((s) => s.setLanguage);
   return (user: PublicUser) => {
     // Anything cached belonged to the previous (or no) user.
+    void clearOfflineData();
     queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
     queryClient.setQueryData(meKey, user);
     setLanguage(user.language);
@@ -55,6 +57,7 @@ export function useLogout() {
     mutationFn: () => api.post<void>('/auth/logout'),
     // Sign out locally even if the request failed; the cookies expire anyway.
     onSettled: () => {
+      void clearOfflineData();
       queryClient.clear();
       queryClient.setQueryData(meKey, null);
     },

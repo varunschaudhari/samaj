@@ -385,6 +385,12 @@ export const mr: Record<MessageKey, string> = {
   'events.goneTitle': 'हा कार्यक्रम आता उपलब्ध नाही',
   'events.goneBody': 'समितीने तो काढला असेल.',
 
+  'offline.banner': 'तुम्ही ऑफलाइन आहात. या फोनवर जतन केलेली माहिती दाखवत आहोत.',
+  'install.title': 'हा फोनवर समाज ॲप इन्स्टॉल करा',
+  'install.body': 'होम स्क्रीनवरून ॲपसारखे उघडते, लवकर लोड होते, आणि इंटरनेट नसतानाही तुम्ही पाहिलेली सदस्य सूची व सूचना दाखवते.',
+  'install.button': 'ॲप इन्स्टॉल करा',
+  'install.done': 'समाज ॲप तुमच्या होम स्क्रीनवर आहे.',
+
   'status.pending': 'पडताळणी बाकी',
   'status.verified': 'पडताळलेले',
   'status.rejected': 'बदल आवश्यक',

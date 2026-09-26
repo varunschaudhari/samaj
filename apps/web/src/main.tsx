@@ -6,12 +6,18 @@ import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
 import { Toaster } from '@/components/ui';
 import { meKey } from '@/features/auth/api';
 import { setSessionExpiredHandler } from '@/lib/api';
+import { listenForInstallPrompt } from '@/lib/offline';
+import { registerSW } from 'virtual:pwa-register';
 import { queryClient } from '@/lib/query-client';
 import { router } from './router';
 import './styles/index.css';
 
 // When a refresh fails mid-session, drop the user; RequireAuth then redirects to sign in.
 setSessionExpiredHandler(() => queryClient.setQueryData(meKey, null));
+
+// Offline support and "Add to home screen". The service worker exists only in production builds.
+listenForInstallPrompt();
+if (import.meta.env.PROD) registerSW({ immediate: true });
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root element in index.html');

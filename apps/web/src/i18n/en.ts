@@ -387,6 +387,12 @@ export const en = {
   'events.goneTitle': 'This event is no longer available',
   'events.goneBody': 'It may have been removed by the committee.',
 
+  'offline.banner': "You're offline. Showing what was saved on this phone.",
+  'install.title': 'Install Samaj on this phone',
+  'install.body': 'Opens from your home screen like an app, loads faster, and shows the directory and notices you have seen even without internet.',
+  'install.button': 'Install app',
+  'install.done': 'Samaj is on your home screen.',
+
   'status.pending': 'Waiting for verification',
   'status.verified': 'Verified',
   'status.rejected': 'Changes requested',
