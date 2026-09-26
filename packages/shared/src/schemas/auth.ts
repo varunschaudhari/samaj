@@ -91,6 +91,12 @@ export const VALIDATION_KEYS = [
   'validation.noticeBody',
   'validation.noticeBranch',
   'validation.pinLimit',
+  'validation.mapUrl',
+  'validation.eventDate',
+  'validation.eventEnd',
+  'validation.venue',
+  'validation.rsvpPeople',
+  'validation.rsvpClosed',
   // Produced by the API rather than a schema, but translated the same way.
   'validation.phoneTaken',
   'validation.relationHead',

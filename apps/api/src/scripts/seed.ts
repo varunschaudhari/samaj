@@ -15,6 +15,8 @@ import { SessionModel } from '../models/session.model';
 import { UserModel } from '../models/user.model';
 import { InterestModel } from '../models/interest.model';
 import { NoticeModel } from '../models/notice.model';
+import { EventModel } from '../models/event.model';
+import { RsvpModel } from '../models/rsvp.model';
 import { ProfileModel } from '../models/profile.model';
 import { ineligibility } from '../services/matrimony.service';
 
@@ -173,7 +175,7 @@ function household(i: number): PersonSeed[] {
 
 async function main() {
   await connectDb(env.MONGODB_URI);
-  await Promise.all([BranchModel.deleteMany({}), FamilyModel.deleteMany({}), MemberModel.deleteMany({}), UserModel.deleteMany({}), SessionModel.deleteMany({}), ProfileModel.deleteMany({}), InterestModel.deleteMany({}), NoticeModel.deleteMany({})]);
+  await Promise.all([BranchModel.deleteMany({}), FamilyModel.deleteMany({}), MemberModel.deleteMany({}), UserModel.deleteMany({}), SessionModel.deleteMany({}), ProfileModel.deleteMany({}), InterestModel.deleteMany({}), NoticeModel.deleteMany({}), EventModel.deleteMany({}), RsvpModel.deleteMany({})]);
 
   const places = await insertBranches(BRANCHES, null);
   const byName = async (name: string) => (await BranchModel.findOne({ name }).orFail().lean()) as BranchDoc;
@@ -326,6 +328,56 @@ async function main() {
       publishedAt: new Date(Date.now() - ago * day),
     })),
   );
+
+  // Events: two coming up (one with RSVPs already), one past.
+  const dharangaonBranch = await byName('Dharangaon');
+  const at = (days: number, hour: number) => {
+    const d = new Date(Date.now() + days * day);
+    d.setHours(hour, 0, 0, 0);
+    return d;
+  };
+  const [gathering] = await EventModel.insertMany([
+    {
+      title: 'Annual samaj gathering',
+      description: 'Cultural programme, felicitation of students who did well in exams, and lunch. Families are requested to RSVP so the committee can plan food.',
+      startsAt: at(20, 10),
+      endsAt: at(20, 16),
+      venue: 'Samaj hall, Amalner',
+      mapUrl: 'https://maps.google.com/?q=Amalner',
+      branchId: districtBranch._id,
+      branchAncestors: districtBranch.ancestors,
+      createdByUserId: secretary._id,
+      createdByName: secretary.name,
+    },
+    {
+      title: 'Blood donation camp',
+      description: 'Donors must be 18 to 60 years old and weigh over 45 kg. Please eat before you come.',
+      startsAt: at(7, 9),
+      endsAt: at(7, 13),
+      venue: 'Samaj hall, Dharangaon',
+      mapUrl: null,
+      branchId: dharangaonBranch._id,
+      branchAncestors: dharangaonBranch.ancestors,
+      createdByUserId: secretary._id,
+      createdByName: secretary.name,
+    },
+    {
+      title: 'Ganeshotsav aarti',
+      description: 'Evening aarti followed by prasad.',
+      startsAt: at(-20, 19),
+      endsAt: at(-20, 21),
+      venue: 'Samaj mandir, Amalner',
+      mapUrl: null,
+      branchId: amalnerBranch._id,
+      branchAncestors: amalnerBranch.ancestors,
+      createdByUserId: secretary._id,
+      createdByName: secretary.name,
+    },
+  ]);
+  if (gathering) {
+    const attending = await FamilyModel.find({ status: 'verified' }).limit(6).lean();
+    await RsvpModel.insertMany(attending.map((f, i) => ({ eventId: gathering._id, familyId: f._id, people: 2 + (i % 4), byUserId: secretary._id })));
+  }
 
   process.stdout.write(
     `\nSeeded ${await BranchModel.countDocuments()} branches, ${families.length} families, ${people} people and ${profileCount} matrimonial profiles.\n\nSign in with any of these (password: ${DEV_PASSWORD}):\n` +

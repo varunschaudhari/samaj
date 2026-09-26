@@ -2,33 +2,16 @@ import { MAX_PINNED_NOTICES, type Notice, type NoticeFeed, type noticeInputSchem
 import { type QueryFilter, Types } from 'mongoose';
 import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
-import { FamilyModel } from '../models/family.model';
 import { type NoticeDoc, NoticeModel } from '../models/notice.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { hasReach } from './access';
+import { branchAudience } from './audience';
 import type { Viewer } from './viewer';
 
 type Input = z.output<typeof noticeInputSchema>;
 type ListQuery = z.output<typeof noticeListQuerySchema>;
 
 const noticeGone = () => notFound('That notice is no longer available.');
-
-/**
- * Which notices a viewer sees: those posted to their family's branch or any
- * branch above it (a district notice reaches its towns), plus, for committee
- * members, everything they could post to themselves. Admins see all.
- */
-async function audienceFilter(viewer: Viewer): Promise<QueryFilter<NoticeDoc>> {
-  if (viewer.role === 'admin') return {};
-  const family = await FamilyModel.findById(viewer.familyId, { branchId: 1, branchAncestors: 1 }).lean();
-  const home = family ? [family.branchId, ...family.branchAncestors] : [];
-  const or: QueryFilter<NoticeDoc>[] = [{ branchId: { $in: home } }];
-  if (viewer.role === 'committee') {
-    const scope = new Types.ObjectId(viewer.branchId);
-    or.push({ branchId: scope }, { branchAncestors: scope });
-  }
-  return { $or: or };
-}
 
 async function toNotices(viewer: Viewer, docs: NoticeDoc[]): Promise<Notice[]> {
   const branches = await BranchModel.find({ _id: { $in: docs.map((d) => d.branchId) } }).lean();
@@ -68,7 +51,7 @@ function decodeCursor(cursor: string): { at: Date; id: Types.ObjectId } {
 
 /** Pinned notices first (on the first page only), then newest first. */
 export async function listNotices(viewer: Viewer, query: ListQuery): Promise<NoticeFeed> {
-  const conditions: QueryFilter<NoticeDoc>[] = [{ removedAt: null }, await audienceFilter(viewer)];
+  const conditions: QueryFilter<NoticeDoc>[] = [{ removedAt: null }, (await branchAudience(viewer)) as QueryFilter<NoticeDoc>];
   if (query.kind) conditions.push({ kind: query.kind });
 
   const page: QueryFilter<NoticeDoc>[] = [...conditions, { pinned: false }];
