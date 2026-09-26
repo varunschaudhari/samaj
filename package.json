@@ -1,0 +1,25 @@
+{
+  "name": "samaj",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"npm:dev -w @samaj/api\" \"npm:dev -w @samaj/web\"",
+    "db:up": "docker compose up -d mongo",
+    "db:down": "docker compose down",
+    "seed": "npm run seed -w @samaj/api",
+    "build": "npm run build -w @samaj/api && npm run build -w @samaj/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5",
+    "typescript": "^7.0.2"
+  }
+}
