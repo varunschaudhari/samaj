@@ -1,21 +1,23 @@
 import type { BranchSummary } from '@samaj/shared';
-import { Network, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Network, Pencil, Plus, Trash2, UsersRound } from 'lucide-react';
 import { useState } from 'react';
 import { Badge, Button, Card, EmptyState, ErrorState, IconButton, Modal, Skeleton, toast } from '@/components/ui';
 import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { branchName } from './api';
 import { useBranchSummaries, useDeleteBranch } from './admin-api';
+import { BranchCommitteeModal } from './BranchCommitteeModal';
 import { type BranchFormTarget, BranchFormModal } from './BranchFormModal';
 
 interface RowProps {
   branch: BranchSummary;
   onRename: () => void;
   onRemove: () => void;
+  onCommittee: () => void;
   heading?: boolean;
 }
 
 /** One branch: its name in both languages, how many families it has, and actions. */
-function BranchRow({ branch, onRename, onRemove, heading }: RowProps) {
+function BranchRow({ branch, onRename, onRemove, onCommittee, heading }: RowProps) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
   const primary = branchName(branch, language);
@@ -35,8 +37,14 @@ function BranchRow({ branch, onRename, onRemove, heading }: RowProps) {
           <span lang={language === 'mr' ? 'en' : 'mr'}>{secondary}</span> ·{' '}
           <span className="tabular-nums">{t('branches.families', { count: branch.familyCount })}</span>
         </p>
+        <p className="text-sm text-fg-muted">
+          {branch.committee.length > 0
+            ? t('branchCommittee.summary', { names: branch.committee.map((c) => c.name).join(', ') })
+            : t('branchCommittee.summaryNone')}
+        </p>
       </div>
       <div className="flex shrink-0">
+        <IconButton icon={UsersRound} label={t('branchCommittee.manage', { branch: primary })} onClick={onCommittee} />
         <IconButton icon={Pencil} label={t('branches.edit', { name: primary })} onClick={onRename} />
         {removable && <IconButton icon={Trash2} label={t('branches.remove', { name: primary })} onClick={onRemove} />}
       </div>
@@ -69,6 +77,7 @@ export function BranchesPage() {
   const remove = useDeleteBranch();
   const [formTarget, setFormTarget] = useState<BranchFormTarget | null>(null);
   const [removing, setRemoving] = useState<BranchSummary | null>(null);
+  const [committeeFor, setCommitteeFor] = useState<string | null>(null);
 
   const all = summaries.data ?? [];
   const districts = all.filter((b) => b.parentId === null);
@@ -95,7 +104,13 @@ export function BranchesPage() {
           const places = placesIn(district.id);
           return (
             <Card as="li" key={district.id} className="flex flex-col gap-1">
-              <BranchRow branch={district} heading onRename={() => setFormTarget({ mode: 'rename', branch: district })} onRemove={() => setRemoving(district)} />
+              <BranchRow
+                branch={district}
+                heading
+                onRename={() => setFormTarget({ mode: 'rename', branch: district })}
+                onRemove={() => setRemoving(district)}
+                onCommittee={() => setCommitteeFor(district.id)}
+              />
               <div className="border-t border-line">
                 {places.length === 0 ? (
                   <p className="py-3 text-sm text-fg-muted">{t('branches.noPlaces')}</p>
@@ -103,7 +118,12 @@ export function BranchesPage() {
                   <ul className="divide-y divide-line">
                     {places.map((place) => (
                       <li key={place.id} className="pl-3">
-                        <BranchRow branch={place} onRename={() => setFormTarget({ mode: 'rename', branch: place })} onRemove={() => setRemoving(place)} />
+                        <BranchRow
+                          branch={place}
+                          onRename={() => setFormTarget({ mode: 'rename', branch: place })}
+                          onRemove={() => setRemoving(place)}
+                          onCommittee={() => setCommitteeFor(place.id)}
+                        />
                       </li>
                     ))}
                   </ul>
@@ -132,6 +152,8 @@ export function BranchesPage() {
       {body}
 
       <BranchFormModal target={formTarget} onClose={() => setFormTarget(null)} />
+      {/* Looked up from the live list, so the modal shows changes as soon as they save. */}
+      <BranchCommitteeModal branch={all.find((b) => b.id === committeeFor) ?? null} onClose={() => setCommitteeFor(null)} />
       <Modal
         open={removing !== null}
         onClose={() => setRemoving(null)}

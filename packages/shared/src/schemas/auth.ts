@@ -81,6 +81,7 @@ export const VALIDATION_KEYS = [
   'validation.branchParentInvalid',
   'validation.role',
   'validation.roleProtected',
+  'validation.alreadyAdmin',
   'validation.resetCode',
   'validation.currentPasswordWrong',
   'validation.choose',

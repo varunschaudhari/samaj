@@ -19,6 +19,20 @@ export const officeBearerInputSchema = z.object({
 });
 export type OfficeBearerInput = z.input<typeof officeBearerInputSchema>;
 
+/**
+ * Make someone a committee member for a branch from the Branches screen, and
+ * optionally list them on that branch's Committee page under a post.
+ */
+export const assignCommitteeSchema = z.object({
+  userId: objectIdSchema,
+  listAs: z
+    .string()
+    .nullish()
+    .transform((v) => v || null)
+    .pipe(z.enum(OFFICE_POSTS, { error: 'validation.choose' }).nullable()),
+});
+export type AssignCommitteeInput = z.input<typeof assignCommitteeSchema>;
+
 export interface OfficeBearer {
   id: string;
   post: OfficePost;

@@ -49,4 +49,6 @@ export type BranchUpdateInput = z.input<typeof branchUpdateSchema>;
 export interface BranchSummary extends Branch {
   familyCount: number;
   childCount: number;
+  /** Accounts with the committee role for exactly this branch. */
+  committee: { userId: string; name: string; phone: string }[];
 }

@@ -26,9 +26,10 @@ export async function listBranches(): Promise<Branch[]> {
 
 /** For the admin screen: every branch with how many families and sub-branches it has. */
 export async function listBranchSummaries(): Promise<BranchSummary[]> {
-  const [docs, familyCounts] = await Promise.all([
+  const [docs, familyCounts, committee] = await Promise.all([
     BranchModel.find().lean(),
     FamilyModel.aggregate<{ _id: Types.ObjectId; n: number }>([{ $group: { _id: '$branchId', n: { $sum: 1 } } }]),
+    UserModel.find({ role: 'committee' }, { name: 1, phone: 1, branchId: 1 }).sort({ name: 1 }).lean(),
   ]);
   const families = new Map(familyCounts.map((c) => [String(c._id), c.n]));
   const children = new Map<string, number>();
@@ -38,6 +39,9 @@ export async function listBranchSummaries(): Promise<BranchSummary[]> {
     ...toBranch(b),
     familyCount: families.get(String(b._id)) ?? 0,
     childCount: children.get(String(b._id)) ?? 0,
+    committee: committee
+      .filter((u) => String(u.branchId) === String(b._id))
+      .map((u) => ({ userId: String(u._id), name: u.name, phone: u.phone })),
   }));
 }
 

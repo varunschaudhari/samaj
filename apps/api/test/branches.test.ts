@@ -1,6 +1,9 @@
 import type { Branch, BranchSummary } from '@samaj/shared';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { FamilyModel } from '../src/models/family.model';
+import { OfficeBearerModel } from '../src/models/office-bearer.model';
+import { RoleChangeModel } from '../src/models/role-change.model';
+import { UserModel } from '../src/models/user.model';
 import { api, clearDb, createFamily, seedBranches, startDb, stopDb } from './helpers';
 
 beforeAll(startDb);
@@ -79,5 +82,54 @@ describe('managing branches', () => {
       expect((await api.post('/api/branches').set('Cookie', cookie).send(town(branches.district))).status).toBe(403);
       expect((await api.get('/api/branches/summary').set('Cookie', cookie)).status).toBe(403);
     }
+  });
+
+  describe('committee per branch', () => {
+    const userOf = async (familyId: string) => UserModel.findOne({ familyId }).orFail().lean();
+
+    it('makes someone committee for a town, lists them, and shows them on the branch', async () => {
+      const person = await createFamily(branches.bhusawal, { account: 'member', people: [{ name: 'Kavita Dhole' }] });
+      const user = await userOf(person.familyId);
+
+      const res = await api.post(`/api/branches/${branches.amalner}/committee`).set('Cookie', admin).send({ userId: String(user._id), listAs: 'secretary' });
+      expect(res.status).toBe(201);
+      expect(res.body.user).toMatchObject({ role: 'committee', branch: { name: 'Amalner' } });
+      expect(await RoleChangeModel.countDocuments({ userId: user._id, toRole: 'committee' })).toBe(1);
+      expect(await OfficeBearerModel.findOne({ branchId: branches.amalner }).lean()).toMatchObject({ post: 'secretary', name: 'Kavita Dhole', phone: user.phone });
+
+      const items = (await api.get('/api/branches/summary').set('Cookie', admin)).body.items as BranchSummary[];
+      expect(items.find((b) => b.name === 'Amalner')?.committee).toEqual([{ userId: String(user._id), name: 'Kavita Dhole', phone: user.phone }]);
+
+      // Adding again doesn't list them twice.
+      await api.post(`/api/branches/${branches.amalner}/committee`).set('Cookie', admin).send({ userId: String(user._id), listAs: 'secretary' });
+      expect(await OfficeBearerModel.countDocuments({ branchId: branches.amalner })).toBe(1);
+    });
+
+    it('removes them: back to member in their own branch, and off the listing', async () => {
+      const person = await createFamily(branches.bhusawal, { account: 'member' });
+      const user = await userOf(person.familyId);
+      await api.post(`/api/branches/${branches.amalner}/committee`).set('Cookie', admin).send({ userId: String(user._id), listAs: 'member' });
+
+      const res = await api.delete(`/api/branches/${branches.amalner}/committee/${user._id}`).set('Cookie', admin);
+      expect(res.status).toBe(200);
+      expect(res.body.user).toMatchObject({ role: 'member', branch: { name: 'Bhusawal' } });
+      expect(await OfficeBearerModel.countDocuments({ branchId: branches.amalner })).toBe(0);
+
+      // Not on that committee any more.
+      expect((await api.delete(`/api/branches/${branches.amalner}/committee/${user._id}`).set('Cookie', admin)).status).toBe(404);
+    });
+
+    it("won't turn an admin into committee, and is closed to committee members", async () => {
+      const otherAdmin = await createFamily(branches.pune, { account: 'admin' });
+      const adminUser = await userOf(otherAdmin.familyId);
+      const res = await api.post(`/api/branches/${branches.amalner}/committee`).set('Cookie', admin).send({ userId: String(adminUser._id) });
+      expect(res.status).toBe(409);
+      expect(res.body.error.issues).toEqual([{ path: 'userId', message: 'validation.alreadyAdmin' }]);
+
+      const committee = (await createFamily(branches.district, { account: 'committee' })).cookie;
+      const person = await createFamily(branches.bhusawal, { account: 'member' });
+      const user = await userOf(person.familyId);
+      expect((await api.post(`/api/branches/${branches.amalner}/committee`).set('Cookie', committee).send({ userId: String(user._id) })).status).toBe(403);
+    });
   });
 });

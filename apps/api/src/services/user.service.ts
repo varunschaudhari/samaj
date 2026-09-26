@@ -1,13 +1,15 @@
-import { type AdminUser, type AdminUserDetail, type AdminUserPage, PROTECTED_ROLES, type Role, type RoleUpdateInput, can, type userListQuerySchema } from '@samaj/shared';
+import { type AdminUser, type AdminUserDetail, type AdminUserPage, PROTECTED_ROLES, type Role, type RoleUpdateInput, type assignCommitteeSchema, can, type userListQuerySchema } from '@samaj/shared';
 import { type QueryFilter, Types } from 'mongoose';
 import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
 import { FamilyModel } from '../models/family.model';
+import { OfficeBearerModel } from '../models/office-bearer.model';
 import { RoleChangeModel } from '../models/role-change.model';
 import { type UserDoc, UserModel } from '../models/user.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { escapeRegex } from '../utils/regex';
 import { canResetPasswordFor } from './access';
+import { addBearer } from './committee.service';
 import type { Viewer } from './viewer';
 
 type ListQuery = z.output<typeof userListQuerySchema>;
@@ -158,4 +160,40 @@ export async function updateRole(viewer: Viewer, id: string, input: RoleUpdateIn
     await user.save();
   }
   return getUser(viewer, id);
+}
+
+/**
+ * Make someone a committee member for a branch (from the Branches screen), and
+ * optionally list them on that branch's Committee page. Goes through updateRole,
+ * so the change is recorded and the usual protections apply.
+ */
+export async function assignCommittee(viewer: Viewer, branchId: string, input: z.output<typeof assignCommitteeSchema>): Promise<AdminUserDetail> {
+  if (!Types.ObjectId.isValid(branchId) || !(await BranchModel.exists({ _id: branchId }))) throw notFound('That branch no longer exists.');
+  const user = await loadUser(input.userId);
+  // Admins already act in every branch; making one "committee" would quietly demote them.
+  if (PROTECTED_ROLES.includes(user.role)) {
+    throw new AppError(409, 'CONFLICT', 'This person is an admin, so they already work in every branch.', [{ path: 'userId', message: 'validation.alreadyAdmin' }]);
+  }
+
+  const detail = await updateRole(viewer, input.userId, { role: 'committee', branchId });
+
+  if (input.listAs && !(await OfficeBearerModel.exists({ branchId, phone: user.phone }))) {
+    await addBearer(viewer, { branchId, post: input.listAs, name: user.name, phone: user.phone });
+  }
+  return detail;
+}
+
+/**
+ * Take someone off a branch's committee: they become a member again, back in
+ * their own family's branch, and leave that branch's Committee page.
+ */
+export async function removeCommittee(viewer: Viewer, branchId: string, userId: string): Promise<AdminUserDetail> {
+  const user = await loadUser(userId);
+  if (user.role !== 'committee' || String(user.branchId) !== branchId) throw notFound('This person is not on that committee.');
+  const family = await FamilyModel.findById(user.familyId, { branchId: 1 }).lean();
+  const home = family ? String(family.branchId) : branchId;
+
+  const detail = await updateRole(viewer, userId, { role: 'member', branchId: home });
+  await OfficeBearerModel.deleteMany({ branchId, phone: user.phone });
+  return detail;
 }
