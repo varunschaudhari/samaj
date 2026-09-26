@@ -36,7 +36,8 @@ export function Field({
 }: FieldProps & { children: (control: FieldControlProps) => ReactNode }) {
   const generated = useId();
   const id = idProp ?? generated;
-  const hintId = hint ? `${id}-hint` : undefined;
+  const showHint = Boolean(hint) && !error;
+  const hintId = showHint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = [errorId, hintId].filter(Boolean).join(' ') || undefined;
 
@@ -53,7 +54,7 @@ export function Field({
           {error}
         </p>
       )}
-      {hint && (
+      {showHint && (
         <p id={hintId} className="text-sm text-fg-muted">
           {hint}
         </p>

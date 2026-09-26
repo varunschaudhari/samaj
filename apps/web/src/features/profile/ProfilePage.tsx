@@ -1,11 +1,15 @@
 import { formatPhone } from '@samaj/shared';
-import { LogOut } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { House, LogOut, Pencil } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
+import { Link } from 'react-router';
 import { LanguageSwitch } from '@/components/layout/LanguageSwitch';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Avatar, Badge, Button, Card, CardTitle, Skeleton, toast } from '@/components/ui';
+import { Avatar, Badge, Button, Card, CardTitle, Icon, Skeleton, buttonVariants, toast } from '@/components/ui';
 import { useLogout, useMe } from '@/features/auth/api';
 import { branchName, useBranches } from '@/features/branches/api';
+import { useFamily } from '@/features/families/api';
+import { FamilyStatusBadge } from '@/features/families/FamilyStatusBadge';
+import { MemberFormModal } from '@/features/families/MemberFormModal';
 import { useLanguageStore, useT } from '@/i18n';
 
 function Detail({ label, children }: { label: string; children: ReactNode }) {
@@ -23,11 +27,15 @@ export function ProfilePage() {
   const me = useMe();
   const branches = useBranches();
   const logout = useLogout();
+  const family = useFamily(me.data?.familyId);
+  const [editing, setEditing] = useState(false);
+
   // RequireAuth guarantees a user here.
   const user = me.data;
   if (!user) return null;
 
   const branch = branches.data?.find((b) => b.id === user.branchId);
+  const self = family.data?.members.find((m) => m.id === user.memberId) ?? null;
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5">
@@ -35,8 +43,8 @@ export function ProfilePage() {
 
       <Card padding="lg" className="flex flex-col gap-4">
         <div className="flex items-center gap-4">
-          <Avatar name={user.name} size="xl" />
-          <div className="flex flex-col gap-1">
+          {family.isPending ? <Skeleton className="size-16 rounded-full" /> : <Avatar name={user.name} src={self?.photoUrl} size="xl" />}
+          <div className="flex min-w-0 flex-col gap-1">
             <p className="font-display text-xl font-semibold break-words text-fg sm:text-2xl">{user.name}</p>
             <Badge tone={user.role === 'member' ? 'neutral' : 'primary'} className="self-start">
               {t(`role.${user.role}`)}
@@ -50,7 +58,19 @@ export function ProfilePage() {
           <Detail label={t('profile.branch')}>
             {branches.isPending ? <Skeleton className="h-5 w-32" /> : branch ? branchName(branch, language) : '–'}
           </Detail>
+          <Detail label={t('profile.familyStatus')}>
+            <FamilyStatusBadge status={user.familyStatus} />
+          </Detail>
         </dl>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" leadingIcon={Pencil} disabled={!self} onClick={() => setEditing(true)}>
+            {t('profile.editDetails')}
+          </Button>
+          <Link to={`/families/${user.familyId}`} className={buttonVariants({ variant: 'ghost' })}>
+            <Icon icon={House} />
+            {t('profile.myFamily')}
+          </Link>
+        </div>
       </Card>
 
       <Card padding="lg" className="flex flex-col gap-3">
@@ -68,6 +88,8 @@ export function ProfilePage() {
       >
         {t('auth.logout')}
       </Button>
+
+      {self && <MemberFormModal familyId={user.familyId} member={self} open={editing} onClose={() => setEditing(false)} />}
     </div>
   );
 }

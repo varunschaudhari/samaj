@@ -1,12 +1,32 @@
+import { can } from '@samaj/shared';
 import { LogOut } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router';
 import { Button, Icon, IconButton, toast } from '@/components/ui';
-import { useLogout } from '@/features/auth/api';
-import { useT } from '@/i18n';
+import { useLogout, useMe } from '@/features/auth/api';
+import { usePendingCount } from '@/features/families/api';
+import { formatNumber, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { BrandMark } from './BrandMark';
 import { LanguageSwitch } from './LanguageSwitch';
-import { visibleNavItems } from './nav-items';
+import { type NavItem, visibleNavItems } from './nav-items';
+
+/** Count bubble on the Review item. The number is also spoken via sr-only text. */
+function PendingBadge({ count, className }: { count: number; className?: string }) {
+  const t = useT();
+  const language = useLanguageStore((s) => s.language);
+  if (count <= 0) return null;
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        className={cn('inline-flex min-w-5 items-center justify-center rounded-full bg-kumkum px-1.5 text-xs leading-5 font-semibold text-on-primary tabular-nums', className)}
+      >
+        {count > 99 ? '99+' : formatNumber(count, language)}
+      </span>
+      <span className="sr-only">{t('nav.pendingCount', { count })}</span>
+    </>
+  );
+}
 
 /**
  * Phones: top bar plus a bottom tab bar (icon and label, thumb-reachable).
@@ -15,7 +35,13 @@ import { visibleNavItems } from './nav-items';
 export function AppShell() {
   const t = useT();
   const logout = useLogout();
-  const items = visibleNavItems();
+  const me = useMe();
+  const role = me.data?.role;
+  const items = visibleNavItems(role);
+  const pending = usePendingCount(Boolean(role && can(role, 'member:verify')));
+  // Link straight to the family page (not the /family redirect) so the tab shows as active there.
+  const hrefFor = (item: NavItem) => (item.to === '/family' && me.data ? `/families/${me.data.familyId}` : item.to);
+  const badgeFor = (item: NavItem) => (item.pendingBadge ? (pending.data ?? 0) : 0);
 
   const signOut = () => logout.mutate(undefined, { onSettled: () => toast.info(t('auth.loggedOut')) });
 
@@ -35,7 +61,7 @@ export function AppShell() {
           {items.map((item) => (
             <NavLink
               key={item.to}
-              to={item.to}
+              to={hrefFor(item)}
               className={({ isActive }) =>
                 cn(
                   'flex min-h-touch items-center gap-3 rounded-sm px-3 font-semibold transition-colors duration-150',
@@ -44,7 +70,8 @@ export function AppShell() {
               }
             >
               <Icon icon={item.icon} size="lg" />
-              {t(item.label)}
+              <span className="flex-1">{t(item.label)}</span>
+              <PendingBadge count={badgeFor(item)} />
             </NavLink>
           ))}
         </nav>
@@ -78,18 +105,19 @@ export function AppShell() {
           {items.map((item) => (
             <NavLink
               key={item.to}
-              to={item.to}
+              to={hrefFor(item)}
               className={({ isActive }) =>
                 cn(
-                  'flex min-h-16 flex-1 flex-col items-center justify-center gap-0.5 text-xs font-semibold transition-colors duration-150',
+                  'flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-center text-xs leading-tight font-semibold transition-colors duration-150',
                   isActive ? 'text-primary' : 'text-fg-muted',
                 )
               }
             >
               {({ isActive }) => (
                 <>
-                  <span className={cn('flex h-7 w-14 items-center justify-center rounded-full', isActive && 'bg-primary-soft')}>
+                  <span className={cn('relative flex h-7 w-14 items-center justify-center rounded-full', isActive && 'bg-primary-soft')}>
                     <Icon icon={item.icon} size="lg" />
+                    <PendingBadge count={badgeFor(item)} className="absolute -top-1 right-1" />
                   </span>
                   {t(item.label)}
                 </>

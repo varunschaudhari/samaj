@@ -1,13 +1,25 @@
+import { type Permission, can } from '@samaj/shared';
+import type { ReactNode } from 'react';
 import { Navigate, createBrowserRouter } from 'react-router';
 import { AppShell } from '@/components/layout/AppShell';
 import { RouteErrorScreen } from '@/components/layout/ErrorBoundary';
+import { useMe } from '@/features/auth/api';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { RedirectIfAuthed, RequireAuth } from '@/features/auth/RequireAuth';
 import { SignupPage } from '@/features/auth/SignupPage';
 import { DirectoryPage } from '@/features/directory/DirectoryPage';
 import { NotFoundPage } from '@/features/errors/NotFoundPage';
+import { FamilyPage, MyFamilyRedirect } from '@/features/families/FamilyPage';
 import { ProfilePage } from '@/features/profile/ProfilePage';
+import { ReviewPage } from '@/features/review/ReviewPage';
 import { StyleguidePage } from '@/features/styleguide/StyleguidePage';
+
+/** Hides a page from roles without the permission. The API enforces the same rule. */
+function RequirePermission({ permission, children }: { permission: Permission; children: ReactNode }) {
+  const me = useMe();
+  if (!me.data || !can(me.data.role, permission)) return <Navigate to="/directory" replace />;
+  return children;
+}
 
 export const router = createBrowserRouter([
   {
@@ -22,6 +34,9 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/directory" replace /> },
           { path: '/directory', element: <DirectoryPage /> },
+          { path: '/family', element: <MyFamilyRedirect /> },
+          { path: '/families/:familyId', element: <FamilyPage /> },
+          { path: '/review', element: <RequirePermission permission="member:verify"><ReviewPage /></RequirePermission> },
           { path: '/profile', element: <ProfilePage /> },
         ],
       },

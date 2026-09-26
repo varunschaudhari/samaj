@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button, EmptyState, ErrorState, Icon, Input, Select, Skeleton } from '@/components/ui';
 import { useMe } from '@/features/auth/api';
+import { VerificationNotice } from '@/features/families/VerificationNotice';
 import { branchName, groupBranches, useBranches } from '@/features/branches/api';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
@@ -126,7 +127,7 @@ function Filters({ filters, update, onClear }: FiltersProps) {
   );
 }
 
-export function DirectoryPage() {
+function Directory() {
   const t = useT();
   const errorMessage = useErrorMessage();
   const me = useMe();
@@ -221,4 +222,18 @@ export function DirectoryPage() {
       {body}
     </div>
   );
+}
+
+/** Members of unverified families see where they stand instead of the directory. */
+export function DirectoryPage() {
+  const me = useMe();
+  const user = me.data;
+  if (user && user.role === 'member' && user.familyStatus !== 'verified') {
+    return (
+      <div className="mx-auto max-w-lg pt-4">
+        <VerificationNotice user={user} />
+      </div>
+    );
+  }
+  return <Directory />;
 }

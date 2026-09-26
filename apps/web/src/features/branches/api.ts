@@ -14,6 +14,16 @@ export function branchName(branch: Pick<Branch, 'name' | 'nameMr'>, language: La
   return language === 'mr' && branch.nameMr ? branch.nameMr : branch.name;
 }
 
+/**
+ * "Varangaon · Bhusawal", or just "Bhusawal" (translated) when the family
+ * lives in the branch town itself.
+ */
+export function placeLabel(place: string, branch: Pick<Branch, 'name' | 'nameMr'>, language: Language): string {
+  const name = branchName(branch, language);
+  if (!name) return place;
+  return place === branch.name ? name : `${place} · ${name}`;
+}
+
 export interface BranchGroup {
   district: Branch;
   children: Branch[];

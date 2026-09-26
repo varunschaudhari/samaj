@@ -48,6 +48,11 @@ export function formatNumber(value: number, language: Language): string {
   return language === 'mr' ? grouped.replace(/\d/g, (d) => MARATHI_DIGITS[Number(d)] ?? d) : grouped;
 }
 
+/** "26 Sept 2026" in English, "२६ सप्टें, २०२६" in Marathi. */
+export function formatDate(iso: string, language: Language): string {
+  return new Intl.DateTimeFormat(language === 'mr' ? 'mr-IN' : 'en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
+}
+
 export function translate(language: Language, key: MessageKey, values?: Record<string, string | number>): string {
   const template = dictionaries[language][key] ?? en[key];
   if (!values) return template;

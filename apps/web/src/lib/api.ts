@@ -51,8 +51,10 @@ function refreshSession(): Promise<boolean> {
 type Query = Record<string, string | number | undefined | null>;
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
+  /** Send this as-is (e.g. an image) instead of JSON-encoding `body`. */
+  raw?: { data: Blob; contentType: string };
   query?: Query;
   signal?: AbortSignal | undefined;
 }
@@ -67,7 +69,7 @@ function buildUrl(path: string, query?: Query): string {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}, allowRefresh = true): Promise<T> {
-  const { method = 'GET', body, query, signal } = options;
+  const { method = 'GET', body, raw, query, signal } = options;
   let res: Response;
   try {
     res = await fetch(buildUrl(path, query), {
@@ -75,9 +77,10 @@ async function request<T>(path: string, options: RequestOptions = {}, allowRefre
       credentials: 'include',
       headers: {
         [CSRF_HEADER]: CSRF_HEADER_VALUE,
-        ...(body !== undefined && { 'content-type': 'application/json' }),
+        ...(raw && { 'content-type': raw.contentType }),
+        ...(!raw && body !== undefined && { 'content-type': 'application/json' }),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: raw ? raw.data : body === undefined ? undefined : JSON.stringify(body),
       signal: signal ?? null,
     });
   } catch (err) {
@@ -107,4 +110,7 @@ export const api = {
   get: <T>(path: string, query?: Query, signal?: AbortSignal) => request<T>(path, { query, signal }),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
+  put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
+  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  upload: <T>(path: string, data: Blob) => request<T>(path, { method: 'PUT', raw: { data, contentType: data.type } }),
 };

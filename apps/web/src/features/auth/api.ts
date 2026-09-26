@@ -17,7 +17,8 @@ export function useMe() {
         throw err;
       }
     },
-    staleTime: Number.POSITIVE_INFINITY,
+    // Refetched on focus after a minute, so a family verified meanwhile sees the directory open up.
+    staleTime: 60_000,
   });
 }
 

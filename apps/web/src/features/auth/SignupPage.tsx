@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { type SignupInput, signupSchema } from '@samaj/shared';
+import { GENDERS, type SignupInput, signupSchema } from '@samaj/shared';
 import { Phone, RotateCw } from 'lucide-react';
 import { type UseFormRegisterReturn, useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router';
@@ -12,7 +12,7 @@ import { FormAlert } from './FormAlert';
 import { applyServerIssues, fieldError } from './form-errors';
 import { PasswordInput } from './PasswordInput';
 
-const FIELDS = ['name', 'phone', 'password', 'branchId'] as const;
+const FIELDS = ['name', 'gender', 'phone', 'password', 'branchId'] as const;
 
 function BranchField({ error, register }: { error: string | undefined; register: UseFormRegisterReturn<'branchId'> }) {
   const t = useT();
@@ -63,7 +63,7 @@ export function SignupPage() {
   const signup = useSignup();
   const form = useForm({
     resolver: zodResolver(signupSchema),
-    defaultValues: { name: '', phone: '', password: '', branchId: '' } satisfies SignupInput,
+    defaultValues: { name: '', gender: '' as SignupInput['gender'], phone: '', password: '', branchId: '' } satisfies SignupInput,
   });
   const { errors } = form.formState;
 
@@ -95,6 +95,13 @@ export function SignupPage() {
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         {showBanner && <FormAlert message={errorMessage(signup.error)} />}
         <Input label={t('auth.field.name')} autoComplete="name" error={fieldError(t, errors.name?.message)} {...form.register('name')} />
+        <Select label={t('auth.field.gender')} placeholder={t('member.choose')} error={fieldError(t, errors.gender?.message)} {...form.register('gender')}>
+          {GENDERS.map((g) => (
+            <option key={g} value={g}>
+              {t(`gender.${g}`)}
+            </option>
+          ))}
+        </Select>
         <Input
           label={t('auth.field.phone')}
           hint={t('auth.field.phoneHint')}

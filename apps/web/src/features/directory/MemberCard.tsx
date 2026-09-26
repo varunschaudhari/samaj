@@ -1,23 +1,27 @@
 import { type Member, formatPhone } from '@samaj/shared';
-import { BadgeCheck, MapPin, Phone } from 'lucide-react';
+import { MapPin, Phone } from 'lucide-react';
+import { Link } from 'react-router';
 import { Avatar, Badge, Card, Icon, Skeleton, SkeletonText, buttonVariants } from '@/components/ui';
-import { branchName } from '@/features/branches/api';
+import { placeLabel } from '@/features/branches/api';
 import { useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 
 export function MemberCard({ member }: { member: Member }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
-  const branch = branchName(member.branch, language);
-  // When the family lives in the branch town itself, show just the (translated) branch name.
-  const location = member.place === member.branch.name || !branch ? branch || member.place : `${member.place} · ${branch}`;
+  const location = placeLabel(member.place, member.branch, language);
 
   return (
-    <Card as="li" className="flex flex-col gap-3">
+    <Card as="li" className="relative flex flex-col gap-3 transition-colors duration-150 hover:border-line-strong">
       <div className="flex items-start gap-3">
-        <Avatar name={member.name} size="lg" />
+        <Avatar name={member.name} src={member.photoUrl} size="lg" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h2 className="font-display text-lg font-semibold break-words text-fg">{member.name}</h2>
+          <h2 className="font-display text-lg font-semibold break-words text-fg">
+            {/* The stretched link makes the whole card open the family; the phone button sits above it. */}
+            <Link to={`/families/${member.familyId}`} className="after:absolute after:inset-0 after:rounded-md hover:underline">
+              {member.name}
+            </Link>
+          </h2>
           <p className="flex items-center gap-1 text-sm text-fg-muted">
             <Icon icon={MapPin} size="sm" />
             <span className="truncate">{location}</span>
@@ -29,13 +33,7 @@ export function MemberCard({ member }: { member: Member }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        {member.verified ? (
-          <Badge tone="success" icon={BadgeCheck}>
-            {t('directory.verified')}
-          </Badge>
-        ) : (
-          <Badge tone="warning">{t('directory.unverified')}</Badge>
-        )}
+        {member.relation !== 'head' && <Badge tone="primary">{t(`relation.${member.relation}`)}</Badge>}
         {member.gotra && <Badge tone="zari">{member.gotra}</Badge>}
         {member.occupation && <Badge>{member.occupation}</Badge>}
       </div>
@@ -44,7 +42,7 @@ export function MemberCard({ member }: { member: Member }) {
         <a
           href={`tel:${member.phone}`}
           aria-label={t('directory.call', { name: member.name })}
-          className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'self-start tabular-nums')}
+          className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'relative z-10 self-start tabular-nums')}
         >
           <Icon icon={Phone} />
           {formatPhone(member.phone)}

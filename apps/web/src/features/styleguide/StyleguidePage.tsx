@@ -13,6 +13,7 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react';
+import type { Member } from '@samaj/shared';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { BrandMark } from '@/components/layout/BrandMark';
@@ -85,15 +86,17 @@ const RADII = [
   { token: 'full', className: 'rounded-full size-12', use: 'avatar, pill' },
 ];
 
-const SAMPLE_MEMBER = {
+const SAMPLE_MEMBER: Member = {
   id: 'sample',
+  familyId: 'sample-family',
+  relation: 'spouse',
+  photoUrl: null,
   name: 'सुनीता चौधरी',
   familyHead: 'रमेश चौधरी',
   gotra: 'Kashyap',
   place: 'Bhusawal',
   occupation: 'Teacher',
   branch: { id: 'b', name: 'Jalgaon District', nameMr: 'जळगाव जिल्हा' },
-  verified: true,
   phone: '+919822012345',
 };
 
