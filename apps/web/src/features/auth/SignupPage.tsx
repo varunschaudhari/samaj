@@ -71,7 +71,7 @@ export function SignupPage() {
     signup.mutate(
       { ...values, language: useLanguageStore.getState().language },
       {
-        onSuccess: () => navigate('/community', { replace: true }),
+        onSuccess: () => navigate('/home', { replace: true }),
         onError: (err) => applyServerIssues(err, FIELDS, form.setError),
       },
     );

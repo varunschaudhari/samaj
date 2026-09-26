@@ -24,6 +24,8 @@ import {
   Button,
   Card,
   CardTitle,
+  Chip,
+  ChipRow,
   EmptyState,
   ErrorState,
   Icon,
@@ -61,6 +63,7 @@ const SWATCHES: { name: string; className: string; note?: string }[] = [
   { name: 'zari-soft', className: 'bg-zari-soft' },
   { name: 'kumkum', className: 'bg-kumkum' },
   { name: 'kumkum-soft', className: 'bg-kumkum-soft' },
+  { name: 'hero', className: 'bg-hero', note: 'greeting and sign-in band' },
   { name: 'success', className: 'bg-success' },
   { name: 'warning', className: 'bg-warning' },
   { name: 'danger', className: 'bg-danger' },
@@ -120,11 +123,12 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-const SECTIONS = ['colour', 'type', 'radius', 'icons', 'buttons', 'inputs', 'cards', 'badges', 'avatars', 'overlays', 'tabs', 'states'];
+const SECTIONS = ['colour', 'type', 'radius', 'icons', 'buttons', 'inputs', 'cards', 'badges', 'chips', 'avatars', 'overlays', 'tabs', 'states'];
 
 export function StyleguidePage() {
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
   const [modalOpen, setModalOpen] = useState(false);
+  const [chip, setChip] = useState('Everyone');
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -310,8 +314,8 @@ export function StyleguidePage() {
               <p className="mt-1 text-sm text-fg-muted">Grouping inside another surface.</p>
             </Card>
           </div>
-          <Row label="In use: member card, and its skeleton">
-            <ul className="grid w-full gap-3 md:grid-cols-2">
+          <Row label="In use: directory rows, and their skeleton">
+            <ul className="w-full max-w-xl divide-y divide-line overflow-hidden rounded-md border border-line bg-surface shadow-card">
               <MemberCard member={SAMPLE_MEMBER} />
               <MemberCardSkeleton />
             </ul>
@@ -330,6 +334,24 @@ export function StyleguidePage() {
             <Badge tone="warning">Not yet verified</Badge>
             <Badge tone="danger">Removed</Badge>
             <Badge tone="info">New</Badge>
+          </Row>
+        </Section>
+
+        <Section id="chips" title="Chips and the zari border">
+          <Row label="A filter row: scrolls sideways on phones">
+            <ChipRow label="Show members from" className="w-full">
+              {['Everyone', 'Amalner', 'Jalgaon District'].map((c) => (
+                <Chip key={c} selected={chip === c} onClick={() => setChip(c)}>
+                  {c}
+                </Chip>
+              ))}
+            </ChipRow>
+          </Row>
+          <Row label="Zari border, under hero bands">
+            <div className="w-full overflow-hidden rounded-md">
+              <div className="h-12 bg-hero" />
+              <div className="zari-border" />
+            </div>
           </Row>
         </Section>
 

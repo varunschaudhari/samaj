@@ -26,3 +26,6 @@ export type FamilyStatus = (typeof FAMILY_STATUSES)[number];
 
 export const GENDERS = ['male', 'female', 'other'] as const;
 export type Gender = (typeof GENDERS)[number];
+
+export const NOTICE_KINDS = ['announcement', 'meeting', 'celebration', 'condolence'] as const;
+export type NoticeKind = (typeof NOTICE_KINDS)[number];

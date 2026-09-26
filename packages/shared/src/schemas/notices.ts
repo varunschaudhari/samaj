@@ -6,8 +6,9 @@ import { objectIdSchema } from './common';
  * town under it see them, so a district notice reaches the whole district.
  */
 
-export const NOTICE_KINDS = ['announcement', 'meeting', 'celebration', 'condolence'] as const;
-export type NoticeKind = (typeof NOTICE_KINDS)[number];
+// The kinds live with the other constants, so screens that only need the list
+// don't pull zod and these schemas into the first download.
+import { NOTICE_KINDS, type NoticeKind } from '../constants';
 
 export const MAX_PINNED_NOTICES = 5;
 

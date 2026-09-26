@@ -1,94 +1,127 @@
 import { type Permission, can } from '@samaj/shared';
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { Navigate, createBrowserRouter } from 'react-router';
 import { AppShell } from '@/components/layout/AppShell';
 import { RouteErrorScreen } from '@/components/layout/ErrorBoundary';
+import { ShellSkeleton } from '@/components/layout/ShellSkeleton';
 import { useMe } from '@/features/auth/api';
-import { LoginPage } from '@/features/auth/LoginPage';
 import { RedirectIfAuthed, RequireAuth } from '@/features/auth/RequireAuth';
-import { JoinPage } from '@/features/auth/JoinPage';
-import { SignupPage } from '@/features/auth/SignupPage';
-import { AdminIndex, AdminLayout } from '@/features/admin/AdminLayout';
-import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
-import { BranchesPage } from '@/features/branches/BranchesPage';
-import { PeoplePage } from '@/features/users/PeoplePage';
-import { InterestsPage } from '@/features/matrimony/InterestsPage';
-import { MatrimonyIndex, MatrimonyLayout } from '@/features/matrimony/MatrimonyLayout';
-import { MyProfilesPage } from '@/features/matrimony/MyProfilesPage';
-import { ProfileDetailPage } from '@/features/matrimony/ProfileDetailPage';
-import { SearchPage } from '@/features/matrimony/SearchPage';
+import { CommunityLayout } from '@/features/community/CommunityLayout';
 import { DirectoryPage } from '@/features/directory/DirectoryPage';
 import { NotFoundPage } from '@/features/errors/NotFoundPage';
-import { FamilyPage, MyFamilyRedirect } from '@/features/families/FamilyPage';
-import { ProfilePage } from '@/features/profile/ProfilePage';
-import { ReviewPage } from '@/features/review/ReviewPage';
-import { StyleguidePage } from '@/features/styleguide/StyleguidePage';
-import { CommunityLayout } from '@/features/community/CommunityLayout';
-import { NoticesPage } from '@/features/community/NoticesPage';
-import { EventDetailPage } from '@/features/community/EventDetailPage';
-import { EventsPage } from '@/features/community/EventsPage';
-import { CommitteePage } from '@/features/community/CommitteePage';
+import { HomePage } from '@/features/home/HomePage';
 
 /** Hides a page from roles without the permission. The API enforces the same rule. */
 function RequirePermission({ permission, children }: { permission: Permission; children: ReactNode }) {
   const me = useMe();
-  if (!me.data || !can(me.data.role, permission)) return <Navigate to="/directory" replace />;
+  if (!me.data || !can(me.data.role, permission)) return <Navigate to="/home" replace />;
   return children;
 }
+
+/**
+ * Loads a page's code when it is first opened. The screens people land on
+ * (Home and Directory) are in the first download; the rest, including
+ * every form, arrive on demand. That keeps the first load small on a slow
+ * connection, and the service worker keeps everything after the first visit.
+ */
+const page = (load: () => Promise<ComponentType>) => async () => ({ Component: await load() });
+const guarded = (permission: Permission, load: () => Promise<ComponentType>) =>
+  page(async () => {
+    const Page = await load();
+    return function Guarded() {
+      return (
+        <RequirePermission permission={permission}>
+          <Page />
+        </RequirePermission>
+      );
+    };
+  });
 
 export const router = createBrowserRouter([
   {
     errorElement: <RouteErrorScreen />,
+    hydrateFallbackElement: <ShellSkeleton />,
     children: [
-      { path: '/login', element: <RedirectIfAuthed><LoginPage /></RedirectIfAuthed> },
-      { path: '/signup', element: <RedirectIfAuthed><SignupPage /></RedirectIfAuthed> },
-      { path: '/join', element: <RedirectIfAuthed><JoinPage /></RedirectIfAuthed> },
-      { path: '/reset-password', element: <RedirectIfAuthed><ResetPasswordPage /></RedirectIfAuthed> },
+      {
+        path: '/login',
+        lazy: page(async () => {
+          const { LoginPage } = await import('@/features/auth/LoginPage');
+          return () => <RedirectIfAuthed><LoginPage /></RedirectIfAuthed>;
+        }),
+      },
+      {
+        path: '/signup',
+        lazy: page(async () => {
+          const { SignupPage } = await import('@/features/auth/SignupPage');
+          return () => <RedirectIfAuthed><SignupPage /></RedirectIfAuthed>;
+        }),
+      },
+      {
+        path: '/join',
+        lazy: page(async () => {
+          const { JoinPage } = await import('@/features/auth/JoinPage');
+          return () => <RedirectIfAuthed><JoinPage /></RedirectIfAuthed>;
+        }),
+      },
+      {
+        path: '/reset-password',
+        lazy: page(async () => {
+          const { ResetPasswordPage } = await import('@/features/auth/ResetPasswordPage');
+          return () => <RedirectIfAuthed><ResetPasswordPage /></RedirectIfAuthed>;
+        }),
+      },
       // Public so the design system can be reviewed without an account.
-      { path: '/styleguide', element: <StyleguidePage /> },
+      { path: '/styleguide', lazy: page(async () => (await import('@/features/styleguide/StyleguidePage')).StyleguidePage) },
       {
         element: <RequireAuth><AppShell /></RequireAuth>,
         children: [
-          { index: true, element: <Navigate to="/community" replace /> },
+          { index: true, element: <Navigate to="/home" replace /> },
+          { path: '/home', element: <HomePage /> },
           {
             path: '/community',
             element: <CommunityLayout />,
             children: [
               { index: true, element: <Navigate to="/community/notices" replace /> },
-              { path: 'notices', element: <NoticesPage /> },
-              { path: 'events', element: <EventsPage /> },
-              { path: 'events/:id', element: <EventDetailPage /> },
-              { path: 'committee', element: <CommitteePage /> },
+              { path: 'notices', lazy: page(async () => (await import('@/features/community/NoticesPage')).NoticesPage) },
+              { path: 'events', lazy: page(async () => (await import('@/features/community/EventsPage')).EventsPage) },
+              { path: 'events/:id', lazy: page(async () => (await import('@/features/community/EventDetailPage')).EventDetailPage) },
+              { path: 'committee', lazy: page(async () => (await import('@/features/community/CommitteePage')).CommitteePage) },
             ],
           },
           { path: '/directory', element: <DirectoryPage /> },
-          { path: '/family', element: <MyFamilyRedirect /> },
-          { path: '/families/:familyId', element: <FamilyPage /> },
+          { path: '/family', lazy: page(async () => (await import('@/features/families/FamilyPage')).MyFamilyRedirect) },
+          { path: '/families/:familyId', lazy: page(async () => (await import('@/features/families/FamilyPage')).FamilyPage) },
           {
             path: '/matrimony',
-            element: <MatrimonyLayout />,
+            lazy: page(async () => (await import('@/features/matrimony/MatrimonyLayout')).MatrimonyLayout),
             children: [
-              { index: true, element: <MatrimonyIndex /> },
-              { path: 'search', element: <SearchPage /> },
-              { path: 'interests', element: <InterestsPage /> },
-              { path: 'profiles', element: <MyProfilesPage /> },
-              { path: 'profiles/:id', element: <ProfileDetailPage /> },
+              { index: true, lazy: page(async () => (await import('@/features/matrimony/MatrimonyLayout')).MatrimonyIndex) },
+              { path: 'search', lazy: page(async () => (await import('@/features/matrimony/SearchPage')).SearchPage) },
+              { path: 'interests', lazy: page(async () => (await import('@/features/matrimony/InterestsPage')).InterestsPage) },
+              { path: 'profiles', lazy: page(async () => (await import('@/features/matrimony/MyProfilesPage')).MyProfilesPage) },
+              { path: 'profiles/:id', lazy: page(async () => (await import('@/features/matrimony/ProfileDetailPage')).ProfileDetailPage) },
             ],
           },
-          { path: '/review', element: <RequirePermission permission="member:verify"><ReviewPage /></RequirePermission> },
+          { path: '/review', lazy: guarded('member:verify', async () => (await import('@/features/review/ReviewPage')).ReviewPage) },
           {
             path: '/admin',
-            element: <AdminLayout />,
+            lazy: page(async () => (await import('@/features/admin/AdminLayout')).AdminLayout),
             children: [
-              { index: true, element: <AdminIndex /> },
-              { path: 'review', element: <RequirePermission permission="member:verify"><ReviewPage embedded /></RequirePermission> },
-              { path: 'people', element: <RequirePermission permission="user:assign-role"><PeoplePage /></RequirePermission> },
-              { path: 'branches', element: <RequirePermission permission="branch:manage"><BranchesPage /></RequirePermission> },
+              { index: true, lazy: page(async () => (await import('@/features/admin/AdminLayout')).AdminIndex) },
+              {
+                path: 'review',
+                lazy: guarded('member:verify', async () => {
+                  const { ReviewPage } = await import('@/features/review/ReviewPage');
+                  return () => <ReviewPage embedded />;
+                }),
+              },
+              { path: 'people', lazy: guarded('user:assign-role', async () => (await import('@/features/users/PeoplePage')).PeoplePage) },
+              { path: 'branches', lazy: guarded('branch:manage', async () => (await import('@/features/branches/BranchesPage')).BranchesPage) },
             ],
           },
           // Old address from before People and Branches were grouped under Admin.
           { path: '/branches', element: <Navigate to="/admin/branches" replace /> },
-          { path: '/profile', element: <ProfilePage /> },
+          { path: '/profile', lazy: page(async () => (await import('@/features/profile/ProfilePage')).ProfilePage) },
         ],
       },
       { path: '*', element: <NotFoundPage /> },

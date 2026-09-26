@@ -2,6 +2,7 @@ export { Avatar, initials } from './Avatar';
 export { Badge } from './Badge';
 export { Button, buttonVariants } from './Button';
 export { Card, CardTitle } from './Card';
+export { Chip, ChipRow } from './Chip';
 export { EmptyState, ErrorState } from './EmptyState';
 export { Icon, ICON_STROKE_WIDTH, type IconSize } from './Icon';
 export { IconButton } from './IconButton';

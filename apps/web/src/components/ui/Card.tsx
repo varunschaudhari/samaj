@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn';
 const cardVariants = cva('rounded-md bg-surface text-fg', {
   variants: {
     variant: {
-      outlined: 'border border-line',
+      outlined: 'border border-line shadow-card',
       raised: 'border border-line shadow-raised',
       muted: 'bg-surface-muted',
     },

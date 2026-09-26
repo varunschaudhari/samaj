@@ -1,11 +1,10 @@
 import { NOTICE_KINDS, type Notice, type NoticeKind, can } from '@samaj/shared';
 import { Megaphone, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { Button, EmptyState, ErrorState, Modal, toast } from '@/components/ui';
+import { Button, Chip, ChipRow, EmptyState, ErrorState, Modal, toast } from '@/components/ui';
 import { useMe } from '@/features/auth/api';
 import { useErrorMessage, useT } from '@/i18n';
-import { cn } from '@/lib/cn';
-import { NoticeCard, NoticeCardSkeleton } from './NoticeCard';
+import { KIND_STYLE, NoticeCard, NoticeCardSkeleton } from './NoticeCard';
 import { NoticeFormModal } from './NoticeFormModal';
 import { useNotices, useRemoveNotice } from './notices-api';
 
@@ -67,25 +66,16 @@ export function NoticesPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="group" aria-label={t('notices.kind')} className="flex flex-wrap gap-1.5">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <ChipRow label={t('notices.kind')} className="min-w-0 sm:flex-1">
           {filters.map((k) => (
-            <button
-              key={k || 'all'}
-              type="button"
-              aria-pressed={kind === k}
-              onClick={() => setKind(k)}
-              className={cn(
-                'min-h-touch rounded-full border px-3 text-sm font-semibold transition-colors duration-150',
-                kind === k ? 'border-primary bg-primary text-on-primary' : 'border-line-strong text-fg-muted hover:text-fg',
-              )}
-            >
+            <Chip key={k || 'all'} selected={kind === k} onClick={() => setKind(k)} icon={k ? KIND_STYLE[k].icon : undefined}>
               {k ? t(`notices.kind.${k}`) : t('notices.all')}
-            </button>
+            </Chip>
           ))}
-        </div>
+        </ChipRow>
         {canPost && all.length > 0 && (
-          <Button leadingIcon={Plus} onClick={() => setEditing('new')}>
+          <Button leadingIcon={Plus} onClick={() => setEditing('new')} className="self-start">
             {t('notices.new')}
           </Button>
         )}

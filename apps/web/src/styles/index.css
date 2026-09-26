@@ -39,8 +39,8 @@
   /* Radius by element size: small things get small radii. */
   --radius-xs: 0.25rem; /* badge, checkbox */
   --radius-sm: 0.375rem; /* button, input, select */
-  --radius-md: 0.625rem; /* card, menu, toast */
-  --radius-lg: 1rem; /* modal, bottom sheet */
+  --radius-md: 0.75rem; /* card, menu, toast */
+  --radius-lg: 1.25rem; /* modal, bottom sheet, hero */
   --radius-full: 9999px; /* avatar, pill */
 
   /* Spacing keeps Tailwind's 0.25rem step (--spacing), so p-4 is 1rem. */
@@ -73,6 +73,10 @@
   --color-zari-fg: var(--zari-fg);
   --color-kumkum: var(--kumkum);
   --color-kumkum-soft: var(--kumkum-soft);
+  --color-hero-from: var(--hero-from);
+  --color-hero-to: var(--hero-to);
+  --color-on-hero: var(--on-hero);
+  --color-on-hero-muted: var(--on-hero-muted);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
@@ -85,8 +89,40 @@
   --color-info-soft: var(--info-soft);
   --color-focus: var(--focus);
 
+  --shadow-card: var(--elevation-card);
   --shadow-raised: var(--elevation-raised);
   --shadow-overlay: var(--elevation-overlay);
+}
+
+@theme {
+  --animate-page-load: page-load 1.1s ease-in-out infinite;
+  @keyframes page-load {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
+}
+
+/* The hero band behind greetings and the sign-in screen. */
+@utility bg-hero {
+  background-color: var(--hero-to);
+  background-image: linear-gradient(150deg, var(--hero-from) 0%, var(--hero-to) 100%);
+}
+
+/*
+ * A Paithani border: a row of zari triangles (the kangura of a temple border)
+ * over a thin line. The shape is a mask, so its colour comes from
+ * background-color and follows the tokens.
+ */
+@utility zari-border {
+  height: 0.625rem;
+  background-color: var(--zari);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='10'%3E%3Cpath d='M0 10 L10 2 L20 10 Z M9 0 h2 v1.5 h-2 Z' /%3E%3Crect y='9' width='20' height='1'/%3E%3C/svg%3E");
+  mask-repeat: repeat-x;
+  mask-size: 1.25rem 0.625rem;
 }
 
 /* Base-layer resets only. Anything that repeats is a component, not @apply. */

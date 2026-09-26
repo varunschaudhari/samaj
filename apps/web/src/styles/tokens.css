@@ -6,7 +6,8 @@
  *
  * Palette: Paithani. Peacock green (mor) is the working colour, zari gold a
  * sparing highlight used as a fill only, kumkum a second accent for occasions.
- * Every text colour passes WCAG AA on canvas and surface.
+ * The canvas is a warm ivory, like the silk's ground. Every text colour passes
+ * WCAG AA on canvas and surface.
  */
 
 :root {
@@ -14,18 +15,18 @@
   --font-display-stack: 'Eczar Variable', 'Samaj Display Fallback', 'Noto Serif Devanagari', Georgia, serif;
 
   /* Surfaces */
-  --canvas: #f6f8f7;
+  --canvas: #f8f5ee;
   --surface: #ffffff;
-  --surface-muted: #edf1f0;
+  --surface-muted: #f1ede4;
   --scrim: rgb(14 21 20 / 0.55);
 
   /* Text */
-  --fg: #16201f; /* 15.6:1 on canvas */
-  --fg-muted: #566562; /* 5.7:1 */
+  --fg: #16201f; /* 15.3:1 on canvas */
+  --fg-muted: #5a5f58; /* 6.0:1 on canvas, 5.6:1 on surface-muted */
 
   /* Lines. line-strong is 3:1+ for input borders (WCAG non-text contrast). */
-  --line: #dce3e1;
-  --line-strong: #74827f;
+  --line: #e7e1d4;
+  --line-strong: #7a7d74; /* 4.2:1 on surface, 3.9:1 on canvas */
 
   /* Brand */
   --primary: #0b5d57; /* 7.2:1 */
@@ -37,6 +38,12 @@
   --zari-fg: #6b4600;
   --kumkum: #8c2356;
   --kumkum-soft: #f5e1ea;
+
+  /* The hero band: deep peacock, with zari and white on it. */
+  --hero-from: #0d6a62;
+  --hero-to: #073f3b;
+  --on-hero: #ffffff; /* 6.5:1 on hero-from */
+  --on-hero-muted: #cfe6e1; /* 4.9:1 on hero-from; zari on hero is decoration only (2.3:1) */
 
   /* Status */
   --success: #1d6f3a;
@@ -52,7 +59,9 @@
   --focus: #23539e;
 
   /* Elevation, for things that float above the page: menus, toasts, modals. */
-  --elevation-raised: 0 1px 2px rgb(22 32 31 / 0.06), 0 4px 12px rgb(22 32 31 / 0.08);
+  /* Cards sit just off the page; raised things float. Shadows are warm, like the canvas. */
+  --elevation-card: 0 1px 2px rgb(60 48 20 / 0.05), 0 1px 1px rgb(60 48 20 / 0.03);
+  --elevation-raised: 0 1px 2px rgb(60 48 20 / 0.06), 0 4px 12px rgb(60 48 20 / 0.08);
   --elevation-overlay: 0 8px 24px rgb(22 32 31 / 0.14), 0 2px 6px rgb(22 32 31 / 0.08);
 }
 
@@ -76,6 +85,10 @@
   --zari-fg: #e2b04a;
   --kumkum: #e58ab5;
   --kumkum-soft: #3a1a29;
+  --hero-from: #0f3d39;
+  --hero-to: #0a2624;
+  --on-hero: #e6ecea;
+  --on-hero-muted: #a9c4bf;
   --success: #6cc98c;
   --success-soft: #173222;
   --warning: #e2b04a;
@@ -87,6 +100,7 @@
   --info: #8db4f0;
   --info-soft: #1a2940;
   --focus: #8db4f0;
+  --elevation-card: 0 1px 2px rgb(0 0 0 / 0.3);
   --elevation-raised: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.3);
   --elevation-overlay: 0 8px 24px rgb(0 0 0 / 0.5);
 }

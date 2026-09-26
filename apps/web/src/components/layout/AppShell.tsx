@@ -1,6 +1,6 @@
 import { can } from '@samaj/shared';
 import { LogOut, UserRound, WifiOff } from 'lucide-react';
-import { NavLink, Outlet } from 'react-router';
+import { NavLink, Outlet, useNavigation } from 'react-router';
 import { Avatar, Button, Icon, Tooltip, toast } from '@/components/ui';
 import { useLogout, useMe } from '@/features/auth/api';
 import { usePendingCount } from '@/features/families/api';
@@ -9,7 +9,7 @@ import { cn } from '@/lib/cn';
 import { useOnline } from '@/lib/offline';
 import { BrandMark } from './BrandMark';
 import { LanguageSwitch } from './LanguageSwitch';
-import { type NavItem, visibleNavItems } from './nav-items';
+import { type NavItem, tabBarItems, visibleNavItems } from './nav-items';
 
 /** Count bubble on the Review item. The number is also spoken via sr-only text. */
 function PendingBadge({ count, className }: { count: number; className?: string }) {
@@ -38,6 +38,8 @@ export function AppShell() {
   const logout = useLogout();
   const me = useMe();
   const online = useOnline();
+  // A page's code is still downloading: say so at once, so a tap on a slow connection isn't met with nothing.
+  const loadingPage = useNavigation().state === 'loading';
   const role = me.data?.role;
   const items = visibleNavItems(role);
   const pending = usePendingCount(Boolean(role && can(role, 'member:verify')));
@@ -49,6 +51,11 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh bg-canvas md:grid md:grid-cols-[15rem_1fr]">
+      {loadingPage && (
+        <div role="progressbar" aria-label={t('common.loading')} className="fixed inset-x-0 top-0 z-50 h-1 overflow-hidden bg-zari-soft">
+          <div className="h-full w-1/3 animate-page-load rounded-full bg-zari" />
+        </div>
+      )}
       <a
         href="#main"
         className="sr-only z-50 rounded-sm bg-primary px-4 py-2 text-on-primary focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
@@ -57,7 +64,7 @@ export function AppShell() {
       </a>
 
       {/* Sidebar, md and up */}
-      <aside className="sticky top-0 hidden h-dvh flex-col gap-6 border-r border-line bg-surface px-3 py-5 md:flex">
+      <aside className="sticky top-0 hidden h-dvh flex-col gap-6 overflow-y-auto border-r border-line bg-surface px-3 py-5 md:flex">
         <BrandMark className="px-3" />
         <nav aria-label={t('nav.primary')} className="flex flex-col gap-1">
           {items.map((item) => (
@@ -114,13 +121,13 @@ export function AppShell() {
           aria-label={t('nav.primary')}
           className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
         >
-          {items.filter((item) => !item.devOnly && !item.sidebarOnly).map((item) => (
+          {tabBarItems(role).map((item) => (
             <NavLink
               key={item.to}
               to={hrefFor(item)}
               className={({ isActive }) =>
                 cn(
-                  'flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-center text-xs leading-tight font-semibold transition-colors duration-150',
+                  'flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 text-center text-[0.75rem] leading-tight font-semibold transition-colors duration-150',
                   isActive ? 'text-primary' : 'text-fg-muted',
                 )
               }
@@ -131,7 +138,7 @@ export function AppShell() {
                     <Icon icon={item.icon} size="lg" />
                     <PendingBadge count={badgeFor(item)} className="absolute -top-1 right-1" />
                   </span>
-                  {t(item.label)}
+                  <span className="max-w-full truncate">{t(item.tabLabel ?? item.label)}</span>
                 </>
               )}
             </NavLink>

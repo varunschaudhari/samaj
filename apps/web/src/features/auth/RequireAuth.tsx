@@ -29,6 +29,6 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 /** For sign-in and sign-up: a signed-in user goes straight to the app. */
 export function RedirectIfAuthed({ children }: { children: ReactNode }) {
   const me = useMe();
-  if (me.data) return <Navigate to="/community" replace />;
+  if (me.data) return <Navigate to="/home" replace />;
   return children;
 }

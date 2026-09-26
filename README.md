@@ -24,7 +24,8 @@ packages/shared  zod schemas, types, RBAC table, constants. Imported by both app
 - **Matrimony:** verified families create profiles for unmarried members of legal age (21 for men, 18 for women), confirming the person's consent. The branch committee approves each profile before others see it, and can remove one with a note. Search is always on behalf of one of your own live profiles: opposite gender, never the same gotra, never your own family (the API enforces this for interests too). Photos are visible to verified members; contact details only after the other family accepts an interest. Marking a profile married closes it and withdraws its open interests. The rules are summarised at the top of [packages/shared/src/schemas/matrimony.ts](packages/shared/src/schemas/matrimony.ts).
 - **Community:** the landing tab, with three sections. **Notices** (announcements, meetings, celebrations, condolences) and **Events** (with a per-family RSVP headcount) are posted by a branch committee and reach families in that branch and every town under it. **Committee** lists each branch's office-bearers with phone numbers, so families, including those still waiting for verification, know who to call. Committee members maintain all three for their own branch and the towns under it; admins anywhere.
 - **Installable app (PWA):** members can add Samaj to their home screen (Profile shows an Install button on Android Chrome). The app itself, and the directory, families, notices and events a person has already opened, work offline, with a banner saying so. Changes always need a connection. Saved data is wiped on sign-in and sign-out, so a shared phone never shows the previous person's data. The service worker runs only in production builds: test it with `npm run build -w @samaj/web && npm run preview -w @samaj/web` (http://localhost:4173, with the API running).
-- **Photos:** resized to 512px JPEG in the browser (which also removes location data), checked by file signature on the server, and stored on disk under `UPLOAD_DIR` (`apps/api/uploads` by default). They are served only to people allowed to see that family. Back this folder up along with the database.
+- **Photos:** resized to 512px JPEG in the browser (which also removes location data), checked by file signature on the server, and stored on disk under `UPLOAD_DIR` (`apps/api/uploads` by default), or in MongoDB GridFS with `PHOTO_STORAGE=mongodb` when more than one API server runs. They are served only to people allowed to see that family. With disk storage, back this folder up along with the database.
+- **Home:** the first screen after sign-in has a greeting, a member search, shortcuts, the committee's review queue (for committee and admins), the next events and the latest notices. On phones the tab bar is Home, Directory, Updates, Family, plus Matrimony for members, Review for committee or Admin for admins.
 - **Languages:** English (the default) and Marathi. Each user picks their language and it's saved to their account. Strings live in [apps/web/src/i18n](apps/web/src/i18n).
 
 ## Requirements
@@ -66,7 +67,20 @@ The API validates `.env` at startup. If anything is missing or malformed, it pri
 | `npm test`          | Vitest in every workspace; API tests use an in-memory MongoDB |
 | `npm run build`     | Bundles the API (`apps/api/dist`) and web (`apps/web/dist`) |
 | `npm run seed`      | Wipes and reseeds the dev database. Refuses to run in production. |
+| `npm run db:migrate` | Builds indexes and fills derived fields on existing records. Run once per release, before starting it (`node apps/api/dist/migrate.js` in a built deployment). |
 | `npm run db:up` / `db:down` | Start or stop MongoDB in Docker          |
+
+## Running at scale
+
+The app is built for lakhs of members. On a generated database of 75,000 families and 3 lakh members, every list (directory, search, People, review queues, notices) returns its page in 4–10 ms, because each one reads a single index in page order. Two-word searches take about 100 ms.
+
+- **Indexes do the work.** Records carry `branchPath` (their branch and every branch above it) and word-prefix search tokens, both filled by Mongoose plugins in [models/plugins.ts](apps/api/src/models/plugins.ts). A new query needs an index that covers both its filter and its sort. Check it with `.explain('executionStats')` against a large database before shipping.
+- **Totals are capped** at 1,000 (`COUNT_CAP`); screens show "1,000+" beyond that.
+- **Production doesn't build indexes at boot.** Run `npm run db:migrate` with each release.
+- **More than one API process:** set `WEB_CONCURRENCY` to the number of CPU cores, or run several containers. Rate limit counts are then shared through MongoDB automatically, and photos need `PHOTO_STORAGE=mongodb` (or, later, object storage behind the interface in [utils/storage.ts](apps/api/src/utils/storage.ts)).
+- **Behind a load balancer or proxy,** set `TRUST_PROXY=1` so rate limits see real client addresses. Signed-in people are limited per account, not per IP, because mobile networks put thousands of phones behind one address.
+- **The web app downloads in pieces.** Home and the directory are in the first download (about 190 KB gzipped). Forms, matrimony, admin and event pages load when first opened, and the service worker keeps them after that.
+- **MongoDB:** use a replica set (for example Atlas M10 or larger) with backups. `DB_POOL_SIZE` sets connections per process.
 
 ## Design system
 
@@ -76,6 +90,7 @@ Open http://localhost:5173/styleguide to see every token and primitive in every 
 - Fonts: Noto Sans Devanagari (UI and body) and Eczar (display). Both are self-hosted, variable, and limited to the Latin and Devanagari subsets. Metric-matched fallbacks keep the layout from shifting when the fonts load. `lang="mr"` on `<html>` switches both fonts to Marathi letterforms.
 - Icons: `lucide-react` only, through the [`Icon`](apps/web/src/components/ui/Icon.tsx) wrapper (16, 20 or 24px, stroke 1.75).
 - Primitives: [apps/web/src/components/ui](apps/web/src/components/ui). Variants use `class-variance-authority`, and classes are composed with `cn()`.
+- Look: a warm ivory canvas, peacock green for actions, and a peacock `bg-hero` band finished with a `zari-border` (a row of gold triangles, like a Paithani border) on Home and the sign-in screens. Filter rows use `Chip` in a `ChipRow`, which scrolls sideways on phones.
 
 ## Conventions
 

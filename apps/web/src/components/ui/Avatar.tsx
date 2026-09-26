@@ -45,7 +45,7 @@ export function Avatar({ name, src, size, className }: AvatarProps) {
   return (
     <span className={cn(avatarVariants({ size }), !showImage && tintFor(name), className)} aria-hidden="true">
       {showImage ? (
-        <img src={src} alt="" className="size-full object-cover" onError={() => setFailed(true)} />
+        <img src={src} alt="" loading="lazy" decoding="async" className="size-full object-cover" onError={() => setFailed(true)} />
       ) : (
         initials(name)
       )}
