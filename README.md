@@ -13,6 +13,7 @@ packages/shared  zod schemas, types, RBAC table, constants. Imported by both app
 - **Auth:** mobile number and password. The access token (JWT, 15 minutes) and a rotating refresh token (30 days) are stored in httpOnly cookies. Passwords are hashed with argon2id.
 - **Families:** every account belongs to a family (a household) and starts as its head. The family lists everyone in the household: relation to the head, gender, birth year, occupation, education, an optional phone and a photo.
 - **Verification:** new families wait for their branch committee to review them. The committee reviews a whole household at once and either verifies it or sends it back with a note, and the family can fix its details and resubmit. The directory shows only verified families, and members of a family that isn't verified yet can open only their own family page. Committee members can't review their own family; an admin can.
+- **Branches:** districts, with cities and towns inside them (two levels). The seed creates Jalgaon District with Amalner and Dharangaon. Admins add, rename and remove branches on the Branches screen; a branch can only be removed while it has no families and nothing inside it, and names must be unique within a district in both English and Marathi.
 - **Gotra:** chosen from a fixed list in [packages/shared/src/gotras.ts](packages/shared/src/gotras.ts), with English and Marathi names. The database stores the id, so spellings can't drift, and "Not listed / not sure" is always available. The six gotras there now are placeholders: replace them with the samaj's real list, and keep the ids stable once families use them.
 - **Roles:** `member` can read the directory and edit their own family. `committee` can also see contact details, edit families and review new ones, but only inside their own branch and the branches below it. `admin` can do everything. The table is in [packages/shared/src/rbac.ts](packages/shared/src/rbac.ts), and the per-record rules (own family, branch scope) are in [apps/api/src/services/access.ts](apps/api/src/services/access.ts).
 - **Photos:** resized to 512px JPEG in the browser (which also removes location data), checked by file signature on the server, and stored on disk under `UPLOAD_DIR` (`apps/api/uploads` by default). They are served only to people allowed to see that family. Back this folder up along with the database.
@@ -37,10 +38,10 @@ Open http://localhost:5173. The seed script prints the demo accounts. All of the
 
 | Role      | Mobile     | What to try                                             |
 | --------- | ---------- | ------------------------------------------------------- |
-| admin     | 9800000001 | everything, in every branch                              |
-| committee | 9800000002 | Review tab: families waiting in Jalgaon District and its towns |
-| member    | 9800000003 | verified family: directory, own family, photo upload     |
-| member    | 9800000004 | pending family: directory is closed until the committee verifies it |
+| admin     | 9800000001 | everything, including the Branches screen                |
+| committee | 9800000002 | Review tab: families waiting in Jalgaon District, Amalner and Dharangaon |
+| member    | 9800000003 | verified family in Amalner: directory, own family, photo upload |
+| member    | 9800000004 | pending family in Dharangaon: directory is closed until the committee verifies it |
 
 **Port 27017 already in use?** If you have MongoDB installed as a service, set `MONGO_PORT=27018` in `.env` and change `MONGODB_URI` to `mongodb://localhost:27018/samaj`.
 
