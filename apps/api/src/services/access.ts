@@ -45,6 +45,11 @@ export function canEditFamily(viewer: Viewer, family: FamilyLike): boolean {
   return isOwnFamily(viewer, family) || hasReach(viewer, 'member:write', family);
 }
 
+/** Committee members register families on their behalf inside their own branch; admins anywhere. */
+export function canEnrolIn(viewer: Viewer, branch: BranchPlaced): boolean {
+  return hasReach(viewer, 'member:write', branch);
+}
+
 /** Committee members don't review their own family; an admin may. */
 export function canReviewFamily(viewer: Viewer, family: FamilyLike): boolean {
   if (!hasReach(viewer, 'member:verify', family)) return false;

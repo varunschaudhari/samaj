@@ -1,5 +1,5 @@
 import argon2 from 'argon2';
-import type { FamilyStatus, PublicUser, UpdatePreferencesInput, loginSchema, signupSchema } from '@samaj/shared';
+import type { FamilyStatus, PublicUser, UpdatePreferencesInput, joinSchema, loginSchema, signupSchema } from '@samaj/shared';
 import { Types } from 'mongoose';
 import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
@@ -9,6 +9,9 @@ import { SessionModel } from '../models/session.model';
 import { type UserDoc, UserModel } from '../models/user.model';
 import { AppError, unauthenticated } from '../utils/app-error';
 import { logger } from '../utils/logger';
+import { recordHistory } from './family.service';
+import { checkInvite, invalidInvite } from './invite.service';
+import { assertPhoneFree, phoneTaken } from './phones';
 import {
   decodeRefreshToken,
   encodeRefreshToken,
@@ -90,11 +93,8 @@ export async function signup(input: z.output<typeof signupSchema>, meta: Session
     ]);
   }
 
-  const phoneTaken = () =>
-    new AppError(409, 'PHONE_TAKEN', 'This mobile number already has an account. Sign in instead.', [
-      { path: 'phone', message: 'validation.phoneTaken' },
-    ]);
-  if (await UserModel.exists({ phone: input.phone })) throw phoneTaken();
+  // Someone already listed in a family joins it with an invite code instead of starting a duplicate.
+  await assertPhoneFree(input.phone);
 
   const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
 
@@ -139,6 +139,54 @@ export async function signup(input: z.output<typeof signupSchema>, meta: Session
     if ((err as { code?: number }).code === 11000) throw phoneTaken();
     throw err;
   }
+
+  return { user: toPublicUser(user, family.status), tokens: await startSession(String(user._id), meta) };
+}
+
+/**
+ * First sign-in for someone already listed in a family, with the invite code
+ * the family or its committee gave them. The account joins that family as the
+ * listed person; the family keeps its verification status, because the
+ * committee already reviewed this person as part of the household.
+ */
+export async function join(input: z.output<typeof joinSchema>, meta: SessionMeta): Promise<AuthResult> {
+  const invite = await checkInvite(input.phone, input.code);
+  if (await UserModel.exists({ phone: input.phone })) throw phoneTaken();
+  const family = await FamilyModel.findById(invite.familyId);
+  if (!family) throw invalidInvite();
+  const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
+
+  // Claim the person first, so two requests with the same code can't both succeed.
+  const userId = new Types.ObjectId();
+  const member = await MemberModel.findOneAndUpdate(
+    { _id: invite.memberId, familyId: family._id, phone: input.phone, userId: null },
+    { $set: { userId } },
+    { returnDocument: 'after' },
+  );
+  if (!member) throw invalidInvite();
+
+  let user;
+  try {
+    user = await UserModel.create({
+      _id: userId,
+      phone: input.phone,
+      name: member.name,
+      passwordHash,
+      branchId: family.branchId,
+      language: input.language,
+      familyId: family._id,
+      memberId: member._id,
+    });
+  } catch (err) {
+    await MemberModel.updateOne({ _id: member._id }, { $set: { userId: null } });
+    if ((err as { code?: number }).code === 11000) throw phoneTaken();
+    throw err;
+  }
+
+  await invite.deleteOne();
+  recordHistory(family, { id: String(userId), name: member.name }, 'joined');
+  await family.save();
+  logger.info({ userId: String(userId), familyId: String(family._id) }, 'Joined family with invite code');
 
   return { user: toPublicUser(user, family.status), tokens: await startSession(String(user._id), meta) };
 }

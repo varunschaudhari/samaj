@@ -12,6 +12,7 @@ import { useFamily, useRemoveMember, useReview } from './api';
 import { FamilyDetailsModal } from './FamilyDetailsModal';
 import { FamilyMemberRow, FamilyMemberRowSkeleton } from './FamilyMemberRow';
 import { FamilyStatusBadge } from './FamilyStatusBadge';
+import { InviteCodeModal } from './InviteCodeModal';
 import { MemberFormModal } from './MemberFormModal';
 import { ResetCodeModal } from '@/features/users/ResetCodeModal';
 import { ReviewPanel } from './ReviewPanel';
@@ -133,6 +134,7 @@ export function FamilyPage() {
   const [removing, setRemoving] = useState<FamilyMember | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [resetTarget, setResetTarget] = useState<{ userId: string; name: string } | null>(null);
+  const [inviting, setInviting] = useState<FamilyMember | null>(null);
 
   if (family.isPending) return <FamilySkeleton />;
 
@@ -175,6 +177,7 @@ export function FamilyPage() {
             onEdit={() => setEditing({ member: m })}
             onRemove={() => setRemoving(m)}
             onResetPassword={() => m.accountId && setResetTarget({ userId: m.accountId, name: m.name })}
+            onInvite={() => setInviting(m)}
           />
         ))}
       </ul>
@@ -234,6 +237,15 @@ export function FamilyPage() {
       <MemberFormModal familyId={data.id} member={editing?.member ?? null} open={editing !== null} onClose={() => setEditing(null)} />
       <FamilyDetailsModal family={data} open={detailsOpen} onClose={() => setDetailsOpen(false)} />
       <ResetCodeModal target={resetTarget} onClose={() => setResetTarget(null)} />
+      <InviteCodeModal
+        familyId={data.id}
+        member={inviting}
+        onClose={() => setInviting(null)}
+        onAddPhone={(m) => {
+          setInviting(null);
+          setEditing({ member: m });
+        }}
+      />
       <Modal
         open={removing !== null}
         onClose={() => setRemoving(null)}

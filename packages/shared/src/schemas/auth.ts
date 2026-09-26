@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { FAMILY_STATUSES, GENDERS, LANGUAGES } from '../constants';
 import { ROLES } from '../rbac';
-import { phoneSchema } from './common';
+import { phoneSchema, resetCodeSchema } from './common';
 
 export const passwordSchema = z.string().min(8, 'validation.passwordMin').max(128, 'validation.passwordMax');
 
@@ -17,6 +17,19 @@ export const signupSchema = z.object({
   language: z.enum(LANGUAGES).default('en'),
 });
 export type SignupInput = z.input<typeof signupSchema>;
+
+/**
+ * Sign in for the first time as someone already listed in a family, with the
+ * invite code the family or its committee gave them. Name, gender and branch
+ * come from the family's record.
+ */
+export const joinSchema = z.object({
+  phone: phoneSchema,
+  code: resetCodeSchema,
+  password: passwordSchema,
+  language: z.enum(LANGUAGES).default('en'),
+});
+export type JoinInput = z.input<typeof joinSchema>;
 
 export const loginSchema = z.object({
   phone: phoneSchema,
@@ -100,6 +113,9 @@ export const VALIDATION_KEYS = [
   'validation.rsvpClosed',
   // Produced by the API rather than a schema, but translated the same way.
   'validation.phoneTaken',
+  'validation.phoneListed',
+  'validation.phoneNeeded',
+  'validation.inviteCode',
   'validation.relationHead',
   'validation.photoType',
   'validation.photoSize',

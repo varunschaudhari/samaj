@@ -3,7 +3,7 @@ import type { FamilyStatus } from '../constants';
 import { MEMBER_PAGE_SIZE } from '../constants';
 import { ROLES, type Role } from '../rbac';
 import { passwordSchema } from './auth';
-import { objectIdSchema, phoneSchema } from './common';
+import { objectIdSchema, phoneSchema, resetCodeSchema } from './common';
 
 export const userListQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
@@ -23,22 +23,6 @@ export const roleUpdateSchema = z.object({
   branchId: objectIdSchema,
 });
 export type RoleUpdateInput = z.input<typeof roleUpdateSchema>;
-
-/*
- * Reset codes are 8 characters from an alphabet without look-alikes
- * (no 0/O, 1/I/L), shown as XXXX-XXXX so they are easy to read over the phone.
- */
-export const RESET_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-export const RESET_CODE_LENGTH = 8;
-
-export const resetCodeSchema = z
-  .string()
-  .transform((v) => v.toUpperCase().replace(/[\s-]/g, ''))
-  .pipe(z.string().regex(new RegExp(`^[${RESET_CODE_ALPHABET}]{${RESET_CODE_LENGTH}}$`), 'validation.resetCode'));
-
-export function formatResetCode(code: string): string {
-  return `${code.slice(0, 4)}-${code.slice(4)}`;
-}
 
 export const resetPasswordSchema = z.object({
   phone: phoneSchema,

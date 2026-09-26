@@ -5,23 +5,27 @@ import {
   type HistoryAction,
   type MemberInputParsed,
   PHOTO_MAX_BYTES,
+  type enrolFamilySchema,
   type familyUpdateSchema,
 } from '@samaj/shared';
 import { type HydratedDocument, Types } from 'mongoose';
 import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
 import { type FamilyDoc, FamilyModel, HISTORY_LIMIT } from '../models/family.model';
+import { InviteModel } from '../models/invite.model';
 import { type MemberDoc, MemberModel } from '../models/member.model';
 import { UserModel } from '../models/user.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { storage } from '../utils/storage';
 import { closeForRemovedMember, syncFamilyGotra, syncMember } from './matrimony.service';
-import { canEditFamily, canResetPasswordFor, canReviewFamily, canSeeContact, canViewFamily, isOwnFamily } from './access';
+import { canEditFamily, canEnrolIn, canResetPasswordFor, canReviewFamily, canSeeContact, canViewFamily, isOwnFamily } from './access';
+import { assertPhoneFree } from './phones';
 import type { Viewer } from './viewer';
 
 export const MAX_FAMILY_MEMBERS = 40;
 
 type FamilyUpdate = z.output<typeof familyUpdateSchema>;
+type EnrolFamily = z.output<typeof enrolFamilySchema>;
 type FamilyDocument = HydratedDocument<FamilyDoc>;
 
 const familyGone = () => notFound('That family is no longer in the directory.');
@@ -37,20 +41,20 @@ export async function loadFamily(id: string): Promise<FamilyDocument> {
   return family;
 }
 
-export function recordHistory(family: FamilyDocument, viewer: Viewer, action: HistoryAction, note: string | null = null) {
+export function recordHistory(family: FamilyDocument, viewer: Pick<Viewer, 'id' | 'name'>, action: HistoryAction, note: string | null = null) {
   family.history.push({ at: new Date(), action, byUserId: new Types.ObjectId(viewer.id), byName: viewer.name, note });
   if (family.history.length > HISTORY_LIMIT) family.history.splice(0, family.history.length - HISTORY_LIMIT);
 }
 
 /** Load a family the viewer may change. Families they can't see are reported as missing, not forbidden. */
-async function loadEditable(viewer: Viewer, familyId: string): Promise<FamilyDocument> {
+export async function loadEditable(viewer: Viewer, familyId: string): Promise<FamilyDocument> {
   const family = await loadFamily(familyId);
   if (!canViewFamily(viewer, family)) throw familyGone();
   if (!canEditFamily(viewer, family)) throw forbidden("Only this family and its branch committee can change these details.");
   return family;
 }
 
-async function loadMemberOf(family: FamilyDocument, memberId: string) {
+export async function loadMemberOf(family: FamilyDocument, memberId: string) {
   if (!Types.ObjectId.isValid(memberId)) throw notFound('That person is no longer in this family.');
   const member = await MemberModel.findOne({ _id: memberId, familyId: family._id });
   if (!member) throw notFound('That person is no longer in this family.');
@@ -96,6 +100,7 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     hasAccount: m.userId !== null,
     canResetPassword,
     ...(canResetPassword && { accountId: String(m.userId) }),
+    canInvite: canEdit && m.userId === null,
     };
   };
 
@@ -125,6 +130,53 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     }));
   }
   return detail;
+}
+
+/** A committee member or admin registers a family and its head. The family starts verified: its reviewer created it. */
+export async function enrolFamily(viewer: Viewer, input: EnrolFamily): Promise<FamilyDetail> {
+  const branch = await BranchModel.findById(input.branchId).lean();
+  if (!branch) {
+    throw new AppError(400, 'VALIDATION_FAILED', 'Pick the branch from the list.', [{ path: 'branchId', message: 'validation.branchRequired' }]);
+  }
+  if (!canEnrolIn(viewer, { branchId: branch._id, branchAncestors: branch.ancestors })) {
+    throw forbidden('You can enrol families only in your own branch and the branches inside it.');
+  }
+  if (input.head.phone) await assertPhoneFree(input.head.phone, 'head.phone');
+
+  const now = new Date();
+  const by = { byUserId: new Types.ObjectId(viewer.id), byName: viewer.name };
+  const family = await FamilyModel.create({
+    branchId: branch._id,
+    branchAncestors: branch.ancestors,
+    place: input.place ?? branch.name,
+    gotra: input.gotra,
+    address: input.address,
+    status: 'verified',
+    submittedAt: now,
+    reviewedAt: now,
+    reviewedByUserId: by.byUserId,
+    history: [
+      { at: now, action: 'created', ...by, note: 'Enrolled by the committee' },
+      { at: now, action: 'verified', ...by, note: null },
+    ],
+  });
+  try {
+    await MemberModel.create({
+      ...input.head,
+      relation: 'head',
+      isHead: true,
+      familyId: family._id,
+      branchId: family.branchId,
+      branchAncestors: family.branchAncestors,
+      place: family.place,
+      gotra: family.gotra,
+      familyStatus: family.status,
+    });
+  } catch (err) {
+    await family.deleteOne();
+    throw err;
+  }
+  return getFamily(viewer, String(family._id));
 }
 
 export async function updateFamily(viewer: Viewer, familyId: string, input: FamilyUpdate): Promise<FamilyDetail> {
@@ -194,6 +246,7 @@ export async function removeMember(viewer: Viewer, familyId: string, memberId: s
 
   if (member.photoKey) await storage.remove(member.photoKey);
   await closeForRemovedMember(member._id);
+  await InviteModel.deleteOne({ memberId: member._id });
   await member.deleteOne();
   recordHistory(family, viewer, 'updated', `Removed ${member.name}`);
   await family.save();

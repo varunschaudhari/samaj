@@ -1,6 +1,5 @@
-import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 import argon2 from 'argon2';
-import { RESET_CODE_ALPHABET, RESET_CODE_LENGTH, type ResetCode, type changePasswordSchema, type resetPasswordSchema } from '@samaj/shared';
+import { type ResetCode, type changePasswordSchema, type resetPasswordSchema } from '@samaj/shared';
 import { Types } from 'mongoose';
 import type { z } from 'zod';
 import { FamilyModel } from '../models/family.model';
@@ -9,20 +8,13 @@ import { SessionModel } from '../models/session.model';
 import { UserModel } from '../models/user.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { logger } from '../utils/logger';
+import { codeMatches, hashCode, newCode } from '../utils/one-time-code';
 import { canResetPasswordFor } from './access';
 import { decodeRefreshToken } from './token.service';
 import type { Viewer } from './viewer';
 
 export const RESET_CODE_TTL_MS = 30 * 60_000;
 export const MAX_RESET_ATTEMPTS = 5;
-
-const hashCode = (code: string) => createHash('sha256').update(code).digest();
-
-function newCode(): string {
-  let code = '';
-  for (let i = 0; i < RESET_CODE_LENGTH; i++) code += RESET_CODE_ALPHABET[randomInt(RESET_CODE_ALPHABET.length)];
-  return code;
-}
 
 /** Sign an account out everywhere, optionally keeping the session making the request. */
 async function revokeSessions(userId: Types.ObjectId, keepSessionId?: string) {
@@ -47,7 +39,7 @@ export async function createResetCode(viewer: Viewer, userId: string): Promise<R
   // One live code per account: a new code replaces the old one.
   await PasswordResetModel.findOneAndUpdate(
     { userId: user._id },
-    { $set: { codeHash: hashCode(code).toString('hex'), createdByUserId: new Types.ObjectId(viewer.id), expiresAt, attempts: 0 } },
+    { $set: { codeHash: hashCode(code), createdByUserId: new Types.ObjectId(viewer.id), expiresAt, attempts: 0 } },
     { upsert: true },
   );
   logger.info({ userId: String(user._id), byUserId: viewer.id }, 'Password reset code created');
@@ -67,9 +59,7 @@ export async function resetPassword(input: z.output<typeof resetPasswordSchema>)
   const reset = await PasswordResetModel.findOne({ userId: user._id });
   if (!reset || reset.expiresAt.getTime() <= Date.now() || reset.attempts >= MAX_RESET_ATTEMPTS) throw invalidCode();
 
-  const expected = Buffer.from(reset.codeHash, 'hex');
-  const presented = hashCode(input.code);
-  if (expected.length !== presented.length || !timingSafeEqual(expected, presented)) {
+  if (!codeMatches(reset.codeHash, input.code)) {
     reset.attempts += 1;
     await reset.save();
     throw invalidCode();

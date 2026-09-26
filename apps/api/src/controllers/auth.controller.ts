@@ -1,4 +1,4 @@
-import { REFRESH_COOKIE, loginSchema, signupSchema, updatePreferencesSchema } from '@samaj/shared';
+import { REFRESH_COOKIE, joinSchema, loginSchema, signupSchema, updatePreferencesSchema } from '@samaj/shared';
 import type { Request, Response } from 'express';
 import * as authService from '../services/auth.service';
 import { unauthenticated } from '../utils/app-error';
@@ -14,6 +14,13 @@ const meta = (req: Request) => ({ userAgent: req.get('user-agent') });
 export async function signup(req: Request, res: Response) {
   const input = signupSchema.parse(req.body);
   const { user, tokens } = await authService.signup(input, meta(req));
+  setAuthCookies(res, tokens);
+  res.status(201).json({ user });
+}
+
+export async function join(req: Request, res: Response) {
+  const input = joinSchema.parse(req.body);
+  const { user, tokens } = await authService.join(input, meta(req));
   setAuthCookies(res, tokens);
   res.status(201).json({ user });
 }

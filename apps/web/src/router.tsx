@@ -6,6 +6,7 @@ import { RouteErrorScreen } from '@/components/layout/ErrorBoundary';
 import { useMe } from '@/features/auth/api';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { RedirectIfAuthed, RequireAuth } from '@/features/auth/RequireAuth';
+import { JoinPage } from '@/features/auth/JoinPage';
 import { SignupPage } from '@/features/auth/SignupPage';
 import { AdminIndex, AdminLayout } from '@/features/admin/AdminLayout';
 import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
@@ -41,6 +42,7 @@ export const router = createBrowserRouter([
     children: [
       { path: '/login', element: <RedirectIfAuthed><LoginPage /></RedirectIfAuthed> },
       { path: '/signup', element: <RedirectIfAuthed><SignupPage /></RedirectIfAuthed> },
+      { path: '/join', element: <RedirectIfAuthed><JoinPage /></RedirectIfAuthed> },
       { path: '/reset-password', element: <RedirectIfAuthed><ResetPasswordPage /></RedirectIfAuthed> },
       // Public so the design system can be reviewed without an account.
       { path: '/styleguide', element: <StyleguidePage /> },

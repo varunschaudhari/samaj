@@ -234,7 +234,8 @@ async function main() {
       account: { role: a.role, phone: a.phone },
       people: [
         { name: a.name, relation: 'head', gender: 'male', birthYear: 1970 },
-        { name: `${a.name} Spouse`, relation: 'spouse', gender: 'female', birthYear: 1974 },
+        // Member Demo's spouse is listed with a number but no sign-in, to try invite codes and Join your family.
+        { name: `${a.name} Spouse`, relation: 'spouse', gender: 'female', birthYear: 1974, ...(a.name === 'Member Demo' && { phone: '+919800000006' }) },
         // Member Demo gets a grown son, so that account can try matrimonial search.
         ...(a.name === 'Member Demo' ? [{ name: 'Rohit Demo', relation: 'son' as const, gender: 'male' as const, birthYear: new Date().getFullYear() - 27, occupation: 'Software engineer', education: 'B.E.' }] : []),
       ],

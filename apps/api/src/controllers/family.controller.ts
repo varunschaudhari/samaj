@@ -1,6 +1,7 @@
-import { familyUpdateSchema, memberInputSchema, pageQuerySchema, rejectFamilySchema } from '@samaj/shared';
+import { enrolFamilySchema, familyUpdateSchema, memberInputSchema, pageQuerySchema, rejectFamilySchema } from '@samaj/shared';
 import type { Request, Response } from 'express';
 import * as familyService from '../services/family.service';
+import * as inviteService from '../services/invite.service';
 import type { Viewer } from '../services/viewer';
 import * as matrimonyService from '../services/matrimony.service';
 import * as verificationService from '../services/verification.service';
@@ -13,6 +14,11 @@ function viewer(req: Request): Viewer {
 
 /** Route params as plain strings (Express 5 types them as string | string[]). */
 const param = (req: Request, name: string) => String(req.params[name] ?? '');
+
+export async function enrol(req: Request, res: Response) {
+  const input = enrolFamilySchema.parse(req.body);
+  res.status(201).json({ family: await familyService.enrolFamily(viewer(req), input) });
+}
 
 export async function get(req: Request, res: Response) {
   res.json({ family: await familyService.getFamily(viewer(req), param(req, 'familyId')) });
@@ -35,6 +41,10 @@ export async function updateMember(req: Request, res: Response) {
 
 export async function removeMember(req: Request, res: Response) {
   res.json({ family: await familyService.removeMember(viewer(req), param(req, 'familyId'), param(req, 'memberId')) });
+}
+
+export async function createInvite(req: Request, res: Response) {
+  res.status(201).json({ invite: await inviteService.createInvite(viewer(req), param(req, 'familyId'), param(req, 'memberId')) });
 }
 
 export async function setPhoto(req: Request, res: Response) {

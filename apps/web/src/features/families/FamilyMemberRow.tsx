@@ -1,5 +1,5 @@
 import { type FamilyMember, formatPhone } from '@samaj/shared';
-import { GraduationCap, KeyRound, Pencil, Phone, Trash2 } from 'lucide-react';
+import { GraduationCap, KeyRound, Pencil, Phone, Smartphone, Trash2 } from 'lucide-react';
 import { Avatar, Badge, Icon, IconButton, Skeleton, buttonVariants } from '@/components/ui';
 import { useT } from '@/i18n';
 import { cn } from '@/lib/cn';
@@ -10,9 +10,10 @@ interface FamilyMemberRowProps {
   onEdit: () => void;
   onRemove: () => void;
   onResetPassword: () => void;
+  onInvite: () => void;
 }
 
-export function FamilyMemberRow({ member, canEdit, onEdit, onRemove, onResetPassword }: FamilyMemberRowProps) {
+export function FamilyMemberRow({ member, canEdit, onEdit, onRemove, onResetPassword, onInvite }: FamilyMemberRowProps) {
   const t = useT();
   const age = member.birthYear ? new Date().getFullYear() - member.birthYear : null;
   const removable = canEdit && !member.isHead && !member.hasAccount;
@@ -25,6 +26,7 @@ export function FamilyMemberRow({ member, canEdit, onEdit, onRemove, onResetPass
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <p className="font-display text-lg font-semibold break-words text-fg">{member.name}</p>
           {member.isHead && <Badge tone="primary">{t('family.headBadge')}</Badge>}
+          {canEdit && member.hasAccount && <Badge>{t('family.signsIn')}</Badge>}
         </div>
         <p className="text-sm text-fg-muted">{facts.join(' · ')}</p>
         {member.education && (
@@ -46,6 +48,7 @@ export function FamilyMemberRow({ member, canEdit, onEdit, onRemove, onResetPass
       </div>
       {(canEdit || member.canResetPassword) && (
         <div className="flex shrink-0">
+          {member.canInvite && <IconButton icon={Smartphone} label={t('invite.createFor', { name: member.name })} onClick={onInvite} />}
           {member.canResetPassword && <IconButton icon={KeyRound} label={t('reset.createFor', { name: member.name })} onClick={onResetPassword} />}
           {canEdit && <IconButton icon={Pencil} label={t('family.editMember', { name: member.name })} onClick={onEdit} />}
           {removable && <IconButton icon={Trash2} label={t('family.removeMember', { name: member.name })} onClick={onRemove} />}

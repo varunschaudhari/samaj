@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { type FamilyStatus, type Gender, GENDERS } from '../constants';
 import { personNameSchema } from './auth';
 import { GOTRA_IDS, type GotraId } from '../gotras';
-import { phoneSchema } from './common';
+import { objectIdSchema, phoneSchema } from './common';
 
 /** Relation to the family head. Exactly one member of a family is the head. */
 export const RELATIONS = [
@@ -22,9 +22,8 @@ export const RELATIONS = [
 ] as const;
 export type Relation = (typeof RELATIONS)[number];
 
-
-
-export const HISTORY_ACTIONS = ['created', 'updated', 'verified', 'rejected', 'resubmitted'] as const;
+/** 'invited': someone was given a code to their own sign-in; 'joined': they used it. */
+export const HISTORY_ACTIONS = ['created', 'updated', 'verified', 'rejected', 'resubmitted', 'invited', 'joined'] as const;
 export type HistoryAction = (typeof HISTORY_ACTIONS)[number];
 
 /*
@@ -89,6 +88,20 @@ export const familyUpdateSchema = z.object({
 });
 export type FamilyUpdateInput = z.input<typeof familyUpdateSchema>;
 
+/**
+ * A committee member or admin registers a family on its behalf, for households
+ * without a smartphone or at an enrolment camp. The head needs no account; a
+ * blank place becomes the branch name.
+ */
+export const enrolFamilySchema = z.object({
+  branchId: objectIdSchema,
+  place: optionalText(60).pipe(z.string().min(2, 'validation.placeMin').nullable()),
+  gotra: gotraSchema,
+  address: optionalText(200),
+  head: memberInputSchema.omit({ relation: true }),
+});
+export type EnrolFamilyInput = z.input<typeof enrolFamilySchema>;
+
 export const rejectFamilySchema = z.object({
   reason: z.string().trim().min(5, 'validation.reasonMin').max(300, 'validation.tooLong'),
 });
@@ -114,6 +127,14 @@ export interface FamilyMember {
   canResetPassword: boolean;
   /** The member's account id, present only when canResetPassword is true. */
   accountId?: string;
+  /** The viewer may create an invite code so this person can sign in to this family. */
+  canInvite: boolean;
+}
+
+/** A one-time code that links a new sign-in to a person already listed in a family. */
+export interface InviteCode {
+  code: string;
+  expiresAt: string;
 }
 
 export interface FamilyHistoryEntry {

@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { GENDERS, type SignupInput, signupSchema } from '@samaj/shared';
-import { Phone, RotateCw } from 'lucide-react';
+import { Phone, RotateCw, UsersRound } from 'lucide-react';
 import { type UseFormRegisterReturn, useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router';
-import { Button, Input, Select, Skeleton } from '@/components/ui';
+import { Button, Card, Icon, Input, Select, Skeleton } from '@/components/ui';
 import { branchName, groupBranches, useBranches } from '@/features/branches/api';
 import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { useSignup } from './api';
@@ -92,6 +92,16 @@ export function SignupPage() {
         </>
       }
     >
+      {/* Relatives already listed by their family join it instead of registering a second family. */}
+      <Card variant="muted" className="flex items-start gap-3">
+        <Icon icon={UsersRound} className="mt-0.5 text-primary" />
+        <p className="text-sm text-fg">
+          {t('join.fromSignup')}{' '}
+          <Link to="/join" className="font-semibold text-primary underline-offset-4 hover:underline">
+            {t('join.link')}
+          </Link>
+        </p>
+      </Card>
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         {showBanner && <FormAlert message={errorMessage(signup.error)} />}
         <Input label={t('auth.field.name')} autoComplete="name" error={fieldError(t, errors.name?.message)} {...form.register('name')} />

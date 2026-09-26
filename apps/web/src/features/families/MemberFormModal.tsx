@@ -124,7 +124,7 @@ export function MemberFormModal({ familyId, member, open, onClose }: MemberFormM
           <Input
             label={t('member.phone')}
             labelSuffix={phoneLocked ? undefined : t('common.optional')}
-            hint={phoneLocked ? t('member.phoneLocked') : undefined}
+            hint={phoneLocked ? t('member.phoneLocked') : t('member.phoneHint')}
             type="tel"
             inputMode="numeric"
             leadingIcon={Phone}

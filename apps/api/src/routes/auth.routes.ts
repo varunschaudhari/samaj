@@ -7,6 +7,7 @@ import { authLimiter } from '../middleware/rate-limit';
 export const authRouter = Router();
 
 authRouter.post('/signup', authLimiter, auth.signup);
+authRouter.post('/join', authLimiter, auth.join);
 authRouter.post('/login', authLimiter, auth.login);
 authRouter.post('/refresh', auth.refresh);
 // Public, like login: rate limited the same way.

@@ -5,11 +5,15 @@ import { requireAuth } from '../middleware/auth';
 export const familyRouter = Router();
 familyRouter.use(requireAuth);
 
+// Committee members (in their branch) and admins register a family on its behalf. The service checks who may.
+familyRouter.post('/', families.enrol);
 familyRouter.get('/:familyId', families.get);
 familyRouter.put('/:familyId', families.update);
 familyRouter.post('/:familyId/members', families.addMember);
 familyRouter.put('/:familyId/members/:memberId', families.updateMember);
 familyRouter.delete('/:familyId/members/:memberId', families.removeMember);
+// A one-time code so a listed person can sign in to this family with their own number.
+familyRouter.post('/:familyId/members/:memberId/invite', families.createInvite);
 
 // Raw image bytes. The limit is above the real cap so the service can return a field error instead of a bare 413.
 familyRouter.put(

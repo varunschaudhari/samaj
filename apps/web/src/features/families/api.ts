@@ -1,4 +1,4 @@
-import type { FamilyDetail, FamilyUpdateInput, MemberInput, PendingFamilyPage } from '@samaj/shared';
+import type { EnrolFamilyInput, FamilyDetail, FamilyUpdateInput, InviteCode, MemberInput, PendingFamilyPage } from '@samaj/shared';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { meKey } from '@/features/auth/api';
 import { api } from '@/lib/api';
@@ -42,6 +42,27 @@ export function useSaveMember(familyId: string) {
 
 export function useRemoveMember(familyId: string) {
   return useFamilyMutation(familyId, (memberId: string) => api.delete(`/families/${familyId}/members/${memberId}`));
+}
+
+/** A one-time code so a listed person can sign in to this family. The family's history records it, so refresh the page. */
+export function useCreateInvite(familyId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (memberId: string) => (await api.post<{ invite: InviteCode }>(`/families/${familyId}/members/${memberId}/invite`)).invite,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: familyKey(familyId) }),
+  });
+}
+
+/** A committee member or admin registers a family on its behalf. */
+export function useEnrolFamily() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: EnrolFamilyInput) => (await api.post<{ family: FamilyDetail }>('/families', input)).family,
+    onSuccess: (family) => {
+      queryClient.setQueryData(familyKey(family.id), family);
+      void queryClient.invalidateQueries({ queryKey: ['members'] });
+    },
+  });
 }
 
 export function useUploadPhoto(familyId: string) {

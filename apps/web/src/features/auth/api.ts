@@ -1,4 +1,4 @@
-import type { Language, LoginInput, PublicUser, SignupInput } from '@samaj/shared';
+import type { JoinInput, Language, LoginInput, PublicUser, SignupInput } from '@samaj/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLanguageStore } from '@/i18n';
 import { ApiError, api } from '@/lib/api';
@@ -47,6 +47,15 @@ export function useSignup() {
   const onSignedIn = useOnSignedIn();
   return useMutation({
     mutationFn: (input: SignupInput) => api.post<{ user: PublicUser }>('/auth/signup', input),
+    onSuccess: ({ user }) => onSignedIn(user),
+  });
+}
+
+/** First sign-in for someone already listed in a family, with their invite code. */
+export function useJoin() {
+  const onSignedIn = useOnSignedIn();
+  return useMutation({
+    mutationFn: (input: JoinInput) => api.post<{ user: PublicUser }>('/auth/join', input),
     onSuccess: ({ user }) => onSignedIn(user),
   });
 }

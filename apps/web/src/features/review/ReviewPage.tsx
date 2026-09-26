@@ -1,10 +1,12 @@
 import type { PendingFamily } from '@samaj/shared';
-import { ChevronRight, ClipboardCheck, HeartHandshake, MapPin } from 'lucide-react';
+import { ChevronRight, ClipboardCheck, HeartHandshake, MapPin, UserPlus } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Avatar, Button, Card, EmptyState, ErrorState, Icon, Skeleton, Tabs } from '@/components/ui';
 import { placeLabel } from '@/features/branches/api';
 import { usePendingFamilies } from '@/features/families/api';
+import { EnrolFamilyModal } from '@/features/families/EnrolFamilyModal';
 import { usePendingProfiles } from '@/features/matrimony/api';
 import { ProfileCardSkeleton, ProfileCardView } from '@/features/matrimony/ProfileCardView';
 import { formatDate, formatNumber, useLanguageStore, useT } from '@/i18n';
@@ -53,6 +55,7 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
   const pending = usePendingFamilies();
+  const [enrolling, setEnrolling] = useState(false);
   const items = pending.data?.pages.flatMap((p) => p.items) ?? [];
   const total = pending.data?.pages[0]?.total;
 
@@ -110,6 +113,12 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
     );
   }
 
+  const enrolButton = (
+    <Button variant="secondary" leadingIcon={UserPlus} onClick={() => setEnrolling(true)}>
+      {t('enrol.open')}
+    </Button>
+  );
+
   const count = (n: number | undefined) => (n === undefined ? '' : ` (${formatNumber(n, language)})`);
 
   return (
@@ -118,8 +127,10 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
         <PageHeader
           title={t('review.page.title')}
           description={total === undefined ? <Skeleton className="h-4 w-32" /> : <span className="tabular-nums">{t('review.page.count', { count: total })}</span>}
+          actions={enrolButton}
         />
       )}
+      {embedded && <div className="flex justify-end">{enrolButton}</div>}
       <Tabs
         label={t('review.page.title')}
         items={[
@@ -127,6 +138,7 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
           { id: 'profiles', label: `${t('review.tab.profiles')}${count(profiles.data?.length)}`, content: profileBody },
         ]}
       />
+      <EnrolFamilyModal open={enrolling} onClose={() => setEnrolling(false)} />
     </div>
   );
 }
