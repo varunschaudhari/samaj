@@ -1,0 +1,103 @@
+import { LogOut } from 'lucide-react';
+import { NavLink, Outlet } from 'react-router';
+import { Button, Icon, IconButton, toast } from '@/components/ui';
+import { useLogout } from '@/features/auth/api';
+import { useT } from '@/i18n';
+import { cn } from '@/lib/cn';
+import { BrandMark } from './BrandMark';
+import { LanguageSwitch } from './LanguageSwitch';
+import { visibleNavItems } from './nav-items';
+
+/**
+ * Phones: top bar plus a bottom tab bar (icon and label, thumb-reachable).
+ * md and up: a left sidebar with the same items.
+ */
+export function AppShell() {
+  const t = useT();
+  const logout = useLogout();
+  const items = visibleNavItems();
+
+  const signOut = () => logout.mutate(undefined, { onSettled: () => toast.info(t('auth.loggedOut')) });
+
+  return (
+    <div className="min-h-dvh bg-canvas md:grid md:grid-cols-[15rem_1fr]">
+      <a
+        href="#main"
+        className="sr-only z-50 rounded-sm bg-primary px-4 py-2 text-on-primary focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      >
+        {t('nav.skipToContent')}
+      </a>
+
+      {/* Sidebar, md and up */}
+      <aside className="sticky top-0 hidden h-dvh flex-col gap-6 border-r border-line bg-surface px-3 py-5 md:flex">
+        <BrandMark className="px-3" />
+        <nav aria-label={t('nav.primary')} className="flex flex-col gap-1">
+          {items.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                cn(
+                  'flex min-h-touch items-center gap-3 rounded-sm px-3 font-semibold transition-colors duration-150',
+                  isActive ? 'bg-primary-soft text-primary' : 'text-fg-muted hover:bg-surface-muted hover:text-fg',
+                )
+              }
+            >
+              <Icon icon={item.icon} size="lg" />
+              {t(item.label)}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="mt-auto flex flex-col gap-3 px-1">
+          <LanguageSwitch />
+          <Button variant="ghost" leadingIcon={LogOut} onClick={signOut} loading={logout.isPending} className="justify-start px-2">
+            {t('auth.logout')}
+          </Button>
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-col">
+        {/* Top bar, phones */}
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-line bg-surface/95 py-2 pr-2 pl-4 backdrop-blur md:hidden">
+          <BrandMark />
+          <div className="flex items-center gap-1">
+            <LanguageSwitch />
+            <IconButton icon={LogOut} label={t('auth.logout')} onClick={signOut} tooltipSide="bottom" />
+          </div>
+        </header>
+
+        <main id="main" tabIndex={-1} className="flex-1 px-4 pt-5 pb-28 focus:outline-none sm:px-6 md:px-8 md:pt-8 md:pb-12">
+          <Outlet />
+        </main>
+
+        {/* Bottom tab bar, phones */}
+        <nav
+          aria-label={t('nav.primary')}
+          className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+        >
+          {items.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                cn(
+                  'flex min-h-16 flex-1 flex-col items-center justify-center gap-0.5 text-xs font-semibold transition-colors duration-150',
+                  isActive ? 'text-primary' : 'text-fg-muted',
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span className={cn('flex h-7 w-14 items-center justify-center rounded-full', isActive && 'bg-primary-soft')}>
+                    <Icon icon={item.icon} size="lg" />
+                  </span>
+                  {t(item.label)}
+                </>
+              )}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
+    </div>
+  );
+}
