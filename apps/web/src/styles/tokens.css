@@ -1,0 +1,92 @@
+/*
+ * Design tokens: the single source for colour, type, radius and elevation.
+ * index.css maps these into Tailwind's theme, and components use only those
+ * Tailwind names (bg-surface, text-fg-muted, rounded-md). No raw hex values
+ * anywhere else.
+ *
+ * Palette: Paithani. Peacock green (mor) is the working colour, zari gold a
+ * sparing highlight used as a fill only, kumkum a second accent for occasions.
+ * Every text colour passes WCAG AA on canvas and surface.
+ */
+
+:root {
+  --font-body-stack: 'Noto Sans Devanagari Variable', 'Samaj Sans Fallback', 'Noto Sans Devanagari', system-ui, sans-serif;
+  --font-display-stack: 'Eczar Variable', 'Samaj Display Fallback', 'Noto Serif Devanagari', Georgia, serif;
+
+  /* Surfaces */
+  --canvas: #f6f8f7;
+  --surface: #ffffff;
+  --surface-muted: #edf1f0;
+  --scrim: rgb(14 21 20 / 0.55);
+
+  /* Text */
+  --fg: #16201f; /* 15.6:1 on canvas */
+  --fg-muted: #566562; /* 5.7:1 */
+
+  /* Lines. line-strong is 3:1+ for input borders (WCAG non-text contrast). */
+  --line: #dce3e1;
+  --line-strong: #74827f;
+
+  /* Brand */
+  --primary: #0b5d57; /* 7.2:1 */
+  --primary-hover: #084a45;
+  --primary-soft: #e3efec;
+  --on-primary: #ffffff; /* 7.7:1 on primary */
+  --zari: #c8911f; /* fill only; fails as text on light surfaces */
+  --zari-soft: #f7ebd2;
+  --zari-fg: #6b4600;
+  --kumkum: #8c2356;
+  --kumkum-soft: #f5e1ea;
+
+  /* Status */
+  --success: #1d6f3a;
+  --success-soft: #e2f0e6;
+  --warning: #8a5a00;
+  --warning-soft: #f7ebd2;
+  --danger: #b3261e;
+  --danger-hover: #962018;
+  --danger-soft: #f9e3e1;
+  --on-danger: #ffffff;
+  --info: #23539e;
+  --info-soft: #e2eaf6;
+  --focus: #23539e;
+
+  /* Elevation, for things that float above the page: menus, toasts, modals. */
+  --elevation-raised: 0 1px 2px rgb(22 32 31 / 0.06), 0 4px 12px rgb(22 32 31 / 0.08);
+  --elevation-overlay: 0 8px 24px rgb(22 32 31 / 0.14), 0 2px 6px rgb(22 32 31 / 0.08);
+}
+
+/* Dark tokens are defined so dark mode is a design task later, not a rewrite. */
+.dark {
+  color-scheme: dark;
+  --canvas: #0e1514;
+  --surface: #16201f;
+  --surface-muted: #1e2a28;
+  --scrim: rgb(0 0 0 / 0.65);
+  --fg: #e6ecea;
+  --fg-muted: #9daeaa;
+  --line: #2a3735;
+  --line-strong: #6e7f7c;
+  --primary: #5cc2b6;
+  --primary-hover: #7bd3c8;
+  --primary-soft: #173a36;
+  --on-primary: #0e1514;
+  --zari: #e2b04a;
+  --zari-soft: #3a2e14;
+  --zari-fg: #e2b04a;
+  --kumkum: #e58ab5;
+  --kumkum-soft: #3a1a29;
+  --success: #6cc98c;
+  --success-soft: #173222;
+  --warning: #e2b04a;
+  --warning-soft: #3a2e14;
+  --danger: #f2857d;
+  --danger-hover: #f5a09a;
+  --danger-soft: #3d1a18;
+  --on-danger: #0e1514;
+  --info: #8db4f0;
+  --info-soft: #1a2940;
+  --focus: #8db4f0;
+  --elevation-raised: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.3);
+  --elevation-overlay: 0 8px 24px rgb(0 0 0 / 0.5);
+}
