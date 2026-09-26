@@ -5,7 +5,9 @@ import { BranchModel } from '../models/branch.model';
 import { type FamilyDoc, FamilyModel } from '../models/family.model';
 import { MemberModel } from '../models/member.model';
 import { AppError, forbidden } from '../utils/app-error';
+import { cappedCount } from '../utils/count';
 import { canReviewFamily, canViewFamily, isOwnFamily } from './access';
+import { inBranch } from './audience';
 import { getFamily, loadFamily, recordHistory } from './family.service';
 import type { Viewer } from './viewer';
 
@@ -16,8 +18,7 @@ function queueFilter(viewer: Viewer): QueryFilter<FamilyDoc> {
   if (!can(viewer.role, 'member:verify')) throw forbidden('Only the branch committee reviews new families.');
   const filter: QueryFilter<FamilyDoc> = { status: 'pending' };
   if (BRANCH_SCOPED_ROLES.includes(viewer.role)) {
-    const branchId = new Types.ObjectId(viewer.branchId);
-    filter.$or = [{ branchId }, { branchAncestors: branchId }];
+    Object.assign(filter, inBranch(viewer.branchId));
     filter._id = { $ne: new Types.ObjectId(viewer.familyId) };
   }
   return filter;
@@ -51,7 +52,7 @@ export async function listPending(viewer: Viewer, query: PageQuery): Promise<Pen
 
   const [docs, total] = await Promise.all([
     FamilyModel.find(page, { history: 0 }).sort({ submittedAt: 1, _id: 1 }).limit(query.limit + 1).lean(),
-    FamilyModel.countDocuments(base),
+    cappedCount(FamilyModel, base),
   ]);
   const hasMore = docs.length > query.limit;
   const families = hasMore ? docs.slice(0, query.limit) : docs;

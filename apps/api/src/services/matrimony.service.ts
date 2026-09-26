@@ -20,6 +20,8 @@ import { InterestModel } from '../models/interest.model';
 import { type MemberDoc, MemberModel } from '../models/member.model';
 import { type ProfileDoc, ProfileModel } from '../models/profile.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
+import { cappedCount } from '../utils/count';
+import { inBranch } from './audience';
 import { escapeRegex } from '../utils/regex';
 import { canBrowseDirectory, canEditFamily, canManageProfile, canReviewProfile, canViewProfile } from './access';
 import { photoUrl } from './family.service';
@@ -278,7 +280,8 @@ export async function search(viewer: Viewer, query: SearchQuery): Promise<Profil
   const year = new Date().getFullYear();
   const conditions: QueryFilter<ProfileDoc>[] = [
     { status: 'active' },
-    { gender: { $ne: own.gender } },
+    // An equality (not $ne) so the index gives the newest-first order.
+    { gender: own.gender === 'male' ? 'female' : 'male' },
     { familyId: { $ne: own.familyId } },
   ];
   // The gotra rule. Profiles whose family hasn't recorded a gotra still appear.
@@ -286,8 +289,7 @@ export async function search(viewer: Viewer, query: SearchQuery): Promise<Profil
   if (query.ageMin) conditions.push({ birthYear: { $lte: year - query.ageMin } });
   if (query.ageMax) conditions.push({ birthYear: { $gte: year - query.ageMax } });
   if (query.branchId) {
-    const branchId = new Types.ObjectId(query.branchId);
-    conditions.push({ $or: [{ branchId }, { branchAncestors: branchId }] });
+    conditions.push(inBranch(query.branchId));
   }
   if (query.education) conditions.push({ education: new RegExp(`(^|[\\s.,/(])${escapeRegex(query.education)}`, 'i') });
 
@@ -300,7 +302,7 @@ export async function search(viewer: Viewer, query: SearchQuery): Promise<Profil
 
   const [docs, total] = await Promise.all([
     ProfileModel.find(page).sort({ activatedAt: -1, _id: -1 }).limit(query.limit + 1).lean(),
-    ProfileModel.countDocuments(base),
+    cappedCount(ProfileModel, base),
   ]);
   const hasMore = docs.length > query.limit;
   const items = hasMore ? docs.slice(0, query.limit) : docs;
@@ -313,8 +315,7 @@ export async function search(viewer: Viewer, query: SearchQuery): Promise<Profil
 function reviewScope(viewer: Viewer): QueryFilter<ProfileDoc> {
   const filter: QueryFilter<ProfileDoc> = { status: 'pending' };
   if (!isGlobalRole(viewer.role)) {
-    const branchId = new Types.ObjectId(viewer.branchId);
-    filter.$or = [{ branchId }, { branchAncestors: branchId }];
+    Object.assign(filter, inBranch(viewer.branchId));
     filter.familyId = { $ne: new Types.ObjectId(viewer.familyId) };
   }
   return filter;

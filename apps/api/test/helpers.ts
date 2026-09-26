@@ -8,6 +8,7 @@ import { BranchModel } from '../src/models/branch.model';
 import { FamilyModel } from '../src/models/family.model';
 import { MemberModel } from '../src/models/member.model';
 import { UserModel } from '../src/models/user.model';
+import { invalidate } from '../src/utils/cache';
 
 let mongo: MongoMemoryServer | undefined;
 
@@ -24,6 +25,7 @@ export async function stopDb() {
 export async function clearDb() {
   const collections = await mongoose.connection.db?.collections();
   await Promise.all((collections ?? []).map((c) => c.deleteMany({})));
+  invalidate('');
 }
 
 export const app = createApp();

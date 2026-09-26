@@ -8,4 +8,6 @@ export interface Viewer {
   branchId: string;
   familyId: string;
   familyStatus: FamilyStatus;
+  /** The family's branch and every branch above it: whose notices, events and committees they see. */
+  homePath: string[];
 }

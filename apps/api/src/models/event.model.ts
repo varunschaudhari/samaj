@@ -1,4 +1,5 @@
 import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
+import { branchPathPlugin } from './plugins';
 
 const eventSchema = new Schema(
   {
@@ -19,9 +20,11 @@ const eventSchema = new Schema(
   { timestamps: true },
 );
 
-eventSchema.index({ removedAt: 1, startsAt: 1 });
-eventSchema.index({ branchId: 1 });
-eventSchema.index({ branchAncestors: 1 });
+eventSchema.plugin(branchPathPlugin);
+
+// Upcoming and past events for my branches, or (committee) anywhere under theirs.
+eventSchema.index({ branchId: 1, removedAt: 1, startsAt: 1 });
+eventSchema.index({ branchPath: 1, removedAt: 1, startsAt: 1 });
 
 export type EventDoc = InferSchemaType<typeof eventSchema> & { _id: Types.ObjectId };
 export const EventModel = model('Event', eventSchema);

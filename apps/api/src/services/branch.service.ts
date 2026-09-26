@@ -6,6 +6,7 @@ import { FamilyModel } from '../models/family.model';
 import { MemberModel } from '../models/member.model';
 import { UserModel } from '../models/user.model';
 import { AppError, notFound } from '../utils/app-error';
+import { cached, invalidate } from '../utils/cache';
 import { escapeRegex } from '../utils/regex';
 
 type CreateInput = z.output<typeof branchCreateSchema>;
@@ -19,19 +20,26 @@ const byLevelThenName = (a: Pick<BranchDoc, 'ancestors' | 'name'>, b: Pick<Branc
   a.ancestors.length - b.ancestors.length || a.name.localeCompare(b.name);
 
 /** All branches, parents before children, alphabetical within a level. */
-export async function listBranches(): Promise<Branch[]> {
-  const docs = await BranchModel.find().lean();
-  return docs.sort(byLevelThenName).map(toBranch);
+export function listBranches(): Promise<Branch[]> {
+  // Every signed-in screen asks for this and it rarely changes, so it's cached.
+  return cached('branches:all', 60_000, async () => (await BranchModel.find().lean()).sort(byLevelThenName).map(toBranch));
 }
 
 /** For the admin screen: every branch with how many families and sub-branches it has. */
-export async function listBranchSummaries(): Promise<BranchSummary[]> {
+export function listBranchSummaries(): Promise<BranchSummary[]> {
+  // Counts every family, so a few seconds' staleness is a fair price.
+  return cached('branches:summary', 15_000, loadBranchSummaries);
+}
+
+async function loadBranchSummaries(): Promise<BranchSummary[]> {
   const [docs, familyCounts, committee] = await Promise.all([
     BranchModel.find().lean(),
     FamilyModel.aggregate<{ _id: Types.ObjectId; n: number }>([{ $group: { _id: '$branchId', n: { $sum: 1 } } }]),
     UserModel.find({ role: 'committee' }, { name: 1, phone: 1, branchId: 1 }).sort({ name: 1 }).lean(),
   ]);
   const families = new Map(familyCounts.map((c) => [String(c._id), c.n]));
+  const committeeBy = new Map<string, typeof committee>();
+  for (const u of committee) committeeBy.set(String(u.branchId), [...(committeeBy.get(String(u.branchId)) ?? []), u]);
   const children = new Map<string, number>();
   for (const b of docs) if (b.parentId) children.set(String(b.parentId), (children.get(String(b.parentId)) ?? 0) + 1);
 
@@ -39,9 +47,7 @@ export async function listBranchSummaries(): Promise<BranchSummary[]> {
     ...toBranch(b),
     familyCount: families.get(String(b._id)) ?? 0,
     childCount: children.get(String(b._id)) ?? 0,
-    committee: committee
-      .filter((u) => String(u.branchId) === String(b._id))
-      .map((u) => ({ userId: String(u._id), name: u.name, phone: u.phone })),
+    committee: (committeeBy.get(String(b._id)) ?? []).map((u) => ({ userId: String(u._id), name: u.name, phone: u.phone })),
   }));
 }
 
@@ -79,6 +85,7 @@ export async function createBranch(input: CreateInput): Promise<Branch> {
   }
   await assertUniqueName(parent?._id ?? null, input.name, input.nameMr);
 
+  invalidate('branches');
   const branch = await BranchModel.create({
     name: input.name,
     nameMr: input.nameMr,
@@ -97,6 +104,7 @@ export async function updateBranch(id: string, input: UpdateInput): Promise<Bran
   branch.name = input.name;
   branch.nameMr = input.nameMr;
   await branch.save();
+  invalidate('branches');
 
   // A family's place starts as its branch name. Where it still is, follow the rename.
   if (oldName !== input.name) {
@@ -119,4 +127,5 @@ export async function deleteBranch(id: string): Promise<void> {
   if (children > 0) throw new AppError(409, 'CONFLICT', 'Remove or move the cities and towns inside this district first.');
   if (families > 0 || users > 0) throw new AppError(409, 'CONFLICT', "Families belong to this branch, so it can't be removed.");
   await branch.deleteOne();
+  invalidate('branches');
 }

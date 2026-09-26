@@ -1,5 +1,6 @@
 import { CLOSE_REASONS, GENDERS, GOTRA_IDS, INCOME_RANGES, MANGLIK, PROFILE_STATUSES } from '@samaj/shared';
 import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
+import { branchPathPlugin } from './plugins';
 
 /**
  * A matrimonial profile for one family member. gender, birthYear, gotra and
@@ -45,8 +46,14 @@ const profileSchema = new Schema(
   { timestamps: true },
 );
 
+profileSchema.plugin(branchPathPlugin);
+
+// Search: newest first, anywhere or within a branch.
 profileSchema.index({ status: 1, gender: 1, activatedAt: -1, _id: -1 });
+profileSchema.index({ status: 1, branchPath: 1, gender: 1, activatedAt: -1, _id: -1 });
+// The review queue.
 profileSchema.index({ status: 1, submittedAt: 1 });
+profileSchema.index({ status: 1, branchPath: 1, submittedAt: 1 });
 
 export type ProfileDoc = InferSchemaType<typeof profileSchema> & { _id: Types.ObjectId };
 export const ProfileModel = model('Profile', profileSchema);

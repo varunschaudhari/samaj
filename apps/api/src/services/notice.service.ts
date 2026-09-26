@@ -51,7 +51,7 @@ function decodeCursor(cursor: string): { at: Date; id: Types.ObjectId } {
 
 /** Pinned notices first (on the first page only), then newest first. */
 export async function listNotices(viewer: Viewer, query: ListQuery): Promise<NoticeFeed> {
-  const conditions: QueryFilter<NoticeDoc>[] = [{ removedAt: null }, (await branchAudience(viewer)) as QueryFilter<NoticeDoc>];
+  const conditions: QueryFilter<NoticeDoc>[] = [{ removedAt: null }, branchAudience(viewer) as QueryFilter<NoticeDoc>];
   if (query.kind) conditions.push({ kind: query.kind });
 
   const page: QueryFilter<NoticeDoc>[] = [...conditions, { pinned: false }];

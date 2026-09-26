@@ -9,7 +9,7 @@ import { usePendingFamilies } from '@/features/families/api';
 import { EnrolFamilyModal } from '@/features/families/EnrolFamilyModal';
 import { usePendingProfiles } from '@/features/matrimony/api';
 import { ProfileCardSkeleton, ProfileCardView } from '@/features/matrimony/ProfileCardView';
-import { formatDate, formatNumber, useLanguageStore, useT } from '@/i18n';
+import { formatDate, formatNumber, formatTotal, useLanguageStore, useT } from '@/i18n';
 
 function PendingCard({ family }: { family: PendingFamily }) {
   const t = useT();
@@ -119,14 +119,14 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
     </Button>
   );
 
-  const count = (n: number | undefined) => (n === undefined ? '' : ` (${formatNumber(n, language)})`);
+  const count = (n: number | undefined) => (n === undefined ? '' : ` (${formatTotal(n, language)})`);
 
   return (
     <div className={embedded ? 'flex flex-col gap-4' : 'mx-auto flex max-w-3xl flex-col gap-5'}>
       {!embedded && (
         <PageHeader
           title={t('review.page.title')}
-          description={total === undefined ? <Skeleton className="h-4 w-32" /> : <span className="tabular-nums">{t('review.page.count', { count: total })}</span>}
+          description={total === undefined ? <Skeleton className="h-4 w-32" /> : <span className="tabular-nums">{t('review.page.count', { count: formatTotal(total, language) })}</span>}
           actions={enrolButton}
         />
       )}

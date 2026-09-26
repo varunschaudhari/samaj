@@ -19,7 +19,7 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
 
   const user = await UserModel.findById(userId, { name: 1, role: 1, branchId: 1, familyId: 1 }).lean();
   if (!user) throw unauthenticated();
-  const family = await FamilyModel.findById(user.familyId, { status: 1 }).lean();
+  const family = await FamilyModel.findById(user.familyId, { status: 1, branchId: 1, branchAncestors: 1 }).lean();
 
   req.user = {
     id: String(user._id),
@@ -28,6 +28,7 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
     branchId: String(user.branchId),
     familyId: String(user.familyId),
     familyStatus: family?.status ?? 'pending',
+    homePath: family ? [family.branchId, ...family.branchAncestors].map(String) : [],
   };
   next();
 };

@@ -1,5 +1,6 @@
 import { FAMILY_STATUSES, GOTRA_IDS, HISTORY_ACTIONS } from '@samaj/shared';
 import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
+import { branchPathPlugin } from './plugins';
 
 const historySchema = new Schema(
   {
@@ -38,9 +39,13 @@ const familySchema = new Schema(
   { timestamps: true },
 );
 
+familySchema.plugin(branchPathPlugin);
+
+// The review queue: everywhere for admins, one branch and below for committee.
 familySchema.index({ status: 1, submittedAt: 1, _id: 1 });
-familySchema.index({ branchId: 1 });
-familySchema.index({ branchAncestors: 1 });
+familySchema.index({ status: 1, branchPath: 1, submittedAt: 1, _id: 1 });
+// Family counts per branch, and renaming a branch.
+familySchema.index({ branchId: 1, place: 1 });
 
 export const HISTORY_LIMIT = 50;
 

@@ -1,5 +1,6 @@
 import { NOTICE_KINDS } from '@samaj/shared';
 import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
+import { branchPathPlugin } from './plugins';
 
 const noticeSchema = new Schema(
   {
@@ -20,8 +21,11 @@ const noticeSchema = new Schema(
   { timestamps: true },
 );
 
-noticeSchema.index({ removedAt: 1, branchId: 1, publishedAt: -1 });
-noticeSchema.index({ branchAncestors: 1 });
+noticeSchema.plugin(branchPathPlugin);
+
+// The feed: posted to one of my branches, or (committee) anywhere under theirs.
+noticeSchema.index({ removedAt: 1, branchId: 1, pinned: 1, publishedAt: -1, _id: -1 });
+noticeSchema.index({ removedAt: 1, branchPath: 1, pinned: 1, publishedAt: -1, _id: -1 });
 
 export type NoticeDoc = InferSchemaType<typeof noticeSchema> & { _id: Types.ObjectId };
 export const NoticeModel = model('Notice', noticeSchema);

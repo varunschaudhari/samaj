@@ -404,6 +404,7 @@ export const en = {
   'events.rsvpSaved': 'Noted: {count} from your family.',
   'events.rsvpClosed': 'This event has ended, so RSVP is closed.',
   'events.attendees': 'Families coming',
+  'events.attendeesLatest': 'The latest {shown} replies of {total} families. The totals above count everyone.',
   'events.noAttendees': 'No RSVPs yet.',
   'events.error': "Events didn't load",
   'events.emptyTitle': 'No upcoming events',

@@ -83,6 +83,14 @@ describe('GET /api/members', () => {
     expect(names(await list(cookie, '?gotra=kashyap'))).toEqual(['Anil Wagh', 'Ramesh Karale', 'Rohit Wagh']);
   });
 
+  it('matches every word typed, in any order, in English or Marathi', async () => {
+    await createFamily(branches.amalner, { people: [{ name: 'सुनीता चौधरी' }] });
+    const cookie = await viewer('member', branches.pune);
+    expect(names(await list(cookie, '?q=wagh an'))).toEqual(['Anil Wagh']);
+    expect(names(await list(cookie, '?q=WAGH'))).toEqual(['Anil Wagh', 'Rohit Wagh']);
+    expect(names(await list(cookie, '?q=' + encodeURIComponent('चौध')))).toEqual(['सुनीता चौधरी']);
+  });
+
   it('treats regex characters in the search as plain text', async () => {
     const cookie = await viewer('member', branches.pune);
     expect((await list(cookie, '?q=.*')).items).toHaveLength(0);

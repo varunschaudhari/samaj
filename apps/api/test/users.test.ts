@@ -28,9 +28,13 @@ describe('GET /api/users', () => {
     const byName = (await api.get('/api/users?q=kav').set('Cookie', admin.cookie)).body as AdminUserPage;
     expect(byName.items.map((u) => u.name)).toEqual(['Kavita Dhole']);
 
-    const phone = byName.items[0]?.phone.slice(-6) ?? '';
-    const byPhone = (await api.get(`/api/users?q=${phone}`).set('Cookie', admin.cookie)).body as AdminUserPage;
-    expect(byPhone.items.map((u) => u.name)).toEqual(['Kavita Dhole']);
+    // A number matches from its start, as people type it, with or without +91.
+    const phone = byName.items[0]?.phone ?? '';
+    const byNumber = async (typed: string) => ((await api.get(`/api/users?q=${typed}`).set('Cookie', admin.cookie)).body as AdminUserPage).items.map((u) => u.name);
+    expect(await byNumber(phone.slice(3, 8))).toContain('Kavita Dhole');
+    expect(await byNumber(phone.slice(3))).toEqual(['Kavita Dhole']);
+    expect(await byNumber(encodeURIComponent(phone))).toEqual(['Kavita Dhole']);
+    expect(await byNumber(phone.slice(-6))).toEqual([]);
 
     const committee = (await api.get('/api/users?role=committee').set('Cookie', admin.cookie)).body as AdminUserPage;
     expect(committee.items.map((u) => u.name)).toEqual(['Anil Wagh']);

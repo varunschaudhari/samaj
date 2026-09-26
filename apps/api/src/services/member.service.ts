@@ -4,8 +4,10 @@ import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
 import { type MemberDoc, MemberModel } from '../models/member.model';
 import { AppError } from '../utils/app-error';
-import { escapeRegex } from '../utils/regex';
+import { searchWords } from '../models/plugins';
+import { cappedCount } from '../utils/count';
 import { canBrowseDirectory, canSeeContact } from './access';
+import { inBranch } from './audience';
 import { photoUrl } from './family.service';
 import type { Viewer } from './viewer';
 
@@ -35,16 +37,15 @@ export async function listMembers(viewer: Viewer, query: ListQuery): Promise<Mem
   if (!canBrowseDirectory(viewer)) throw notVerified();
 
   const conditions: QueryFilter<MemberDoc>[] = [{ familyStatus: 'verified' }];
-  if (query.branchId) {
-    // A district includes every city and town under it.
-    const branchId = new Types.ObjectId(query.branchId);
-    conditions.push({ $or: [{ branchId }, { branchAncestors: branchId }] });
-  }
+  // A district includes every city and town under it.
+  if (query.branchId) conditions.push(inBranch(query.branchId));
   if (query.gotra) conditions.push({ gotra: query.gotra });
   if (query.q) {
-    // Match the start of any word, so "cha" finds "Sunita Chaudhari".
-    const rx = new RegExp(`(^|\\s)${escapeRegex(query.q)}`, 'i');
-    conditions.push({ $or: [{ name: rx }, { place: rx }, { occupation: rx }] });
+    // Every word typed must start a word of the name, place or occupation, so
+    // "sun cha" finds "Sunita Chaudhari". Indexed prefix tokens, not a regex.
+    for (const word of searchWords(query.q)) {
+      conditions.push({ $or: [{ nameTokens: word }, { placeTokens: word }, { occupationTokens: word }] });
+    }
   }
 
   const baseFilter: QueryFilter<MemberDoc> = { $and: conditions };
@@ -56,7 +57,7 @@ export async function listMembers(viewer: Viewer, query: ListQuery): Promise<Mem
 
   const [docs, total] = await Promise.all([
     MemberModel.find(pageFilter).sort({ name: 1, _id: 1 }).limit(query.limit + 1).lean(),
-    MemberModel.countDocuments(baseFilter),
+    cappedCount(MemberModel, baseFilter),
   ]);
 
   const hasMore = docs.length > query.limit;

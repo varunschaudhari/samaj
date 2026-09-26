@@ -12,6 +12,7 @@ const rsvpSchema = new Schema(
 );
 
 rsvpSchema.index({ eventId: 1, familyId: 1 }, { unique: true });
+rsvpSchema.index({ eventId: 1, updatedAt: -1 });
 
 export type RsvpDoc = InferSchemaType<typeof rsvpSchema> & { _id: Types.ObjectId };
 export const RsvpModel = model('Rsvp', rsvpSchema);

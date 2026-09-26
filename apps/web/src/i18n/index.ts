@@ -1,4 +1,4 @@
-import { DEFAULT_LANGUAGE, LANGUAGES, type Language } from '@samaj/shared';
+import { COUNT_CAP, DEFAULT_LANGUAGE, LANGUAGES, type Language } from '@samaj/shared';
 import { useCallback } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -46,6 +46,11 @@ const MARATHI_DIGITS = ['०', '१', '२', '३', '४', '५', '६', '७', 
 export function formatNumber(value: number, language: Language): string {
   const grouped = new Intl.NumberFormat('en-IN').format(value);
   return language === 'mr' ? grouped.replace(/\d/g, (d) => MARATHI_DIGITS[Number(d)] ?? d) : grouped;
+}
+
+/** A list total from the API, which counts up to COUNT_CAP and no further: "1,000+". */
+export function formatTotal(value: number, language: Language): string {
+  return value > COUNT_CAP ? `${formatNumber(COUNT_CAP, language)}+` : formatNumber(value, language);
 }
 
 /** "26 Sept 2026" in English, "२६ सप्टें, २०२६" in Marathi. */

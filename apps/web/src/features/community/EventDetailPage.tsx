@@ -138,6 +138,9 @@ export function EventDetailPage() {
       {e.attendees && (
         <section className="flex flex-col gap-2">
           <h3 className="font-display text-lg font-semibold text-fg">{t('events.attendees')}</h3>
+          {e.families > e.attendees.length && (
+            <p className="text-sm text-fg-muted">{t('events.attendeesLatest', { shown: e.attendees.length, total: e.families })}</p>
+          )}
           {e.attendees.length === 0 ? (
             <p className="text-sm text-fg-muted">{t('events.noAttendees')}</p>
           ) : (

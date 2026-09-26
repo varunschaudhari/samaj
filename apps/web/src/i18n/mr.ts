@@ -402,6 +402,7 @@ export const mr: Record<MessageKey, string> = {
   'events.rsvpSaved': 'नोंद केली: तुमच्या कुटुंबातून {count} जण.',
   'events.rsvpClosed': 'हा कार्यक्रम झाला आहे, म्हणून नोंदणी बंद आहे.',
   'events.attendees': 'येणारी कुटुंबे',
+  'events.attendeesLatest': '{total} पैकी अलीकडील {shown} कुटुंबांची उत्तरे. वरील एकूण संख्येत सर्वांचा समावेश आहे.',
   'events.noAttendees': 'अजून कोणतीही नोंद नाही.',
   'events.error': 'कार्यक्रम लोड झाले नाहीत',
   'events.emptyTitle': 'येणारे कार्यक्रम नाहीत',

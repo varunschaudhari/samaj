@@ -1,6 +1,7 @@
 import type { Branch, BranchSummary } from '@samaj/shared';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { FamilyModel } from '../src/models/family.model';
+import { MemberModel } from '../src/models/member.model';
 import { OfficeBearerModel } from '../src/models/office-bearer.model';
 import { RoleChangeModel } from '../src/models/role-change.model';
 import { UserModel } from '../src/models/user.model';
@@ -56,6 +57,10 @@ describe('managing branches', () => {
     expect(res.status).toBe(200);
     expect(res.body.branch.name).toBe('Amalner Town');
     expect((await FamilyModel.findById(family.familyId).lean())?.place).toBe('Amalner Town');
+    // Search follows the new name too.
+    const member = await MemberModel.findOne({ familyId: family.familyId }).select('+placeTokens').orFail().lean<{ placeTokens: string[]; branchPath: unknown[] }>();
+    expect(member.placeTokens).toContain('town');
+    expect(member.branchPath.map(String)).toEqual([branches.amalner, branches.district]);
   });
 
   it('only removes empty branches', async () => {

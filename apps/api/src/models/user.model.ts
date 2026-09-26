@@ -1,5 +1,6 @@
 import { LANGUAGES, ROLES } from '@samaj/shared';
 import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
+import { searchTokensPlugin } from './plugins';
 
 const userSchema = new Schema(
   {
@@ -16,6 +17,13 @@ const userSchema = new Schema(
   },
   { timestamps: true },
 );
+
+// People (admin): everyone or one role, in name order. Committee per branch.
+userSchema.plugin(searchTokensPlugin, ['name']);
+userSchema.index({ nameTokens: 1, name: 1, _id: 1 });
+userSchema.index({ name: 1, _id: 1 });
+userSchema.index({ role: 1, name: 1, _id: 1 });
+userSchema.index({ branchId: 1, role: 1 });
 
 export type UserDoc = InferSchemaType<typeof userSchema> & { _id: Types.ObjectId };
 export const UserModel = model('User', userSchema);

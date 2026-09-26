@@ -8,7 +8,7 @@ import { useMe } from '@/features/auth/api';
 import { VerificationNotice } from '@/features/families/VerificationNotice';
 import { branchName, groupBranches, useBranches } from '@/features/branches/api';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
+import { formatTotal, useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { gotraOptions } from '@/features/families/gotra-options';
 import { type DirectoryFilters, useMembers } from './api';
 import { MemberCard, MemberCardSkeleton } from './MemberCard';
@@ -134,6 +134,7 @@ function Directory() {
   const hasFilters = Boolean(filters.q || filters.branchId || filters.gotra);
   const items = members.data?.pages.flatMap((p) => p.items) ?? [];
   const total = members.data?.pages[0]?.total;
+  const language = useLanguageStore((s) => s.language);
   const canSeeContacts = me.data ? can(me.data.role, 'member:read-contact') : false;
   // Remounting Filters on clear also resets its local search text.
   const [filtersKey, setFiltersKey] = useState(0);
@@ -206,7 +207,7 @@ function Directory() {
     <div className="mx-auto flex max-w-6xl flex-col gap-5">
       <PageHeader
         title={t('directory.title')}
-        description={total === undefined ? <Skeleton className="h-4 w-24" /> : <span className="tabular-nums">{t('directory.count', { count: total })}</span>}
+        description={total === undefined ? <Skeleton className="h-4 w-24" /> : <span className="tabular-nums">{t('directory.count', { count: formatTotal(total, language) })}</span>}
       />
       <Filters key={filtersKey} {...filterParams} onClear={clearFilters} />
       {!canSeeContacts && me.data && (

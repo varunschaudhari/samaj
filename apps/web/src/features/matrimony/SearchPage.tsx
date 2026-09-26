@@ -5,7 +5,7 @@ import { Link, useSearchParams } from 'react-router';
 import { Button, EmptyState, ErrorState, Input, Select, Skeleton, buttonVariants } from '@/components/ui';
 import { branchName, groupBranches, useBranches } from '@/features/branches/api';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { useLanguageStore, useT } from '@/i18n';
+import { formatTotal, useLanguageStore, useT } from '@/i18n';
 import { type SearchFilters, useMyMatrimony, useProfileSearch } from './api';
 import { ProfileCardSkeleton, ProfileCardView } from './ProfileCardView';
 
@@ -171,7 +171,7 @@ export function SearchPage() {
         />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-fg-muted tabular-nums">{total === undefined ? '' : t('matrimony.search.count', { count: total })}</p>
+        <p className="text-sm text-fg-muted tabular-nums">{total === undefined ? '' : t('matrimony.search.count', { count: formatTotal(total, language) })}</p>
         {filtered && (
           <Button variant="ghost" size="sm" leadingIcon={X} onClick={clear}>
             {t('directory.clearFilters')}

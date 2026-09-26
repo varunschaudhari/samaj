@@ -7,6 +7,9 @@ import { OfficeBearerModel } from '../models/office-bearer.model';
 import { RoleChangeModel } from '../models/role-change.model';
 import { type UserDoc, UserModel } from '../models/user.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
+import { invalidate } from '../utils/cache';
+import { cappedCount } from '../utils/count';
+import { searchWords } from '../models/plugins';
 import { escapeRegex } from '../utils/regex';
 import { canResetPasswordFor } from './access';
 import { addBearer } from './committee.service';
@@ -59,9 +62,13 @@ export async function listUsers(query: ListQuery): Promise<AdminUserPage> {
   const conditions: QueryFilter<UserDoc>[] = [];
   if (query.role) conditions.push({ role: query.role });
   if (query.q) {
+    // A number matches from its start (after +91), and each word typed starts
+    // a word of the name, so both use an index.
     const digits = query.q.replace(/\D/g, '');
-    const rx = new RegExp(`(^|\\s)${escapeRegex(query.q)}`, 'i');
-    conditions.push({ $or: [{ name: rx }, ...(digits.length >= 3 ? [{ phone: new RegExp(escapeRegex(digits)) }] : [])] });
+    const isNumber = digits.length >= 3 && digits.length === query.q.replace(/[\s+-]/g, '').length;
+    const national = digits.length > 10 && digits.startsWith('91') ? digits.slice(2) : digits;
+    if (isNumber) conditions.push({ phone: new RegExp(`^\\+91${escapeRegex(national)}`) });
+    else for (const word of searchWords(query.q)) conditions.push({ nameTokens: word });
   }
   const base: QueryFilter<UserDoc> = conditions.length ? { $and: conditions } : {};
   const page: QueryFilter<UserDoc> = { $and: [...conditions] };
@@ -73,7 +80,7 @@ export async function listUsers(query: ListQuery): Promise<AdminUserPage> {
 
   const [docs, total] = await Promise.all([
     UserModel.find(page).sort({ name: 1, _id: 1 }).limit(query.limit + 1).lean(),
-    UserModel.countDocuments(base),
+    cappedCount(UserModel, base),
   ]);
   const hasMore = docs.length > query.limit;
   const users = hasMore ? docs.slice(0, query.limit) : docs;
@@ -158,6 +165,8 @@ export async function updateRole(viewer: Viewer, id: string, input: RoleUpdateIn
     user.role = input.role;
     user.branchId = branch._id;
     await user.save();
+    // Branch summaries list each branch's committee.
+    invalidate('branches:summary');
   }
   return getUser(viewer, id);
 }

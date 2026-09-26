@@ -2,7 +2,6 @@ import { type CommitteeGroup, OFFICE_POSTS, type OfficeBearer, isGlobalRole, typ
 import { Types } from 'mongoose';
 import type { z } from 'zod';
 import { type BranchDoc, BranchModel } from '../models/branch.model';
-import { FamilyModel } from '../models/family.model';
 import { type OfficeBearerDoc, OfficeBearerModel } from '../models/office-bearer.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { hasReach } from './access';
@@ -30,8 +29,7 @@ export async function listCommittees(viewer: Viewer): Promise<CommitteeGroup[]> 
   if (isGlobalRole(viewer.role)) {
     branches = await BranchModel.find().lean();
   } else {
-    const family = await FamilyModel.findById(viewer.familyId, { branchId: 1, branchAncestors: 1 }).lean();
-    const ids = family ? [family.branchId, ...family.branchAncestors] : [];
+    const ids = viewer.homePath.map((id) => new Types.ObjectId(id));
     const or: Record<string, unknown>[] = [{ _id: { $in: ids } }];
     if (viewer.role === 'committee') {
       const scope = new Types.ObjectId(viewer.branchId);

@@ -11,6 +11,15 @@ export const REFRESH_COOKIE = 'samaj_rt';
 
 export const MEMBER_PAGE_SIZE = 20;
 
+/**
+ * List totals are counted up to this many and no further, so a count over a
+ * collection of lakhs stays cheap. A total above it means "more than this".
+ */
+export const COUNT_CAP = 1000;
+
+/** An event page lists at most this many attending families, newest replies first. */
+export const ATTENDEE_LIST_LIMIT = 300;
+
 /** Verification happens per family: a committee member reviews the whole household at once. */
 export const FAMILY_STATUSES = ['pending', 'verified', 'rejected'] as const;
 export type FamilyStatus = (typeof FAMILY_STATUSES)[number];

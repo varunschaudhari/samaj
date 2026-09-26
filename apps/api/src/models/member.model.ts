@@ -1,5 +1,6 @@
 import { FAMILY_STATUSES, GENDERS, GOTRA_IDS, RELATIONS } from '@samaj/shared';
 import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
+import { branchPathPlugin, searchTokensPlugin } from './plugins';
 
 /**
  * A person in a family. Separate from User because most people in a family
@@ -11,7 +12,7 @@ import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
  */
 const memberSchema = new Schema(
   {
-    familyId: { type: Schema.Types.ObjectId, ref: 'Family', required: true, index: true },
+    familyId: { type: Schema.Types.ObjectId, ref: 'Family', required: true },
     name: { type: String, required: true, trim: true },
     relation: { type: String, enum: RELATIONS, required: true },
     isHead: { type: Boolean, default: false },
@@ -36,10 +37,23 @@ const memberSchema = new Schema(
   { timestamps: true },
 );
 
+memberSchema.plugin(branchPathPlugin);
+memberSchema.plugin(searchTokensPlugin, ['name', 'place', 'occupation']);
+
+// The directory: browse everyone, a branch, or a gotra, in name order.
 memberSchema.index({ familyStatus: 1, name: 1, _id: 1 });
-memberSchema.index({ branchId: 1, name: 1 });
-memberSchema.index({ branchAncestors: 1 });
-memberSchema.index({ gotra: 1 });
+memberSchema.index({ familyStatus: 1, branchPath: 1, name: 1, _id: 1 });
+memberSchema.index({ familyStatus: 1, gotra: 1, name: 1, _id: 1 });
+// Directory search: one index per searched field, which the query ORs. Each
+// ends in the sort, so a common surname reads one page, not every match.
+memberSchema.index({ familyStatus: 1, nameTokens: 1, name: 1, _id: 1 });
+memberSchema.index({ familyStatus: 1, placeTokens: 1, name: 1, _id: 1 });
+memberSchema.index({ familyStatus: 1, occupationTokens: 1, name: 1, _id: 1 });
+// Signup and enrolment look for an unclaimed person with this number.
+memberSchema.index({ phone: 1 });
+// Renaming a branch renames the place of families written as the old name.
+memberSchema.index({ branchId: 1, place: 1 });
+memberSchema.index({ familyId: 1, isHead: 1 });
 
 export type MemberDoc = InferSchemaType<typeof memberSchema> & { _id: Types.ObjectId };
 export const MemberModel = model('Member', memberSchema);

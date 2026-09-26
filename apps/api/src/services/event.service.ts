@@ -1,4 +1,4 @@
-import type { EventDetail, EventSummary, eventInputSchema, eventListQuerySchema } from '@samaj/shared';
+import { ATTENDEE_LIST_LIMIT, type EventDetail, type EventSummary, type eventInputSchema, type eventListQuerySchema } from '@samaj/shared';
 import { Types } from 'mongoose';
 import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
@@ -57,7 +57,7 @@ const LONGEST_EVENT = 7 * DAY;
 
 /** Upcoming: not yet ended, soonest first. Past: ended in the last year, most recent first. */
 export async function listEvents(viewer: Viewer, query: ListQuery): Promise<EventSummary[]> {
-  const audience = await branchAudience(viewer);
+  const audience = branchAudience(viewer);
   const now = Date.now();
   const window =
     query.when === 'upcoming'
@@ -73,7 +73,7 @@ export async function listEvents(viewer: Viewer, query: ListQuery): Promise<Even
 
 async function loadVisible(viewer: Viewer, id: string) {
   if (!Types.ObjectId.isValid(id)) throw eventGone();
-  const doc = await EventModel.findOne({ $and: [{ _id: new Types.ObjectId(id), removedAt: null }, await branchAudience(viewer)] });
+  const doc = await EventModel.findOne({ $and: [{ _id: new Types.ObjectId(id), removedAt: null }, branchAudience(viewer)] });
   if (!doc) throw eventGone();
   return doc;
 }
@@ -92,8 +92,9 @@ export async function getEvent(viewer: Viewer, id: string): Promise<EventDetail>
   };
 
   if (canEdit) {
-    // The organisers see who is coming, by family.
-    const rsvps = await RsvpModel.find({ eventId: doc._id }).sort({ updatedAt: -1 }).lean();
+    // The organisers see who is coming, by family: the latest replies, since a
+    // district event can have thousands. The totals above count everyone.
+    const rsvps = await RsvpModel.find({ eventId: doc._id }).sort({ updatedAt: -1 }).limit(ATTENDEE_LIST_LIMIT).lean();
     const familyIds = rsvps.map((r) => r.familyId);
     const [heads, families] = await Promise.all([
       MemberModel.find({ familyId: { $in: familyIds }, isHead: true }, { familyId: 1, name: 1 }).lean(),

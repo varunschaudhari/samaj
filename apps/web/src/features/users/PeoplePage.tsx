@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Avatar, Badge, Button, Card, EmptyState, ErrorState, Icon, Input, Select, Skeleton } from '@/components/ui';
 import { branchName } from '@/features/branches/api';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { useLanguageStore, useT } from '@/i18n';
+import { formatTotal, useLanguageStore, useT } from '@/i18n';
 import { type UserFilters, useUsers } from './api';
 import { ResetCodeModal } from './ResetCodeModal';
 import { UserRoleModal } from './UserRoleModal';
@@ -56,6 +56,7 @@ export function PeoplePage() {
 
   const items = users.data?.pages.flatMap((p) => p.items) ?? [];
   const total = users.data?.pages[0]?.total;
+  const language = useLanguageStore((s) => s.language);
   const filtered = Boolean(q || role);
 
   let body;
@@ -109,7 +110,7 @@ export function PeoplePage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-fg-muted tabular-nums">{total === undefined ? <Skeleton className="h-4 w-24" /> : t('people.count', { count: total })}</p>
+      <p className="text-sm text-fg-muted tabular-nums">{total === undefined ? <Skeleton className="h-4 w-24" /> : t('people.count', { count: formatTotal(total, language) })}</p>
       <div className="flex flex-col gap-3 sm:flex-row">
         <Input
           label={t('people.search')}
