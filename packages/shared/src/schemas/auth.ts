@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LANGUAGES } from '../constants';
+import { FAMILY_STATUSES, GENDERS, LANGUAGES } from '../constants';
 import { ROLES } from '../rbac';
 import { phoneSchema } from './common';
 
@@ -12,6 +12,7 @@ export const signupSchema = z.object({
   phone: phoneSchema,
   password: passwordSchema,
   branchId: z.string().regex(/^[a-f0-9]{24}$/i, 'validation.branchRequired'),
+  gender: z.enum(GENDERS, { error: 'validation.gender' }),
   /** The language picked on the signup screen becomes the account's preference. */
   language: z.enum(LANGUAGES).default('en'),
 });
@@ -30,6 +31,9 @@ export const publicUserSchema = z.object({
   role: z.enum(ROLES),
   branchId: z.string(),
   language: z.enum(LANGUAGES),
+  familyId: z.string(),
+  memberId: z.string(),
+  familyStatus: z.enum(FAMILY_STATUSES),
 });
 export type PublicUser = z.infer<typeof publicUserSchema>;
 
@@ -48,7 +52,16 @@ export const VALIDATION_KEYS = [
   'validation.nameMin',
   'validation.nameMax',
   'validation.branchRequired',
+  'validation.tooLong',
+  'validation.birthYear',
+  'validation.relation',
+  'validation.gender',
+  'validation.placeMin',
+  'validation.reasonMin',
   // Produced by the API rather than a schema, but translated the same way.
   'validation.phoneTaken',
+  'validation.relationHead',
+  'validation.photoType',
+  'validation.photoSize',
 ] as const;
 export type ValidationKey = (typeof VALIDATION_KEYS)[number];

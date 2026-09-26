@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { MEMBER_PAGE_SIZE } from '../constants';
 import { objectIdSchema } from './common';
+import type { Relation } from './family';
 
 export const memberListQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
@@ -11,19 +12,21 @@ export const memberListQuerySchema = z.object({
 });
 export type MemberListQuery = z.input<typeof memberListQuerySchema>;
 
-export const memberSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  familyHead: z.string().nullable(),
-  gotra: z.string().nullable(),
-  place: z.string(),
-  occupation: z.string().nullable(),
-  branch: z.object({ id: z.string(), name: z.string(), nameMr: z.string() }),
-  verified: z.boolean(),
+/** A directory entry. The directory lists people from verified families only. */
+export interface Member {
+  id: string;
+  familyId: string;
+  name: string;
+  relation: Relation;
+  familyHead: string | null;
+  gotra: string | null;
+  place: string;
+  occupation: string | null;
+  branch: { id: string; name: string; nameMr: string };
+  photoUrl: string | null;
   /** Present only when the viewer may see contact details for this member. */
-  phone: z.string().optional(),
-});
-export type Member = z.infer<typeof memberSchema>;
+  phone?: string;
+}
 
 export interface MemberPage {
   items: Member[];
@@ -34,3 +37,8 @@ export interface MemberPage {
 export interface GotraList {
   items: string[];
 }
+
+export const pageQuerySchema = z.object({
+  cursor: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(MEMBER_PAGE_SIZE),
+});
