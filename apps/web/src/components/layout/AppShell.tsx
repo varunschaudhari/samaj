@@ -1,7 +1,7 @@
 import { can } from '@samaj/shared';
-import { LogOut } from 'lucide-react';
+import { LogOut, UserRound } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router';
-import { Button, Icon, IconButton, toast } from '@/components/ui';
+import { Avatar, Button, Icon, Tooltip, toast } from '@/components/ui';
 import { useLogout, useMe } from '@/features/auth/api';
 import { usePendingCount } from '@/features/families/api';
 import { formatNumber, useLanguageStore, useT } from '@/i18n';
@@ -89,7 +89,11 @@ export function AppShell() {
           <BrandMark />
           <div className="flex items-center gap-1">
             <LanguageSwitch />
-            <IconButton icon={LogOut} label={t('auth.logout')} onClick={signOut} tooltipSide="bottom" />
+            <Tooltip content={t('nav.profile')} side="bottom">
+              <NavLink to="/profile" aria-label={t('nav.profile')} className="flex size-touch items-center justify-center rounded-full">
+                {me.data ? <Avatar name={me.data.name} size="sm" /> : <Icon icon={UserRound} />}
+              </NavLink>
+            </Tooltip>
           </div>
         </header>
 
@@ -102,7 +106,7 @@ export function AppShell() {
           aria-label={t('nav.primary')}
           className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
         >
-          {items.filter((item) => !item.devOnly).map((item) => (
+          {items.filter((item) => !item.devOnly && !item.sidebarOnly).map((item) => (
             <NavLink
               key={item.to}
               to={hrefFor(item)}

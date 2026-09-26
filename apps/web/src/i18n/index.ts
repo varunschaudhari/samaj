@@ -81,6 +81,8 @@ export function useErrorMessage() {
   return useCallback(
     (error: unknown): string => {
       if (error instanceof ApiError) {
+        const reason = error.issues[0]?.message;
+        if (reason && isMessageKey(reason)) return t(reason);
         const key = `error.${error.code}`;
         return isMessageKey(key) ? t(key) : error.message;
       }

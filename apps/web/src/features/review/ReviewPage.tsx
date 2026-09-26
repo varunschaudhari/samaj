@@ -1,11 +1,13 @@
 import type { PendingFamily } from '@samaj/shared';
-import { ChevronRight, ClipboardCheck, MapPin } from 'lucide-react';
+import { ChevronRight, ClipboardCheck, HeartHandshake, MapPin } from 'lucide-react';
 import { Link } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Avatar, Button, Card, EmptyState, ErrorState, Icon, Skeleton } from '@/components/ui';
+import { Avatar, Button, Card, EmptyState, ErrorState, Icon, Skeleton, Tabs } from '@/components/ui';
 import { placeLabel } from '@/features/branches/api';
 import { usePendingFamilies } from '@/features/families/api';
-import { formatDate, useLanguageStore, useT } from '@/i18n';
+import { usePendingProfiles } from '@/features/matrimony/api';
+import { ProfileCardSkeleton, ProfileCardView } from '@/features/matrimony/ProfileCardView';
+import { formatDate, formatNumber, useLanguageStore, useT } from '@/i18n';
 
 function PendingCard({ family }: { family: PendingFamily }) {
   const t = useT();
@@ -49,6 +51,7 @@ function PendingCardSkeleton() {
 
 export function ReviewPage() {
   const t = useT();
+  const language = useLanguageStore((s) => s.language);
   const pending = usePendingFamilies();
   const items = pending.data?.pages.flatMap((p) => p.items) ?? [];
   const total = pending.data?.pages[0]?.total;
@@ -83,13 +86,45 @@ export function ReviewPage() {
     );
   }
 
+  const profiles = usePendingProfiles(true);
+  let profileBody;
+  if (profiles.isPending) {
+    profileBody = (
+      <ul className="grid gap-3 md:grid-cols-2" aria-busy="true">
+        {[0, 1].map((i) => (
+          <ProfileCardSkeleton key={i} />
+        ))}
+      </ul>
+    );
+  } else if (profiles.isError) {
+    profileBody = <ErrorState title={t('matrimony.review.error')} error={profiles.error} onRetry={() => profiles.refetch()} retrying={profiles.isFetching} />;
+  } else if (profiles.data.length === 0) {
+    profileBody = <EmptyState icon={HeartHandshake} title={t('matrimony.review.emptyTitle')} body={t('matrimony.review.emptyBody')} />;
+  } else {
+    profileBody = (
+      <ul className="grid gap-3 md:grid-cols-2">
+        {profiles.data.map((p) => (
+          <ProfileCardView key={p.id} profile={p} href={`/matrimony/profiles/${p.id}`} />
+        ))}
+      </ul>
+    );
+  }
+
+  const count = (n: number | undefined) => (n === undefined ? '' : ` (${formatNumber(n, language)})`);
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5">
       <PageHeader
         title={t('review.page.title')}
         description={total === undefined ? <Skeleton className="h-4 w-32" /> : <span className="tabular-nums">{t('review.page.count', { count: total })}</span>}
       />
-      {body}
+      <Tabs
+        label={t('review.page.title')}
+        items={[
+          { id: 'families', label: `${t('review.tab.families')}${count(total)}`, content: body },
+          { id: 'profiles', label: `${t('review.tab.profiles')}${count(profiles.data?.length)}`, content: profileBody },
+        ]}
+      />
     </div>
   );
 }

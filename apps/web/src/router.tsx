@@ -11,6 +11,11 @@ import { AdminIndex, AdminLayout } from '@/features/admin/AdminLayout';
 import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
 import { BranchesPage } from '@/features/branches/BranchesPage';
 import { PeoplePage } from '@/features/users/PeoplePage';
+import { InterestsPage } from '@/features/matrimony/InterestsPage';
+import { MatrimonyIndex, MatrimonyLayout } from '@/features/matrimony/MatrimonyLayout';
+import { MyProfilesPage } from '@/features/matrimony/MyProfilesPage';
+import { ProfileDetailPage } from '@/features/matrimony/ProfileDetailPage';
+import { SearchPage } from '@/features/matrimony/SearchPage';
 import { DirectoryPage } from '@/features/directory/DirectoryPage';
 import { NotFoundPage } from '@/features/errors/NotFoundPage';
 import { FamilyPage, MyFamilyRedirect } from '@/features/families/FamilyPage';
@@ -41,6 +46,17 @@ export const router = createBrowserRouter([
           { path: '/directory', element: <DirectoryPage /> },
           { path: '/family', element: <MyFamilyRedirect /> },
           { path: '/families/:familyId', element: <FamilyPage /> },
+          {
+            path: '/matrimony',
+            element: <MatrimonyLayout />,
+            children: [
+              { index: true, element: <MatrimonyIndex /> },
+              { path: 'search', element: <SearchPage /> },
+              { path: 'interests', element: <InterestsPage /> },
+              { path: 'profiles', element: <MyProfilesPage /> },
+              { path: 'profiles/:id', element: <ProfileDetailPage /> },
+            ],
+          },
           { path: '/review', element: <RequirePermission permission="member:verify"><ReviewPage /></RequirePermission> },
           {
             path: '/admin',
