@@ -10,8 +10,9 @@ const userSchema = new Schema(
     role: { type: String, enum: ROLES, default: 'member', required: true },
     branchId: { type: Schema.Types.ObjectId, ref: 'Branch', required: true },
     language: { type: String, enum: LANGUAGES, default: 'en', required: true },
-    /** The directory entry for this person, created at signup. */
-    memberId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
+    /** The family this account belongs to, and the person within it. Both created at signup. */
+    familyId: { type: Schema.Types.ObjectId, ref: 'Family', required: true },
+    memberId: { type: Schema.Types.ObjectId, ref: 'Member', required: true },
   },
   { timestamps: true },
 );

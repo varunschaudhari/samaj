@@ -1,14 +1,15 @@
 /**
- * Fills a development database with sample branches, members and three
- * sign-in accounts (admin, committee, member). Wipes existing data first.
- * Every name and number below is invented for development.
+ * Fills a development database with sample branches, families and four
+ * sign-in accounts (admin, committee, verified member, pending member).
+ * Wipes existing data first. Every name and number below is invented.
  */
 import argon2 from 'argon2';
-import type { BranchKind, Role } from '@samaj/shared';
-import type { Types } from 'mongoose';
+import type { BranchKind, FamilyStatus, Gender, Relation, Role } from '@samaj/shared';
+import { Types } from 'mongoose';
 import { env } from '../config/env';
 import { connectDb, disconnectDb } from '../config/db';
-import { BranchModel } from '../models/branch.model';
+import { type BranchDoc, BranchModel } from '../models/branch.model';
+import { FamilyModel } from '../models/family.model';
 import { MemberModel } from '../models/member.model';
 import { SessionModel } from '../models/session.model';
 import { UserModel } from '../models/user.model';
@@ -66,24 +67,42 @@ const BRANCHES: BranchSeed[] = [
   },
 ];
 
-const FIRST = ['Sunita', 'Ramesh', 'Anil', 'Kavita', 'Prakash', 'Meena', 'Sanjay', 'Vaishali', 'Dilip', 'Asha', 'Vijay', 'Rekha', 'Suresh', 'Pooja', 'Mahesh', 'Jyoti', 'Nitin', 'Swati', 'Rajendra', 'Manisha'];
-const MEN = ['Ramesh', 'Prakash', 'Dilip', 'Suresh', 'Rajendra', 'Vasant', 'Shankar', 'Madhukar'];
+const MEN = ['Ramesh', 'Prakash', 'Dilip', 'Suresh', 'Rajendra', 'Vasant', 'Shankar', 'Madhukar', 'Anil', 'Sanjay', 'Vijay', 'Mahesh', 'Nitin', 'Ganesh'];
+const WOMEN = ['Sunita', 'Kavita', 'Meena', 'Vaishali', 'Asha', 'Rekha', 'Pooja', 'Jyoti', 'Swati', 'Manisha', 'Sarita', 'Shubhangi', 'Anjali', 'Lata'];
+const BOYS = ['Rohit', 'Amit', 'Sagar', 'Akash', 'Omkar', 'Tushar', 'Yash'];
+const GIRLS = ['Priya', 'Neha', 'Sneha', 'Komal', 'Gauri', 'Tanvi', 'Rutuja'];
 const SURNAMES = ['Chaudhari', 'Karale', 'Dhole', 'Bagul', 'Wagh', 'Sonawane', 'Mahale', 'Shinde'];
 // Placeholder gotras for development. Replace with the samaj's actual list.
 const GOTRAS = ['Kashyap', 'Bharadwaj', 'Vasishtha', 'Gautam', 'Atri', 'Jamadagni', null];
-const OCCUPATIONS = ['Oil mill (ghani) owner', 'Farmer', 'Teacher', 'Shopkeeper', 'Engineer', 'Doctor', 'Government service', 'Accountant', 'Nurse', null];
-
-const MARATHI_MEMBERS = [
-  { name: 'सुनीता चौधरी', familyHead: 'रमेश चौधरी', occupation: 'शिक्षिका' },
-  { name: 'प्रकाश कराळे', familyHead: 'प्रकाश कराळे', occupation: 'घाणी व्यवसाय' },
-  { name: 'ज्योती वाघ', familyHead: 'सुरेश वाघ', occupation: null },
-  { name: 'महेश सोनवणे', familyHead: 'महेश सोनवणे', occupation: 'शेती' },
-];
+const OCCUPATIONS = ['Oil mill (ghani) owner', 'Farmer', 'Teacher', 'Shopkeeper', 'Engineer', 'Government service', 'Accountant', 'Nurse'];
+const EDUCATION = ['B.Com', 'B.A.', 'B.E.', '12th', 'M.Sc.', 'D.Ed.', null];
 
 const DEV_PASSWORD = 'samaj-dev-2026';
+const pick = <T>(list: readonly T[], i: number): T => list[i % list.length] as T;
+let phoneSeq = 0;
+const nextPhone = () => `+9198${String(22000000 + ++phoneSeq * 1379).padStart(8, '0')}`;
 
-async function insertBranches(seeds: BranchSeed[], parent: { _id: Types.ObjectId; ancestors: Types.ObjectId[] } | null) {
-  const leaves: { _id: Types.ObjectId; name: string; ancestors: Types.ObjectId[] }[] = [];
+interface PersonSeed {
+  name: string;
+  relation: Relation;
+  gender: Gender;
+  birthYear: number | null;
+  occupation?: string | null;
+  education?: string | null;
+  phone?: string | null;
+}
+
+interface FamilySeed {
+  branch: BranchDoc;
+  gotra: string | null;
+  status: FamilyStatus;
+  rejectionReason?: string;
+  people: PersonSeed[];
+  account?: { role: Role; phone: string };
+}
+
+async function insertBranches(seeds: BranchSeed[], parent: BranchDoc | null): Promise<BranchDoc[]> {
+  const leaves: BranchDoc[] = [];
   for (const seed of seeds) {
     const doc = await BranchModel.create({
       name: seed.name,
@@ -92,60 +111,160 @@ async function insertBranches(seeds: BranchSeed[], parent: { _id: Types.ObjectId
       parentId: parent?._id ?? null,
       ancestors: parent ? [...parent.ancestors, parent._id] : [],
     });
-    if (seed.children) leaves.push(...(await insertBranches(seed.children, doc)));
-    else leaves.push(doc);
+    const plain = doc.toObject() as BranchDoc;
+    if (seed.children) leaves.push(...(await insertBranches(seed.children, plain)));
+    else leaves.push(plain);
   }
   return leaves;
 }
 
-async function main() {
-  await connectDb(env.MONGODB_URI);
-  await Promise.all([BranchModel.deleteMany({}), MemberModel.deleteMany({}), UserModel.deleteMany({}), SessionModel.deleteMany({})]);
+async function createFamily(seed: FamilySeed, passwordHash: string) {
+  const head = seed.people[0];
+  if (!head) throw new Error('A family needs at least one person');
+  const userId = seed.account ? new Types.ObjectId() : null;
+  const createdAt = new Date(Date.now() - Math.floor(Math.random() * 60) * 86_400_000);
 
-  const places = await insertBranches(BRANCHES, null);
-  const pick = <T>(list: readonly T[], i: number): T => list[i % list.length] as T;
+  const history: { at: Date; action: 'created' | 'verified' | 'rejected'; byUserId: null; byName: string; note: string | null }[] = [
+    { at: createdAt, action: 'created', byUserId: null, byName: head.name, note: null },
+  ];
+  if (seed.status === 'verified') history.push({ at: new Date(createdAt.getTime() + 86_400_000), action: 'verified', byUserId: null, byName: 'Committee Demo', note: null });
+  if (seed.status === 'rejected') history.push({ at: new Date(createdAt.getTime() + 86_400_000), action: 'rejected', byUserId: null, byName: 'Committee Demo', note: seed.rejectionReason ?? null });
 
-  const members = [];
-  for (let i = 0; i < 44; i++) {
-    const place = pick(places, i * 7);
-    // Offset the surname each time the first names wrap, so no two members share a full name.
-    const surname = pick(SURNAMES, i + Math.floor(i / FIRST.length));
-    members.push({
-      name: `${pick(FIRST, i)} ${surname}`,
-      familyHead: `${pick(MEN, i * 5)} ${surname}`,
-      gotra: pick(GOTRAS, i),
-      place: place.name,
-      occupation: pick(OCCUPATIONS, i * 3),
-      phone: `+9198${String(22000000 + i * 1379).padStart(8, '0')}`,
-      branchId: place._id,
-      branchAncestors: place.ancestors,
-      verified: i % 4 !== 0,
+  const family = await FamilyModel.create({
+    branchId: seed.branch._id,
+    branchAncestors: seed.branch.ancestors,
+    place: seed.branch.name,
+    gotra: seed.gotra,
+    status: seed.status,
+    rejectionReason: seed.rejectionReason ?? null,
+    submittedAt: createdAt,
+    history,
+  });
+
+  const members = await MemberModel.insertMany(
+    seed.people.map((p, i) => ({
+      ...p,
+      familyId: family._id,
+      isHead: i === 0,
+      phone: i === 0 && seed.account ? seed.account.phone : (p.phone ?? null),
+      userId: i === 0 ? userId : null,
+      branchId: seed.branch._id,
+      branchAncestors: seed.branch.ancestors,
+      place: family.place,
+      gotra: family.gotra,
+      familyStatus: family.status,
+    })),
+  );
+
+  if (seed.account && userId) {
+    await UserModel.create({
+      _id: userId,
+      name: head.name,
+      phone: seed.account.phone,
+      role: seed.account.role,
+      branchId: seed.branch._id,
+      passwordHash,
+      familyId: family._id,
+      memberId: members[0]?._id,
     });
   }
-  MARATHI_MEMBERS.forEach((m, i) => {
-    const place = pick(places, i * 2);
-    members.push({ ...m, gotra: pick(GOTRAS, i + 2), place: place.name, phone: `+9197${String(30000000 + i * 911).padStart(8, '0')}`, branchId: place._id, branchAncestors: place.ancestors, verified: true });
-  });
-  await MemberModel.insertMany(members);
+  return members.length;
+}
 
-  const jalgaonDistrict = await BranchModel.findOne({ name: 'Jalgaon District' }).orFail();
-  const jalgaon = await BranchModel.findOne({ name: 'Jalgaon' }).orFail();
-  const pune = await BranchModel.findOne({ name: 'Pune' }).orFail();
+/** A household: head, spouse, and one to three children. */
+function household(i: number): PersonSeed[] {
+  const surname = pick(SURNAMES, i);
+  const headYear = 1958 + (i * 7) % 30;
+  const people: PersonSeed[] = [
+    { name: `${pick(MEN, i)} ${surname}`, relation: 'head', gender: 'male', birthYear: headYear, occupation: pick(OCCUPATIONS, i), education: pick(EDUCATION, i), phone: nextPhone() },
+    { name: `${pick(WOMEN, i)} ${surname}`, relation: 'spouse', gender: 'female', birthYear: headYear + 3, occupation: i % 3 === 0 ? 'Teacher' : null, education: pick(EDUCATION, i + 2) },
+  ];
+  const children = 1 + (i % 3);
+  for (let c = 0; c < children; c++) {
+    const isSon = (i + c) % 2 === 0;
+    people.push({
+      name: `${isSon ? pick(BOYS, i + c) : pick(GIRLS, i + c)} ${surname}`,
+      relation: isSon ? 'son' : 'daughter',
+      gender: isSon ? 'male' : 'female',
+      birthYear: headYear + 26 + c * 3,
+      occupation: c === 0 ? pick(OCCUPATIONS, i + 4) : null,
+      education: pick(EDUCATION, i + c + 1),
+      phone: c === 0 ? nextPhone() : null,
+    });
+  }
+  return people;
+}
+
+async function main() {
+  await connectDb(env.MONGODB_URI);
+  await Promise.all([BranchModel.deleteMany({}), FamilyModel.deleteMany({}), MemberModel.deleteMany({}), UserModel.deleteMany({}), SessionModel.deleteMany({})]);
+
+  const places = await insertBranches(BRANCHES, null);
+  const byName = async (name: string) => (await BranchModel.findOne({ name }).orFail().lean()) as BranchDoc;
   const passwordHash = await argon2.hash(DEV_PASSWORD, { type: argon2.argon2id });
 
-  const accounts: { name: string; phone: string; role: Role; branch: typeof jalgaon }[] = [
-    { name: 'Admin Demo', phone: '+919800000001', role: 'admin', branch: jalgaon },
-    { name: 'Committee Demo (Jalgaon District)', phone: '+919800000002', role: 'committee', branch: jalgaonDistrict },
-    { name: 'Member Demo (Pune)', phone: '+919800000003', role: 'member', branch: pune },
+  const families: FamilySeed[] = [];
+  for (let i = 0; i < 14; i++) {
+    families.push({ branch: pick(places, i * 3), gotra: pick(GOTRAS, i), status: 'verified', people: household(i) });
+  }
+  // Two families written in Devanagari.
+  families.push({
+    branch: await byName('Bhusawal'),
+    gotra: 'Kashyap',
+    status: 'verified',
+    people: [
+      { name: 'रमेश चौधरी', relation: 'head', gender: 'male', birthYear: 1962, occupation: 'घाणी व्यवसाय', education: 'बी.कॉम', phone: nextPhone() },
+      { name: 'सुनीता चौधरी', relation: 'spouse', gender: 'female', birthYear: 1966, occupation: 'शिक्षिका', education: 'डी.एड.' },
+      { name: 'ओंकार चौधरी', relation: 'son', gender: 'male', birthYear: 1991, occupation: 'अभियंता', education: 'बी.ई.', phone: nextPhone() },
+    ],
+  });
+  families.push({
+    branch: await byName('Amalner'),
+    gotra: 'Atri',
+    status: 'verified',
+    people: [
+      { name: 'प्रकाश कराळे', relation: 'head', gender: 'male', birthYear: 1970, occupation: 'शेती', phone: nextPhone() },
+      { name: 'ज्योती कराळे', relation: 'spouse', gender: 'female', birthYear: 1974 },
+      { name: 'गौरी कराळे', relation: 'daughter', gender: 'female', birthYear: 2001, education: 'एम.एस्सी.' },
+    ],
+  });
+  // Waiting for the Jalgaon committee.
+  families.push({ branch: await byName('Chopda'), gotra: 'Gautam', status: 'pending', people: household(20).slice(0, 3) });
+  families.push({ branch: await byName('Jalgaon'), gotra: null, status: 'pending', people: household(21).slice(0, 2) });
+  // Sent back with a reason.
+  families.push({
+    branch: await byName('Amalner'),
+    gotra: 'Bharadwaj',
+    status: 'rejected',
+    rejectionReason: 'Please add the family head’s father and the correct village name.',
+    people: household(22).slice(0, 2),
+  });
+
+  const accounts: { role: Role; phone: string; name: string; branch: string; status: FamilyStatus }[] = [
+    { role: 'admin', phone: '+919800000001', name: 'Admin Demo', branch: 'Jalgaon', status: 'verified' },
+    { role: 'committee', phone: '+919800000002', name: 'Committee Demo', branch: 'Jalgaon District', status: 'verified' },
+    { role: 'member', phone: '+919800000003', name: 'Member Demo', branch: 'Pune', status: 'verified' },
+    { role: 'member', phone: '+919800000004', name: 'Pending Demo', branch: 'Bhusawal', status: 'pending' },
   ];
   for (const a of accounts) {
-    const member = await MemberModel.create({ name: a.name, place: a.branch.name, phone: a.phone, branchId: a.branch._id, branchAncestors: a.branch.ancestors, verified: true });
-    await UserModel.create({ name: a.name, phone: a.phone, role: a.role, branchId: a.branch._id, passwordHash, memberId: member._id });
+    families.push({
+      branch: await byName(a.branch),
+      gotra: 'Kashyap',
+      status: a.status,
+      account: { role: a.role, phone: a.phone },
+      people: [
+        { name: a.name, relation: 'head', gender: 'male', birthYear: 1980 },
+        { name: `${a.name} Spouse`, relation: 'spouse', gender: 'female', birthYear: 1983 },
+      ],
+    });
   }
 
+  let people = 0;
+  for (const f of families) people += await createFamily(f, passwordHash);
+
   process.stdout.write(
-    `\nSeeded ${await BranchModel.countDocuments()} branches and ${members.length + accounts.length} members.\n\nSign in with any of these (password: ${DEV_PASSWORD}):\n` +
-      accounts.map((a) => `  ${a.role.padEnd(10)} ${a.phone.replace('+91', '')}  ${a.name}`).join('\n') +
+    `\nSeeded ${await BranchModel.countDocuments()} branches, ${families.length} families and ${people} people.\n\nSign in with any of these (password: ${DEV_PASSWORD}):\n` +
+      accounts.map((a) => `  ${a.role.padEnd(10)} ${a.phone.replace('+91', '')}  ${a.name} (${a.branch}, ${a.status})`).join('\n') +
       '\n\n',
   );
   await disconnectDb();

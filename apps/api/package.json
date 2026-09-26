@@ -38,5 +38,11 @@
     "tsup": "^8.5.1",
     "tsx": "^4.23.15",
     "vitest": "^5.0.2"
+  },
+  "config": {
+    "mongodbMemoryServer": {
+      "version": "8.2.6",
+      "downloadDir": "../../node_modules/.cache/mongodb-memory-server"
+    }
   }
 }

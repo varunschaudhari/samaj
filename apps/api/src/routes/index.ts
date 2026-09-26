@@ -2,6 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { authRouter } from './auth.routes';
 import { branchRouter } from './branch.routes';
+import { familyRouter, verificationRouter } from './family.routes';
 import { memberRouter } from './member.routes';
 
 export const apiRouter = Router();
@@ -14,3 +15,5 @@ apiRouter.get('/health', (_req, res) => {
 apiRouter.use('/auth', authRouter);
 apiRouter.use('/branches', branchRouter);
 apiRouter.use('/members', memberRouter);
+apiRouter.use('/families', familyRouter);
+apiRouter.use('/verifications', verificationRouter);

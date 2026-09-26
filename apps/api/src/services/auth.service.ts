@@ -1,7 +1,9 @@
 import argon2 from 'argon2';
-import type { PublicUser, UpdatePreferencesInput, loginSchema, signupSchema } from '@samaj/shared';
+import type { FamilyStatus, PublicUser, UpdatePreferencesInput, loginSchema, signupSchema } from '@samaj/shared';
+import { Types } from 'mongoose';
 import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
+import { FamilyModel } from '../models/family.model';
 import { MemberModel } from '../models/member.model';
 import { SessionModel } from '../models/session.model';
 import { type UserDoc, UserModel } from '../models/user.model';
@@ -39,7 +41,9 @@ interface SessionMeta {
 
 const sessionEnded = () => new AppError(401, 'SESSION_EXPIRED', 'Your session has ended. Sign in again.');
 
-export function toPublicUser(user: Pick<UserDoc, '_id' | 'name' | 'phone' | 'role' | 'branchId' | 'language'>): PublicUser {
+type UserFields = Pick<UserDoc, '_id' | 'name' | 'phone' | 'role' | 'branchId' | 'language' | 'familyId' | 'memberId'>;
+
+export function toPublicUser(user: UserFields, familyStatus: FamilyStatus): PublicUser {
   return {
     id: String(user._id),
     name: user.name,
@@ -47,7 +51,16 @@ export function toPublicUser(user: Pick<UserDoc, '_id' | 'name' | 'phone' | 'rol
     role: user.role,
     branchId: String(user.branchId),
     language: user.language,
+    familyId: String(user.familyId),
+    memberId: String(user.memberId),
+    familyStatus,
   };
+}
+
+/** The public user with their family's current verification status. */
+async function withFamilyStatus(user: UserFields): Promise<PublicUser> {
+  const family = await FamilyModel.findById(user.familyId, { status: 1 }).lean();
+  return toPublicUser(user, family?.status ?? 'pending');
 }
 
 // Verifying against a throwaway hash when the phone isn't registered keeps the
@@ -85,33 +98,49 @@ export async function signup(input: z.output<typeof signupSchema>, meta: Session
 
   const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
 
+  // Every account starts a family, of which it is the head. The family waits
+  // for the branch committee to verify it.
+  const userId = new Types.ObjectId();
+  const family = await FamilyModel.create({
+    branchId: branch._id,
+    branchAncestors: branch.ancestors,
+    place: branch.name,
+    history: [{ at: new Date(), action: 'created', byUserId: userId, byName: input.name, note: null }],
+  });
+  const member = await MemberModel.create({
+    familyId: family._id,
+    name: input.name,
+    relation: 'head',
+    isHead: true,
+    gender: input.gender,
+    phone: input.phone,
+    userId,
+    branchId: branch._id,
+    branchAncestors: branch.ancestors,
+    place: family.place,
+    familyStatus: family.status,
+  });
+
   let user;
   try {
     user = await UserModel.create({
+      _id: userId,
       phone: input.phone,
       name: input.name,
       passwordHash,
       branchId: branch._id,
       language: input.language,
+      familyId: family._id,
+      memberId: member._id,
     });
   } catch (err) {
+    await Promise.all([member.deleteOne(), family.deleteOne()]);
     // Lost a race with a simultaneous signup for the same number.
     if ((err as { code?: number }).code === 11000) throw phoneTaken();
     throw err;
   }
 
-  const member = await MemberModel.create({
-    name: input.name,
-    place: branch.name,
-    phone: input.phone,
-    branchId: branch._id,
-    branchAncestors: branch.ancestors,
-    userId: user._id,
-  });
-  user.memberId = member._id;
-  await user.save();
-
-  return { user: toPublicUser(user), tokens: await startSession(String(user._id), meta) };
+  return { user: toPublicUser(user, family.status), tokens: await startSession(String(user._id), meta) };
 }
 
 export async function login(input: z.output<typeof loginSchema>, meta: SessionMeta): Promise<AuthResult> {
@@ -130,7 +159,7 @@ export async function login(input: z.output<typeof loginSchema>, meta: SessionMe
     await user.save();
   }
 
-  return { user: toPublicUser(user), tokens: await startSession(String(user._id), meta) };
+  return { user: await withFamilyStatus(user), tokens: await startSession(String(user._id), meta) };
 }
 
 export async function refresh(refreshToken: string | undefined, attempt = 0): Promise<AuthResult> {
@@ -169,7 +198,7 @@ export async function refresh(refreshToken: string | undefined, attempt = 0): Pr
   if (!user) throw sessionEnded();
 
   return {
-    user: toPublicUser(user),
+    user: await withFamilyStatus(user),
     tokens: {
       accessToken: await signAccessToken(String(user._id)),
       refreshToken: encodeRefreshToken(String(session._id), secret),
@@ -186,11 +215,11 @@ export async function logout(refreshToken: string | undefined): Promise<void> {
 export async function getMe(userId: string): Promise<PublicUser> {
   const user = await UserModel.findById(userId).lean();
   if (!user) throw unauthenticated();
-  return toPublicUser(user);
+  return withFamilyStatus(user);
 }
 
 export async function updatePreferences(userId: string, input: UpdatePreferencesInput): Promise<PublicUser> {
   const user = await UserModel.findByIdAndUpdate(userId, { $set: { language: input.language } }, { returnDocument: 'after' }).lean();
   if (!user) throw unauthenticated();
-  return toPublicUser(user);
+  return withFamilyStatus(user);
 }

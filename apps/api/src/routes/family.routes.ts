@@ -1,0 +1,29 @@
+import express, { Router } from 'express';
+import * as families from '../controllers/family.controller';
+import { requireAuth } from '../middleware/auth';
+
+export const familyRouter = Router();
+familyRouter.use(requireAuth);
+
+familyRouter.get('/:familyId', families.get);
+familyRouter.put('/:familyId', families.update);
+familyRouter.post('/:familyId/members', families.addMember);
+familyRouter.put('/:familyId/members/:memberId', families.updateMember);
+familyRouter.delete('/:familyId/members/:memberId', families.removeMember);
+
+// Raw image bytes. The limit is above the real cap so the service can return a field error instead of a bare 413.
+familyRouter.put(
+  '/:familyId/members/:memberId/photo',
+  express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '3mb' }),
+  families.setPhoto,
+);
+familyRouter.delete('/:familyId/members/:memberId/photo', families.removePhoto);
+
+familyRouter.post('/:familyId/verify', families.verify);
+familyRouter.post('/:familyId/reject', families.reject);
+familyRouter.post('/:familyId/resubmit', families.resubmit);
+
+export const verificationRouter = Router();
+verificationRouter.use(requireAuth);
+verificationRouter.get('/', families.listPending);
+verificationRouter.get('/count', families.countPending);

@@ -1,6 +1,7 @@
 import { ACCESS_COOKIE, REFRESH_COOKIE } from '@samaj/shared';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { FamilyModel } from '../src/models/family.model';
 import { MemberModel } from '../src/models/member.model';
 import { SessionModel } from '../src/models/session.model';
 import { UserModel } from '../src/models/user.model';
@@ -16,7 +17,7 @@ beforeEach(async () => {
   branches = await seedBranches();
 });
 
-const signupBody = () => ({ name: 'Sunita Chaudhari', phone: '98220 12345', password: 'correct-horse', branchId: branches.bhusawal });
+const signupBody = () => ({ name: 'Sunita Chaudhari', phone: '98220 12345', password: 'correct-horse', branchId: branches.bhusawal, gender: 'female' });
 
 async function signUp() {
   const res = await api.post('/api/auth/signup').send(signupBody());
@@ -25,10 +26,10 @@ async function signUp() {
 }
 
 describe('POST /api/auth/signup', () => {
-  it('creates the account and a directory entry, and sets both cookies', async () => {
+  it('creates the account and a pending family headed by the new user, and sets both cookies', async () => {
     const { res, cookies } = await signUp();
 
-    expect(res.body.user).toMatchObject({ name: 'Sunita Chaudhari', phone: '+919822012345', role: 'member', language: 'en' });
+    expect(res.body.user).toMatchObject({ name: 'Sunita Chaudhari', phone: '+919822012345', role: 'member', language: 'en', familyStatus: 'pending' });
     expect(res.body.user).not.toHaveProperty('passwordHash');
     expect(cookies[ACCESS_COOKIE]).toBeTruthy();
     expect(cookies[REFRESH_COOKIE]).toMatch(/^[a-f0-9]{24}\./);
@@ -39,7 +40,10 @@ describe('POST /api/auth/signup', () => {
 
     const user = await UserModel.findOne({ phone: '+919822012345' }).select('+passwordHash').lean();
     expect(user?.passwordHash).toMatch(/^\$argon2id\$/);
-    expect(await MemberModel.countDocuments({ userId: user?._id })).toBe(1);
+    const head = await MemberModel.findOne({ userId: user?._id }).lean();
+    expect(head).toMatchObject({ isHead: true, relation: 'head', gender: 'female', familyStatus: 'pending' });
+    expect(String(head?.familyId)).toBe(res.body.user.familyId);
+    expect(await FamilyModel.countDocuments({ _id: head?.familyId, status: 'pending' })).toBe(1);
   });
 
   it('rejects a number that already has an account', async () => {
@@ -51,7 +55,7 @@ describe('POST /api/auth/signup', () => {
   });
 
   it('returns field issues as translatable keys', async () => {
-    const res = await api.post('/api/auth/signup').send({ name: 'S', phone: '12345', password: 'short', branchId: 'nope' });
+    const res = await api.post('/api/auth/signup').send({ name: 'S', phone: '12345', password: 'short', branchId: 'nope', gender: 'x' });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_FAILED');
     const byPath = Object.fromEntries(res.body.error.issues.map((i: { path: string; message: string }) => [i.path, i.message]));
@@ -60,6 +64,7 @@ describe('POST /api/auth/signup', () => {
       phone: 'validation.phone',
       password: 'validation.passwordMin',
       branchId: 'validation.branchRequired',
+      gender: 'validation.gender',
     });
   });
 

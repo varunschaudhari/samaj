@@ -1,8 +1,11 @@
-import type { Role } from '@samaj/shared';
+import type { FamilyStatus, Role } from '@samaj/shared';
 
 /** The signed-in user as services see them. Set on req.user by requireAuth. */
 export interface Viewer {
   id: string;
+  name: string;
   role: Role;
   branchId: string;
+  familyId: string;
+  familyStatus: FamilyStatus;
 }
