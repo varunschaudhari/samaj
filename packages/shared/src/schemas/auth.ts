@@ -66,6 +66,9 @@ export const VALIDATION_KEYS = [
   // Produced by the API for branches.
   'validation.branchExists',
   'validation.branchParentInvalid',
+  'validation.role',
+  'validation.resetCode',
+  'validation.currentPasswordWrong',
   // Produced by the API rather than a schema, but translated the same way.
   'validation.phoneTaken',
   'validation.relationHead',

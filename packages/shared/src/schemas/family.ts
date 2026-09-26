@@ -110,6 +110,10 @@ export interface FamilyMember {
   isHead: boolean;
   /** The member signs in with their own account; they can't be removed from the family here. */
   hasAccount: boolean;
+  /** The viewer may create a password reset code for this member's account. */
+  canResetPassword: boolean;
+  /** The member's account id, present only when canResetPassword is true. */
+  accountId?: string;
 }
 
 export interface FamilyHistoryEntry {

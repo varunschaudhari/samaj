@@ -7,3 +7,4 @@ export * from './schemas/auth';
 export * from './schemas/branch';
 export * from './schemas/member';
 export * from './schemas/family';
+export * from './schemas/users';

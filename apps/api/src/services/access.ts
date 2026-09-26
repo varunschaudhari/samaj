@@ -1,4 +1,4 @@
-import { BRANCH_SCOPED_ROLES, type FamilyStatus, type Permission, can } from '@samaj/shared';
+import { BRANCH_SCOPED_ROLES, type FamilyStatus, type Permission, type Role, can } from '@samaj/shared';
 import type { Types } from 'mongoose';
 import type { Viewer } from './viewer';
 
@@ -49,6 +49,18 @@ export function canEditFamily(viewer: Viewer, family: FamilyLike): boolean {
 export function canReviewFamily(viewer: Viewer, family: FamilyLike): boolean {
   if (!hasReach(viewer, 'member:verify', family)) return false;
   return viewer.role === 'admin' || !isOwnFamily(viewer, family);
+}
+
+/**
+ * Who may create a password reset code for an account. Never for yourself
+ * (use change password). Admins for anyone else. Committee members only for
+ * ordinary members of families in their branch: resetting a fellow committee
+ * member's or an admin's password would let them sign in as that person.
+ */
+export function canResetPasswordFor(viewer: Viewer, target: { id: string; role: Role }, targetFamily: BranchPlaced): boolean {
+  if (target.id === viewer.id) return false;
+  if (viewer.role === 'admin') return true;
+  return target.role === 'member' && hasReach(viewer, 'member:write', targetFamily);
 }
 
 /** Phone numbers and addresses. Your own family always; others only with read-contact in scope. */

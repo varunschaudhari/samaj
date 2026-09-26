@@ -15,7 +15,7 @@ import { type MemberDoc, MemberModel } from '../models/member.model';
 import { UserModel } from '../models/user.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { storage } from '../utils/storage';
-import { canEditFamily, canReviewFamily, canSeeContact, canViewFamily, isOwnFamily } from './access';
+import { canEditFamily, canResetPasswordFor, canReviewFamily, canSeeContact, canViewFamily, isOwnFamily } from './access';
 import type { Viewer } from './viewer';
 
 export const MAX_FAMILY_MEMBERS = 40;
@@ -69,12 +69,19 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     MemberModel.find({ familyId: family._id }).sort({ isHead: -1, birthYear: 1, createdAt: 1 }).lean(),
     BranchModel.findById(family.branchId).lean(),
   ]);
+  // Roles of the members who have accounts, to decide who may get a password reset code.
+  const accountIds = members.flatMap((m) => (m.userId ? [m.userId] : []));
+  const accounts = accountIds.length ? await UserModel.find({ _id: { $in: accountIds } }, { role: 1 }).lean() : [];
+  const roleByUser = new Map(accounts.map((u) => [String(u._id), u.role]));
 
   const showContact = canSeeContact(viewer, { ...family.toObject(), familyId: family._id });
   const canEdit = canEditFamily(viewer, family);
   const canReview = canReviewFamily(viewer, family);
 
-  const toMember = (m: (typeof members)[number]): FamilyMember => ({
+  const toMember = (m: (typeof members)[number]): FamilyMember => {
+    const role = m.userId ? roleByUser.get(String(m.userId)) : undefined;
+    const canResetPassword = role !== undefined && canResetPasswordFor(viewer, { id: String(m.userId), role }, family);
+    return {
     id: String(m._id),
     name: m.name,
     relation: m.relation,
@@ -86,7 +93,10 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     photoUrl: photoUrl(m),
     isHead: m.isHead,
     hasAccount: m.userId !== null,
-  });
+    canResetPassword,
+    ...(canResetPassword && { accountId: String(m.userId) }),
+    };
+  };
 
   const detail: FamilyDetail = {
     id: String(family._id),
