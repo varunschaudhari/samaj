@@ -1,4 +1,4 @@
-import type { EventDetail } from '@samaj/shared';
+import { type EventDetail, isGlobalRole } from '@samaj/shared';
 import { MapPin } from 'lucide-react';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
@@ -70,7 +70,7 @@ export function EventFormModal({ target, onClose, onSaved }: { target: EventDeta
   }, [target]);
 
   const user = me.data;
-  const postable = (branches.data ?? []).filter((b) => user?.role === 'admin' || b.id === user?.branchId || b.parentId === user?.branchId);
+  const postable = (branches.data ?? []).filter((b) => (user && isGlobalRole(user.role)) || b.id === user?.branchId || b.parentId === user?.branchId);
 
   const onSubmit = form.handleSubmit((values) => {
     const startsAt = fromLocalInput(values.startsLocal);

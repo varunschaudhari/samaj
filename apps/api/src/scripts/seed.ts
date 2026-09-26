@@ -220,6 +220,7 @@ async function main() {
   });
 
   const accounts: { role: Role; phone: string; name: string; branch: string; status: FamilyStatus }[] = [
+    { role: 'superadmin', phone: '+919800000005', name: 'Super Admin Demo', branch: 'Jalgaon District', status: 'verified' },
     { role: 'admin', phone: '+919800000001', name: 'Admin Demo', branch: 'Jalgaon District', status: 'verified' },
     { role: 'committee', phone: '+919800000002', name: 'Committee Demo', branch: 'Jalgaon District', status: 'verified' },
     { role: 'member', phone: '+919800000003', name: 'Member Demo', branch: 'Amalner', status: 'verified' },

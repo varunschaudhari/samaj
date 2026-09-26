@@ -67,6 +67,8 @@ export const mr: Record<MessageKey, string> = {
 
   'role.member': 'सदस्य',
   'role.committee': 'समिती',
+  'role.superadmin': 'मुख्य प्रशासक',
+  'people.cantChangeAdmin': 'प्रशासक किंवा मुख्य प्रशासकाची भूमिका फक्त मुख्य प्रशासक बदलू शकतात.',
   'role.admin': 'प्रशासक',
 
   'branchKind.district': 'जिल्हा',
@@ -128,7 +130,7 @@ export const mr: Record<MessageKey, string> = {
   'people.role': 'भूमिका',
   'people.branch': 'शाखा',
   'people.branchHintCommittee': 'ते या शाखेतील आणि त्यातील प्रत्येक गावातील कुटुंबांची पडताळणी व व्यवस्थापन करतात.',
-  'people.branchHintAdmin': 'प्रशासक सर्व शाखांमध्ये काम करतात. ही फक्त त्यांची मूळ शाखा आहे.',
+  'people.branchHintAdmin': 'प्रशासक व मुख्य प्रशासक सर्व शाखांमध्ये काम करतात. ही फक्त त्यांची मूळ शाखा आहे.',
   'people.branchHintMember': 'त्यांची मूळ शाखा.',
   'people.roleSaved': '{name} आता {role} आहेत.',
   'people.cantChangeOwn': 'तुम्ही स्वतःची भूमिका बदलू शकत नाही. दुसरे प्रशासक बदलू शकतात.',
@@ -580,6 +582,7 @@ export const mr: Record<MessageKey, string> = {
   'validation.venue': 'ठिकाण टाका.',
   'validation.rsvpPeople': 'एका कुटुंबातून जास्तीत जास्त ३० जण.',
   'validation.rsvpClosed': 'या कार्यक्रमाची नोंदणी बंद आहे.',
+  'validation.roleProtected': 'प्रशासक फक्त मुख्य प्रशासक नेमू किंवा काढू शकतात.',
   'validation.invalidId': 'ही माहिती वैध नाही.',
   'validation.phone': '६, ७, ८ किंवा ९ ने सुरू होणारा १० अंकी मोबाईल क्रमांक टाका.',
   'validation.phoneTaken': 'या क्रमांकाचे खाते आधीच आहे. लॉग इन करा.',

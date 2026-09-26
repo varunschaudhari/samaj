@@ -9,7 +9,7 @@ import { type UserFilters, useUsers } from './api';
 import { ResetCodeModal } from './ResetCodeModal';
 import { UserRoleModal } from './UserRoleModal';
 
-const ROLE_TONE: Record<Role, 'neutral' | 'primary' | 'kumkum'> = { member: 'neutral', committee: 'primary', admin: 'kumkum' };
+const ROLE_TONE: Record<Role, 'neutral' | 'primary' | 'kumkum' | 'zari'> = { member: 'neutral', committee: 'primary', admin: 'kumkum', superadmin: 'zari' };
 
 function UserRow({ user, onOpen }: { user: AdminUser; onOpen: () => void }) {
   const t = useT();

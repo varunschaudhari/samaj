@@ -1,4 +1,4 @@
-import { type CommitteeGroup, OFFICE_POSTS, type OfficeBearer, type officeBearerInputSchema } from '@samaj/shared';
+import { type CommitteeGroup, OFFICE_POSTS, type OfficeBearer, isGlobalRole, type officeBearerInputSchema } from '@samaj/shared';
 import { Types } from 'mongoose';
 import type { z } from 'zod';
 import { type BranchDoc, BranchModel } from '../models/branch.model';
@@ -27,7 +27,7 @@ function toBearer(d: OfficeBearerDoc): OfficeBearer {
  */
 export async function listCommittees(viewer: Viewer): Promise<CommitteeGroup[]> {
   let branches: BranchDoc[];
-  if (viewer.role === 'admin') {
+  if (isGlobalRole(viewer.role)) {
     branches = await BranchModel.find().lean();
   } else {
     const family = await FamilyModel.findById(viewer.familyId, { branchId: 1, branchAncestors: 1 }).lean();

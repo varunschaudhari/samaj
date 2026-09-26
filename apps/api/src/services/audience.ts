@@ -1,3 +1,4 @@
+import { isGlobalRole } from '@samaj/shared';
 import { Types } from 'mongoose';
 import { FamilyModel } from '../models/family.model';
 import type { Viewer } from './viewer';
@@ -11,7 +12,7 @@ import type { Viewer } from './viewer';
  * Returns a MongoDB condition on { branchId, branchAncestors } fields.
  */
 export async function branchAudience(viewer: Viewer): Promise<Record<string, unknown>> {
-  if (viewer.role === 'admin') return {};
+  if (isGlobalRole(viewer.role)) return {};
   const family = await FamilyModel.findById(viewer.familyId, { branchId: 1, branchAncestors: 1 }).lean();
   const home = family ? [family.branchId, ...family.branchAncestors] : [];
   const or: Record<string, unknown>[] = [{ branchId: { $in: home } }];

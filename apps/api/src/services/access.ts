@@ -1,4 +1,4 @@
-import { BRANCH_SCOPED_ROLES, type FamilyStatus, type Permission, type Role, can } from '@samaj/shared';
+import { BRANCH_SCOPED_ROLES, type FamilyStatus, type Permission, ROLE_RANK, type Role, can, isGlobalRole } from '@samaj/shared';
 import type { Types } from 'mongoose';
 import type { Viewer } from './viewer';
 
@@ -48,7 +48,7 @@ export function canEditFamily(viewer: Viewer, family: FamilyLike): boolean {
 /** Committee members don't review their own family; an admin may. */
 export function canReviewFamily(viewer: Viewer, family: FamilyLike): boolean {
   if (!hasReach(viewer, 'member:verify', family)) return false;
-  return viewer.role === 'admin' || !isOwnFamily(viewer, family);
+  return isGlobalRole(viewer.role) || !isOwnFamily(viewer, family);
 }
 
 interface ProfileLike extends BranchPlaced {
@@ -64,7 +64,7 @@ export function canManageProfile(viewer: Viewer, profile: ProfileLike): boolean 
 /** Committee members approve profiles in their branch, but not their own family's; admins may. */
 export function canReviewProfile(viewer: Viewer, profile: ProfileLike): boolean {
   if (!hasReach(viewer, 'member:verify', profile)) return false;
-  return viewer.role === 'admin' || String(profile.familyId) !== viewer.familyId;
+  return isGlobalRole(viewer.role) || String(profile.familyId) !== viewer.familyId;
 }
 
 /** Live profiles are for verified families; the family and reviewers always see their own. */
@@ -75,15 +75,17 @@ export function canViewProfile(viewer: Viewer, profile: ProfileLike): boolean {
 }
 
 /**
- * Who may create a password reset code for an account. Never for yourself
- * (use change password). Admins for anyone else. Committee members only for
- * ordinary members of families in their branch: resetting a fellow committee
- * member's or an admin's password would let them sign in as that person.
+ * Who may create a password reset code for an account. A reset code lets you
+ * sign in as that person, so it only ever works downwards: never for yourself
+ * (use change password), and only for accounts below your own role. Super
+ * admins may help anyone, including another super admin. Committee members are
+ * also limited to their own branch.
  */
 export function canResetPasswordFor(viewer: Viewer, target: { id: string; role: Role }, targetFamily: BranchPlaced): boolean {
   if (target.id === viewer.id) return false;
-  if (viewer.role === 'admin') return true;
-  return target.role === 'member' && hasReach(viewer, 'member:write', targetFamily);
+  if (viewer.role === 'superadmin') return true;
+  if (ROLE_RANK[target.role] >= ROLE_RANK[viewer.role]) return false;
+  return isGlobalRole(viewer.role) || hasReach(viewer, 'member:write', targetFamily);
 }
 
 /** Phone numbers and addresses. Your own family always; others only with read-contact in scope. */

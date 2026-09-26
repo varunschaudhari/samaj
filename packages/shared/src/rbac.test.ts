@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PERMISSIONS, can } from './rbac';
+import { PERMISSIONS, assignableRoles, can } from './rbac';
 
 describe('rbac', () => {
   it('members can only read the directory', () => {
@@ -13,7 +13,14 @@ describe('rbac', () => {
     expect(can('committee', 'branch:manage')).toBe(false);
   });
 
-  it('admins have every permission', () => {
-    for (const p of PERMISSIONS) expect(can('admin', p)).toBe(true);
+  it('super admins have every permission; admins all but appointing admins', () => {
+    for (const p of PERMISSIONS) expect(can('superadmin', p)).toBe(true);
+    expect(PERMISSIONS.filter((p) => !can('admin', p))).toEqual(['user:assign-admin']);
+  });
+
+  it('admins hand out member and committee roles; super admins any', () => {
+    expect(assignableRoles('admin')).toEqual(['member', 'committee']);
+    expect(assignableRoles('superadmin')).toEqual(['member', 'committee', 'admin', 'superadmin']);
+    expect(assignableRoles('committee')).toEqual([]);
   });
 });

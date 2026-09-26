@@ -23,7 +23,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/directory', label: 'nav.directory', icon: Users },
   { to: '/family', label: 'nav.family', icon: House },
   { to: '/matrimony', label: 'nav.matrimony', icon: HeartHandshake },
-  { to: '/review', label: 'nav.review', icon: ClipboardCheck, permission: 'member:verify', pendingBadge: true, hideForRoles: ['admin'] },
+  { to: '/review', label: 'nav.review', icon: ClipboardCheck, permission: 'member:verify', pendingBadge: true, hideForRoles: ['admin', 'superadmin'] },
   { to: '/admin', label: 'nav.admin', icon: ShieldCheck, permission: 'user:assign-role', pendingBadge: true },
   // On phones Profile is the avatar in the top bar, which keeps the tab bar at five.
   { to: '/profile', label: 'nav.profile', icon: UserRound, sidebarOnly: true },

@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { NOTICE_KINDS, type Notice, type NoticeInput, type PublicUser, noticeInputSchema } from '@samaj/shared';
+import { NOTICE_KINDS, type Notice, type NoticeInput, type PublicUser, isGlobalRole, noticeInputSchema } from '@samaj/shared';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button, Input, Modal, Select, Textarea, toast } from '@/components/ui';
@@ -41,7 +41,7 @@ export function NoticeFormModal({ target, onClose }: { target: Notice | 'new' | 
   // Committee members post to their own branch and the towns under it; admins anywhere.
   // The tree is two levels deep, so "under it" is its direct children.
   const user = me.data;
-  const postable = (branches.data ?? []).filter((b) => user?.role === 'admin' || b.id === user?.branchId || b.parentId === user?.branchId);
+  const postable = (branches.data ?? []).filter((b) => (user && isGlobalRole(user.role)) || b.id === user?.branchId || b.parentId === user?.branchId);
 
   const onSubmit = form.handleSubmit((values) =>
     save.mutate(

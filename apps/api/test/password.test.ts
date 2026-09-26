@@ -56,6 +56,20 @@ describe('reset codes', () => {
     // An admin may create one for a committee member.
     expect((await codeFor(adminAccount.cookie, String((await accountOf(peer.familyId))._id))).status).toBe(201);
   });
+
+  it('only works downwards: admins not for other admins, super admins for anyone', async () => {
+    const adminA = await createFamily(branches.pune, { account: 'admin' });
+    const adminB = await createFamily(branches.pune, { account: 'admin' });
+    const trusteeA = await createFamily(branches.pune, { account: 'superadmin' });
+    const trusteeB = await createFamily(branches.pune, { account: 'superadmin' });
+    const idOf = async (f: { familyId: string }) => String((await accountOf(f.familyId))._id);
+
+    expect((await codeFor(adminA.cookie, await idOf(adminB))).status).toBe(403);
+    expect((await codeFor(adminA.cookie, await idOf(trusteeA))).status).toBe(403);
+    expect((await codeFor(trusteeA.cookie, await idOf(adminA))).status).toBe(201);
+    // Two trustees can help each other.
+    expect((await codeFor(trusteeA.cookie, await idOf(trusteeB))).status).toBe(201);
+  });
 });
 
 describe('POST /api/auth/reset-password', () => {

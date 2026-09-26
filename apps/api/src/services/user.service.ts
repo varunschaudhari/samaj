@@ -1,4 +1,4 @@
-import type { AdminUser, AdminUserDetail, AdminUserPage, RoleUpdateInput, userListQuerySchema } from '@samaj/shared';
+import { type AdminUser, type AdminUserDetail, type AdminUserPage, PROTECTED_ROLES, type Role, type RoleUpdateInput, can, type userListQuerySchema } from '@samaj/shared';
 import { type QueryFilter, Types } from 'mongoose';
 import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
@@ -110,10 +110,15 @@ export async function getUser(viewer: Viewer, id: string): Promise<AdminUserDeta
       toBranch: nameOf(c.toBranchId),
     })),
     permissions: {
-      canChangeRole: user.id !== viewer.id,
+      canChangeRole: user.id !== viewer.id && mayChangeRole(viewer, user.role),
       canResetPassword: family ? canResetPasswordFor(viewer, { id: user.id, role: user.role }, family) : false,
     },
   };
+}
+
+/** Admins manage members and committee; only a super admin may change an admin's or super admin's role. */
+function mayChangeRole(viewer: Viewer, targetRole: Role): boolean {
+  return !PROTECTED_ROLES.includes(targetRole) || can(viewer.role, 'user:assign-admin');
 }
 
 /**
@@ -123,15 +128,18 @@ export async function getUser(viewer: Viewer, id: string): Promise<AdminUserDeta
 export async function updateRole(viewer: Viewer, id: string, input: RoleUpdateInput): Promise<AdminUserDetail> {
   const user = await loadUser(id);
   if (user.id === viewer.id) throw forbidden("You can't change your own role. Ask another admin.");
+  if (!mayChangeRole(viewer, user.role) || !mayChangeRole(viewer, input.role)) {
+    throw new AppError(403, 'FORBIDDEN', 'Only a super admin can appoint or remove admins.', [{ path: 'role', message: 'validation.roleProtected' }]);
+  }
 
   const branch = await BranchModel.findById(input.branchId).lean();
   if (!branch) {
     throw new AppError(400, 'VALIDATION_FAILED', 'Pick a branch from the list.', [{ path: 'branchId', message: 'validation.branchRequired' }]);
   }
-  // Normally unreachable (the only admin can't change their own role), but two
-  // admins demoting each other at the same moment must not leave none.
-  if (user.role === 'admin' && input.role !== 'admin' && (await UserModel.countDocuments({ role: 'admin' })) <= 1) {
-    throw new AppError(409, 'CONFLICT', "This is the only admin. Make someone else an admin first.");
+  // Normally unreachable (the only super admin can't change their own role), but
+  // two super admins demoting each other at the same moment must not leave none.
+  if (user.role === 'superadmin' && input.role !== 'superadmin' && (await UserModel.countDocuments({ role: 'superadmin' })) <= 1) {
+    throw new AppError(409, 'CONFLICT', 'This is the only super admin. Make someone else a super admin first.');
   }
 
   const changed = user.role !== input.role || String(user.branchId) !== input.branchId;

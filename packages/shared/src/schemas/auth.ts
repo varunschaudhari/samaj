@@ -67,6 +67,7 @@ export const VALIDATION_KEYS = [
   'validation.branchExists',
   'validation.branchParentInvalid',
   'validation.role',
+  'validation.roleProtected',
   'validation.resetCode',
   'validation.currentPasswordWrong',
   'validation.choose',

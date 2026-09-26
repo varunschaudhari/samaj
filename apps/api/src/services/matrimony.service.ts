@@ -1,5 +1,6 @@
 import {
   ELIGIBLE_RELATIONS,
+  isGlobalRole,
   type FieldIssue,
   MIN_MARRIAGE_AGE,
   type MyMatrimony,
@@ -311,7 +312,7 @@ export async function search(viewer: Viewer, query: SearchQuery): Promise<Profil
 
 function reviewScope(viewer: Viewer): QueryFilter<ProfileDoc> {
   const filter: QueryFilter<ProfileDoc> = { status: 'pending' };
-  if (viewer.role !== 'admin') {
+  if (!isGlobalRole(viewer.role)) {
     const branchId = new Types.ObjectId(viewer.branchId);
     filter.$or = [{ branchId }, { branchAncestors: branchId }];
     filter.familyId = { $ne: new Types.ObjectId(viewer.familyId) };

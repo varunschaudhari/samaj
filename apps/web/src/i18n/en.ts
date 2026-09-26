@@ -69,6 +69,8 @@ export const en = {
 
   'role.member': 'Member',
   'role.committee': 'Committee',
+  'role.superadmin': 'Super admin',
+  'people.cantChangeAdmin': "Only a super admin can change an admin's or super admin's role.",
   'role.admin': 'Admin',
 
   'branchKind.district': 'District',
@@ -130,7 +132,7 @@ export const en = {
   'people.role': 'Role',
   'people.branch': 'Branch',
   'people.branchHintCommittee': 'They review and manage families in this branch and every town inside it.',
-  'people.branchHintAdmin': 'Admins work across every branch. This is only their home branch.',
+  'people.branchHintAdmin': 'Admins and super admins work across every branch. This is only their home branch.',
   'people.branchHintMember': 'Their home branch.',
   'people.roleSaved': '{name} is now {role}.',
   'people.cantChangeOwn': "You can't change your own role. Another admin can.",
@@ -582,6 +584,7 @@ export const en = {
   'validation.venue': 'Enter where it is.',
   'validation.rsvpPeople': 'Up to 30 people per family.',
   'validation.rsvpClosed': 'RSVP is closed for this event.',
+  'validation.roleProtected': 'Only a super admin can appoint or remove admins.',
   'validation.invalidId': 'This value is not valid.',
   'validation.phone': 'Enter a 10-digit mobile number starting with 6, 7, 8 or 9.',
   'validation.phoneTaken': 'This number already has an account. Sign in instead.',

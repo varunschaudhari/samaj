@@ -1,11 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ROLES, type RoleUpdateInput, formatPhone, roleUpdateSchema } from '@samaj/shared';
+import { PROTECTED_ROLES, type RoleUpdateInput, assignableRoles, formatPhone, roleUpdateSchema } from '@samaj/shared';
 import { KeyRound } from 'lucide-react';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button, ErrorState, Modal, Select, Skeleton, toast } from '@/components/ui';
 import { FormAlert } from '@/features/auth/FormAlert';
 import { applyServerIssues, fieldError } from '@/features/auth/form-errors';
+import { useMe } from '@/features/auth/api';
 import { branchName, groupBranches, useBranches } from '@/features/branches/api';
 import { formatDate, useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { useUpdateRole, useUser } from './api';
@@ -24,6 +25,9 @@ export function UserRoleModal({ userId, onClose, onResetPassword }: UserRoleModa
   const language = useLanguageStore((s) => s.language);
   const errorMessage = useErrorMessage();
   const user = useUser(userId);
+  const me = useMe();
+  // Admins give out member and committee; only a super admin gives out admin roles.
+  const roles = me.data ? assignableRoles(me.data.role) : [];
   const branches = useBranches();
   const update = useUpdateRole(userId ?? '');
   const form = useForm({ resolver: zodResolver(roleUpdateSchema), defaultValues: { role: 'member', branchId: '' } as RoleUpdateInput });
@@ -48,7 +52,7 @@ export function UserRoleModal({ userId, onClose, onResetPassword }: UserRoleModa
     }),
   );
 
-  const hint = role === 'committee' ? t('people.branchHintCommittee') : role === 'admin' ? t('people.branchHintAdmin') : t('people.branchHintMember');
+  const hint = role === 'committee' ? t('people.branchHintCommittee') : PROTECTED_ROLES.includes(role) ? t('people.branchHintAdmin') : t('people.branchHintMember');
 
   return (
     <Modal
@@ -82,7 +86,7 @@ export function UserRoleModal({ userId, onClose, onResetPassword }: UserRoleModa
             <form id="role-form" onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
               {update.isError && !FIELDS.some((f) => errors[f]?.type === 'server') && <FormAlert message={errorMessage(update.error)} />}
               <Select label={t('people.role')} error={fieldError(t, errors.role?.message)} {...form.register('role')}>
-                {ROLES.map((r) => (
+                {roles.map((r) => (
                   <option key={r} value={r}>
                     {t(`role.${r}`)}
                   </option>
@@ -104,7 +108,9 @@ export function UserRoleModal({ userId, onClose, onResetPassword }: UserRoleModa
               </Select>
             </form>
           ) : (
-            <p className="rounded-sm bg-surface-muted p-3 text-sm text-fg">{t('people.cantChangeOwn')}</p>
+            <p className="rounded-sm bg-surface-muted p-3 text-sm text-fg">
+              {user.data.id === me.data?.id ? t('people.cantChangeOwn') : t('people.cantChangeAdmin')}
+            </p>
           )}
 
           {user.data.permissions.canResetPassword && (

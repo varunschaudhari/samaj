@@ -70,13 +70,32 @@ describe('PUT /api/users/:id/role', () => {
     expect(res.status).toBe(403);
   });
 
-  it('lets one of two admins demote the other, after which the remaining admin is the only one', async () => {
-    const second = await createFamily(branches.pune, { account: 'admin', people: [{ name: 'Bina Admin' }] });
-    const secondId = await userIdOf(second.familyId);
-    expect((await api.put(`/api/users/${secondId}/role`).set('Cookie', admin.cookie).send({ role: 'member', branchId: branches.pune })).status).toBe(200);
-    expect(await UserModel.countDocuments({ role: 'admin' })).toBe(1);
+  it('only a super admin appoints or removes admins', async () => {
+    const target = await createFamily(branches.amalner, { account: 'member', people: [{ name: 'Kavita Dhole' }] });
+    const otherAdmin = await createFamily(branches.pune, { account: 'admin', people: [{ name: 'Bina Admin' }] });
+    const targetId = await userIdOf(target.familyId);
+    const otherAdminId = await userIdOf(otherAdmin.familyId);
+
+    // An admin can't promote to admin, or change another admin.
+    const promote = await api.put(`/api/users/${targetId}/role`).set('Cookie', admin.cookie).send({ role: 'admin', branchId: branches.pune });
+    expect(promote.status).toBe(403);
+    expect(promote.body.error.issues).toEqual([{ path: 'role', message: 'validation.roleProtected' }]);
+    expect((await api.put(`/api/users/${otherAdminId}/role`).set('Cookie', admin.cookie).send({ role: 'member', branchId: branches.pune })).status).toBe(403);
+    const seen = (await api.get(`/api/users/${otherAdminId}`).set('Cookie', admin.cookie)).body.user as AdminUserDetail;
+    expect(seen.permissions.canChangeRole).toBe(false);
+
+    // A super admin can do both.
+    const superAdmin = await createFamily(branches.pune, { account: 'superadmin', people: [{ name: 'Trustee' }] });
+    expect((await api.put(`/api/users/${targetId}/role`).set('Cookie', superAdmin.cookie).send({ role: 'admin', branchId: branches.pune })).status).toBe(200);
+    expect((await api.put(`/api/users/${otherAdminId}/role`).set('Cookie', superAdmin.cookie).send({ role: 'member', branchId: branches.pune })).status).toBe(200);
     // The demoted admin lost access immediately.
-    expect((await api.get('/api/users').set('Cookie', second.cookie)).status).toBe(403);
+    expect((await api.get('/api/users').set('Cookie', otherAdmin.cookie)).status).toBe(403);
+  });
+
+  it("super admins can't change their own role either", async () => {
+    const superAdmin = await createFamily(branches.pune, { account: 'superadmin' });
+    const id = await userIdOf(superAdmin.familyId);
+    expect((await api.put(`/api/users/${id}/role`).set('Cookie', superAdmin.cookie).send({ role: 'member', branchId: branches.pune })).status).toBe(403);
   });
 
   it('validates the role and branch', async () => {
