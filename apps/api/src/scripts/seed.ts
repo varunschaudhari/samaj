@@ -26,43 +26,15 @@ interface BranchSeed {
   children?: BranchSeed[];
 }
 
+// The samaj's first branches. Admins add more from the Branches screen.
 const BRANCHES: BranchSeed[] = [
   {
     name: 'Jalgaon District',
     nameMr: 'जळगाव जिल्हा',
     kind: 'district',
     children: [
-      { name: 'Jalgaon', nameMr: 'जळगाव', kind: 'city' },
-      { name: 'Bhusawal', nameMr: 'भुसावळ', kind: 'town' },
       { name: 'Amalner', nameMr: 'अमळनेर', kind: 'town' },
-      { name: 'Chopda', nameMr: 'चोपडा', kind: 'town' },
-    ],
-  },
-  {
-    name: 'Dhule District',
-    nameMr: 'धुळे जिल्हा',
-    kind: 'district',
-    children: [
-      { name: 'Dhule', nameMr: 'धुळे', kind: 'city' },
-      { name: 'Shirpur', nameMr: 'शिरपूर', kind: 'town' },
-    ],
-  },
-  {
-    name: 'Nashik District',
-    nameMr: 'नाशिक जिल्हा',
-    kind: 'district',
-    children: [
-      { name: 'Nashik', nameMr: 'नाशिक', kind: 'city' },
-      { name: 'Malegaon', nameMr: 'मालेगाव', kind: 'town' },
-    ],
-  },
-  {
-    name: 'Pune District',
-    nameMr: 'पुणे जिल्हा',
-    kind: 'district',
-    children: [
-      { name: 'Pune', nameMr: 'पुणे', kind: 'city' },
-      { name: 'Pimpri-Chinchwad', nameMr: 'पिंपरी-चिंचवड', kind: 'city' },
+      { name: 'Dharangaon', nameMr: 'धरणगाव', kind: 'town' },
     ],
   },
 ];
@@ -209,7 +181,7 @@ async function main() {
   }
   // Two families written in Devanagari.
   families.push({
-    branch: await byName('Bhusawal'),
+    branch: await byName('Amalner'),
     gotra: 'kashyap',
     status: 'verified',
     people: [
@@ -219,7 +191,7 @@ async function main() {
     ],
   });
   families.push({
-    branch: await byName('Amalner'),
+    branch: await byName('Dharangaon'),
     gotra: 'atri',
     status: 'verified',
     people: [
@@ -229,8 +201,8 @@ async function main() {
     ],
   });
   // Waiting for the Jalgaon committee.
-  families.push({ branch: await byName('Chopda'), gotra: 'gautam', status: 'pending', people: household(20).slice(0, 3) });
-  families.push({ branch: await byName('Jalgaon'), gotra: null, status: 'pending', people: household(21).slice(0, 2) });
+  families.push({ branch: await byName('Dharangaon'), gotra: 'gautam', status: 'pending', people: household(20).slice(0, 3) });
+  families.push({ branch: await byName('Amalner'), gotra: null, status: 'pending', people: household(21).slice(0, 2) });
   // Sent back with a reason.
   families.push({
     branch: await byName('Amalner'),
@@ -241,10 +213,10 @@ async function main() {
   });
 
   const accounts: { role: Role; phone: string; name: string; branch: string; status: FamilyStatus }[] = [
-    { role: 'admin', phone: '+919800000001', name: 'Admin Demo', branch: 'Jalgaon', status: 'verified' },
+    { role: 'admin', phone: '+919800000001', name: 'Admin Demo', branch: 'Jalgaon District', status: 'verified' },
     { role: 'committee', phone: '+919800000002', name: 'Committee Demo', branch: 'Jalgaon District', status: 'verified' },
-    { role: 'member', phone: '+919800000003', name: 'Member Demo', branch: 'Pune', status: 'verified' },
-    { role: 'member', phone: '+919800000004', name: 'Pending Demo', branch: 'Bhusawal', status: 'pending' },
+    { role: 'member', phone: '+919800000003', name: 'Member Demo', branch: 'Amalner', status: 'verified' },
+    { role: 'member', phone: '+919800000004', name: 'Pending Demo', branch: 'Dharangaon', status: 'pending' },
   ];
   for (const a of accounts) {
     families.push({

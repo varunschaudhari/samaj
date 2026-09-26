@@ -59,6 +59,13 @@ export const VALIDATION_KEYS = [
   'validation.placeMin',
   'validation.reasonMin',
   'validation.gotra',
+  'validation.branchNameMin',
+  'validation.branchKind',
+  'validation.districtHasParent',
+  'validation.branchParentRequired',
+  // Produced by the API for branches.
+  'validation.branchExists',
+  'validation.branchParentInvalid',
   // Produced by the API rather than a schema, but translated the same way.
   'validation.phoneTaken',
   'validation.relationHead',
