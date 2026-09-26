@@ -3,9 +3,10 @@
  * the API validates against it, and the web app builds its dropdowns and
  * filter from it.
  *
- * PLACEHOLDER: these six are generic examples used during development.
+ * PLACEHOLDER: these are common gotras used as examples during development.
  * Replace them with the samaj's actual list. Keep each `id` stable once real
- * families use it, because the database stores the id, not the name.
+ * families use it, because the database stores the id, not the name. Names
+ * can be corrected at any time.
  */
 export const GOTRAS = [
   { id: 'kashyap', en: 'Kashyap', mr: 'कश्यप' },
@@ -14,6 +15,15 @@ export const GOTRAS = [
   { id: 'gautam', en: 'Gautam', mr: 'गौतम' },
   { id: 'atri', en: 'Atri', mr: 'अत्रि' },
   { id: 'jamadagni', en: 'Jamadagni', mr: 'जमदग्नी' },
+  { id: 'vishwamitra', en: 'Vishwamitra', mr: 'विश्वामित्र' },
+  { id: 'agastya', en: 'Agastya', mr: 'अगस्त्य' },
+  { id: 'kaushik', en: 'Kaushik', mr: 'कौशिक' },
+  { id: 'shandilya', en: 'Shandilya', mr: 'शांडिल्य' },
+  { id: 'garg', en: 'Garg', mr: 'गर्ग' },
+  { id: 'parashar', en: 'Parashar', mr: 'पराशर' },
+  { id: 'vatsa', en: 'Vatsa', mr: 'वत्स' },
+  { id: 'kaundinya', en: 'Kaundinya', mr: 'कौंडिण्य' },
+  { id: 'angiras', en: 'Angiras', mr: 'अंगिरस' },
 ] as const;
 
 export type GotraId = (typeof GOTRAS)[number]['id'];
