@@ -15,6 +15,7 @@ import { type MemberDoc, MemberModel } from '../models/member.model';
 import { UserModel } from '../models/user.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { storage } from '../utils/storage';
+import { closeForRemovedMember, syncFamilyGotra, syncMember } from './matrimony.service';
 import { canEditFamily, canResetPasswordFor, canReviewFamily, canSeeContact, canViewFamily, isOwnFamily } from './access';
 import type { Viewer } from './viewer';
 
@@ -134,6 +135,7 @@ export async function updateFamily(viewer: Viewer, familyId: string, input: Fami
   recordHistory(family, viewer, 'updated', 'Family details');
   await family.save();
   await MemberModel.updateMany({ familyId: family._id }, { $set: { place: family.place, gotra: family.gotra } });
+  await syncFamilyGotra(family._id, family.gotra ?? null);
   return getFamily(viewer, familyId);
 }
 
@@ -176,6 +178,7 @@ export async function updateMember(viewer: Viewer, familyId: string, memberId: s
   await member.save();
 
   if (member.userId) await UserModel.updateOne({ _id: member.userId }, { $set: { name: member.name } });
+  await syncMember(member);
 
   recordHistory(family, viewer, 'updated', `Updated ${member.name}`);
   await family.save();
@@ -190,6 +193,7 @@ export async function removeMember(viewer: Viewer, familyId: string, memberId: s
   }
 
   if (member.photoKey) await storage.remove(member.photoKey);
+  await closeForRemovedMember(member._id);
   await member.deleteOne();
   recordHistory(family, viewer, 'updated', `Removed ${member.name}`);
   await family.save();

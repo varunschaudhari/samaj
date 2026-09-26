@@ -77,6 +77,8 @@ const uniquePhone = () => `+9199${String(10000000 + ++phoneSeq).padStart(8, '0')
 interface PersonFixture {
   name: string;
   relation?: Relation;
+  gender?: 'male' | 'female';
+  birthYear?: number;
   occupation?: string;
 }
 
@@ -108,7 +110,8 @@ export async function createFamily(branchId: string, fixture: FamilyFixture = {}
       name: p.name,
       relation: p.relation ?? (i === 0 ? 'head' : 'son'),
       isHead: i === 0,
-      gender: 'male',
+      gender: p.gender ?? 'male',
+      birthYear: p.birthYear ?? null,
       occupation: p.occupation ?? null,
       phone: uniquePhone(),
       userId: i === 0 ? userId : null,

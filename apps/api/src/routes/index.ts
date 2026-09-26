@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { authRouter } from './auth.routes';
 import { branchRouter } from './branch.routes';
 import { familyRouter, verificationRouter } from './family.routes';
+import { matrimonyRouter } from './matrimony.routes';
 import { memberRouter } from './member.routes';
 import { userRouter } from './user.routes';
 
@@ -19,3 +20,4 @@ apiRouter.use('/members', memberRouter);
 apiRouter.use('/families', familyRouter);
 apiRouter.use('/verifications', verificationRouter);
 apiRouter.use('/users', userRouter);
+apiRouter.use('/matrimony', matrimonyRouter);

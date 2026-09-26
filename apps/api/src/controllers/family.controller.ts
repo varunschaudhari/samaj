@@ -2,6 +2,7 @@ import { familyUpdateSchema, memberInputSchema, pageQuerySchema, rejectFamilySch
 import type { Request, Response } from 'express';
 import * as familyService from '../services/family.service';
 import type { Viewer } from '../services/viewer';
+import * as matrimonyService from '../services/matrimony.service';
 import * as verificationService from '../services/verification.service';
 import { unauthenticated } from '../utils/app-error';
 
@@ -57,7 +58,8 @@ export async function listPending(req: Request, res: Response) {
 }
 
 export async function countPending(req: Request, res: Response) {
-  res.json({ pending: await verificationService.countPending(viewer(req)) });
+  const [families, profiles] = await Promise.all([verificationService.countPending(viewer(req)), matrimonyService.countPendingProfiles(viewer(req))]);
+  res.json({ pending: families + profiles, families, profiles });
 }
 
 export async function verify(req: Request, res: Response) {

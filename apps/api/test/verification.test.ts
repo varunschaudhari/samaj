@@ -27,13 +27,13 @@ describe('the review queue', () => {
     expect(page.items[0]).toMatchObject({ id: first.familyId, memberCount: 2 });
 
     const count = await api.get('/api/verifications/count').set('Cookie', committee.cookie);
-    expect(count.body).toEqual({ pending: 2 });
+    expect(count.body).toEqual({ pending: 2, families: 2, profiles: 0 });
   });
 
   it('is not available to ordinary members', async () => {
     const { cookie } = await createFamily(branches.bhusawal, { account: 'member' });
     expect((await api.get('/api/verifications').set('Cookie', cookie)).status).toBe(403);
-    expect((await api.get('/api/verifications/count').set('Cookie', cookie)).body).toEqual({ pending: 0 });
+    expect((await api.get('/api/verifications/count').set('Cookie', cookie)).body).toEqual({ pending: 0, families: 0, profiles: 0 });
   });
 });
 

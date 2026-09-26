@@ -13,6 +13,9 @@ import { FamilyModel } from '../models/family.model';
 import { MemberModel } from '../models/member.model';
 import { SessionModel } from '../models/session.model';
 import { UserModel } from '../models/user.model';
+import { InterestModel } from '../models/interest.model';
+import { ProfileModel } from '../models/profile.model';
+import { ineligibility } from '../services/matrimony.service';
 
 if (env.NODE_ENV === 'production') {
   process.stderr.write('Refusing to seed a production database.\n');
@@ -169,7 +172,7 @@ function household(i: number): PersonSeed[] {
 
 async function main() {
   await connectDb(env.MONGODB_URI);
-  await Promise.all([BranchModel.deleteMany({}), FamilyModel.deleteMany({}), MemberModel.deleteMany({}), UserModel.deleteMany({}), SessionModel.deleteMany({})]);
+  await Promise.all([BranchModel.deleteMany({}), FamilyModel.deleteMany({}), MemberModel.deleteMany({}), UserModel.deleteMany({}), SessionModel.deleteMany({}), ProfileModel.deleteMany({}), InterestModel.deleteMany({})]);
 
   const places = await insertBranches(BRANCHES, null);
   const byName = async (name: string) => (await BranchModel.findOne({ name }).orFail().lean()) as BranchDoc;
@@ -225,8 +228,10 @@ async function main() {
       status: a.status,
       account: { role: a.role, phone: a.phone },
       people: [
-        { name: a.name, relation: 'head', gender: 'male', birthYear: 1980 },
-        { name: `${a.name} Spouse`, relation: 'spouse', gender: 'female', birthYear: 1983 },
+        { name: a.name, relation: 'head', gender: 'male', birthYear: 1970 },
+        { name: `${a.name} Spouse`, relation: 'spouse', gender: 'female', birthYear: 1974 },
+        // Member Demo gets a grown son, so that account can try matrimonial search.
+        ...(a.name === 'Member Demo' ? [{ name: 'Rohit Demo', relation: 'son' as const, gender: 'male' as const, birthYear: new Date().getFullYear() - 27, occupation: 'Software engineer', education: 'B.E.' }] : []),
       ],
     });
   }
@@ -234,8 +239,45 @@ async function main() {
   let people = 0;
   for (const f of families) people += await createFamily(f, passwordHash);
 
+  // Matrimonial profiles for grown, unmarried children of verified families.
+  const admin = await UserModel.findOne({ role: 'admin' }).orFail().lean();
+  const verified = await FamilyModel.find({ status: 'verified' }).lean();
+  let profileCount = 0;
+  for (const [i, family] of verified.entries()) {
+    const members = await MemberModel.find({ familyId: family._id }).lean();
+    const hasSpouse = members.some((m) => m.relation === 'spouse');
+    const candidate = members.find((m) => ineligibility(m, hasSpouse) === null);
+    if (!candidate?.birthYear) continue;
+    const head = members.find((m) => m.isHead);
+    // Most go live; every fourth waits for the committee, so the review queue has something in it.
+    const live = i % 4 !== 3;
+    await ProfileModel.create({
+      memberId: candidate._id,
+      familyId: family._id,
+      heightCm: candidate.gender === 'male' ? 168 + (i % 10) : 152 + (i % 10),
+      education: candidate.education ?? 'Graduate',
+      occupation: candidate.occupation ?? null,
+      income: (['3to6', '6to10', '10to20', null] as const)[i % 4],
+      manglik: (['no', 'dontKnow', 'no', 'yes'] as const)[i % 4],
+      about: 'Close-knit family. Enjoys reading and travel, and helps with the family business on weekends.',
+      expectations: 'Educated, respectful, and from a family that values tradition.',
+      contactName: head?.name ?? candidate.name,
+      contactPhone: head?.phone ?? '+919800000000',
+      status: live ? 'active' : 'pending',
+      activatedAt: live ? new Date(Date.now() - i * 86_400_000) : null,
+      consentByUserId: admin._id,
+      consentAt: new Date(),
+      gender: candidate.gender,
+      birthYear: candidate.birthYear,
+      gotra: family.gotra,
+      branchId: family.branchId,
+      branchAncestors: family.branchAncestors,
+    });
+    profileCount++;
+  }
+
   process.stdout.write(
-    `\nSeeded ${await BranchModel.countDocuments()} branches, ${families.length} families and ${people} people.\n\nSign in with any of these (password: ${DEV_PASSWORD}):\n` +
+    `\nSeeded ${await BranchModel.countDocuments()} branches, ${families.length} families, ${people} people and ${profileCount} matrimonial profiles.\n\nSign in with any of these (password: ${DEV_PASSWORD}):\n` +
       accounts.map((a) => `  ${a.role.padEnd(10)} ${a.phone.replace('+91', '')}  ${a.name} (${a.branch}, ${a.status})`).join('\n') +
       '\n\n',
   );

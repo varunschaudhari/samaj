@@ -51,6 +51,29 @@ export function canReviewFamily(viewer: Viewer, family: FamilyLike): boolean {
   return viewer.role === 'admin' || !isOwnFamily(viewer, family);
 }
 
+interface ProfileLike extends BranchPlaced {
+  familyId: Types.ObjectId | string;
+  status: string;
+}
+
+/** The profile's own family (or its committee, via member:write) manages it. */
+export function canManageProfile(viewer: Viewer, profile: ProfileLike): boolean {
+  return String(profile.familyId) === viewer.familyId || hasReach(viewer, 'member:write', profile);
+}
+
+/** Committee members approve profiles in their branch, but not their own family's; admins may. */
+export function canReviewProfile(viewer: Viewer, profile: ProfileLike): boolean {
+  if (!hasReach(viewer, 'member:verify', profile)) return false;
+  return viewer.role === 'admin' || String(profile.familyId) !== viewer.familyId;
+}
+
+/** Live profiles are for verified families; the family and reviewers always see their own. */
+export function canViewProfile(viewer: Viewer, profile: ProfileLike): boolean {
+  if (String(profile.familyId) === viewer.familyId) return true;
+  if (hasReach(viewer, 'member:verify', profile)) return true;
+  return profile.status === 'active' && canBrowseDirectory(viewer);
+}
+
 /**
  * Who may create a password reset code for an account. Never for yourself
  * (use change password). Admins for anyone else. Committee members only for
