@@ -5,6 +5,7 @@ import { branchRouter } from './branch.routes';
 import { familyRouter, verificationRouter } from './family.routes';
 import { matrimonyRouter } from './matrimony.routes';
 import { memberRouter } from './member.routes';
+import { noticeRouter } from './notice.routes';
 import { userRouter } from './user.routes';
 
 export const apiRouter = Router();
@@ -21,3 +22,4 @@ apiRouter.use('/families', familyRouter);
 apiRouter.use('/verifications', verificationRouter);
 apiRouter.use('/users', userRouter);
 apiRouter.use('/matrimony', matrimonyRouter);
+apiRouter.use('/notices', noticeRouter);

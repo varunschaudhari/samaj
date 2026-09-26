@@ -22,6 +22,8 @@ import { FamilyPage, MyFamilyRedirect } from '@/features/families/FamilyPage';
 import { ProfilePage } from '@/features/profile/ProfilePage';
 import { ReviewPage } from '@/features/review/ReviewPage';
 import { StyleguidePage } from '@/features/styleguide/StyleguidePage';
+import { CommunityLayout } from '@/features/community/CommunityLayout';
+import { NoticesPage } from '@/features/community/NoticesPage';
 
 /** Hides a page from roles without the permission. The API enforces the same rule. */
 function RequirePermission({ permission, children }: { permission: Permission; children: ReactNode }) {
@@ -42,7 +44,15 @@ export const router = createBrowserRouter([
       {
         element: <RequireAuth><AppShell /></RequireAuth>,
         children: [
-          { index: true, element: <Navigate to="/directory" replace /> },
+          { index: true, element: <Navigate to="/community" replace /> },
+          {
+            path: '/community',
+            element: <CommunityLayout />,
+            children: [
+              { index: true, element: <Navigate to="/community/notices" replace /> },
+              { path: 'notices', element: <NoticesPage /> },
+            ],
+          },
           { path: '/directory', element: <DirectoryPage /> },
           { path: '/family', element: <MyFamilyRedirect /> },
           { path: '/families/:familyId', element: <FamilyPage /> },
@@ -63,6 +73,7 @@ export const router = createBrowserRouter([
             element: <AdminLayout />,
             children: [
               { index: true, element: <AdminIndex /> },
+              { path: 'review', element: <RequirePermission permission="member:verify"><ReviewPage embedded /></RequirePermission> },
               { path: 'people', element: <RequirePermission permission="user:assign-role"><PeoplePage /></RequirePermission> },
               { path: 'branches', element: <RequirePermission permission="branch:manage"><BranchesPage /></RequirePermission> },
             ],

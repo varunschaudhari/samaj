@@ -49,7 +49,7 @@ function PendingCardSkeleton() {
   );
 }
 
-export function ReviewPage() {
+export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
   const pending = usePendingFamilies();
@@ -113,11 +113,13 @@ export function ReviewPage() {
   const count = (n: number | undefined) => (n === undefined ? '' : ` (${formatNumber(n, language)})`);
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5">
-      <PageHeader
-        title={t('review.page.title')}
-        description={total === undefined ? <Skeleton className="h-4 w-32" /> : <span className="tabular-nums">{t('review.page.count', { count: total })}</span>}
-      />
+    <div className={embedded ? 'flex flex-col gap-4' : 'mx-auto flex max-w-3xl flex-col gap-5'}>
+      {!embedded && (
+        <PageHeader
+          title={t('review.page.title')}
+          description={total === undefined ? <Skeleton className="h-4 w-32" /> : <span className="tabular-nums">{t('review.page.count', { count: total })}</span>}
+        />
+      )}
       <Tabs
         label={t('review.page.title')}
         items={[

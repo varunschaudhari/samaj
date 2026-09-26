@@ -87,6 +87,10 @@ export const VALIDATION_KEYS = [
   'validation.interestExists',
   'validation.interestLimit',
   'validation.interestAnswered',
+  'validation.noticeTitle',
+  'validation.noticeBody',
+  'validation.noticeBranch',
+  'validation.pinLimit',
   // Produced by the API rather than a schema, but translated the same way.
   'validation.phoneTaken',
   'validation.relationHead',

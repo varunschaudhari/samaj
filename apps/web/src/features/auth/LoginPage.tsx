@@ -13,7 +13,7 @@ import { PasswordInput } from './PasswordInput';
 
 /** Only follow ?next= to a path inside the app. */
 function safeNext(value: string | null): string {
-  return value && value.startsWith('/') && !value.startsWith('//') ? value : '/directory';
+  return value && value.startsWith('/') && !value.startsWith('//') ? value : '/community';
 }
 
 export function LoginPage() {

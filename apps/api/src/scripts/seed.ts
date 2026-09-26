@@ -14,6 +14,7 @@ import { MemberModel } from '../models/member.model';
 import { SessionModel } from '../models/session.model';
 import { UserModel } from '../models/user.model';
 import { InterestModel } from '../models/interest.model';
+import { NoticeModel } from '../models/notice.model';
 import { ProfileModel } from '../models/profile.model';
 import { ineligibility } from '../services/matrimony.service';
 
@@ -172,7 +173,7 @@ function household(i: number): PersonSeed[] {
 
 async function main() {
   await connectDb(env.MONGODB_URI);
-  await Promise.all([BranchModel.deleteMany({}), FamilyModel.deleteMany({}), MemberModel.deleteMany({}), UserModel.deleteMany({}), SessionModel.deleteMany({}), ProfileModel.deleteMany({}), InterestModel.deleteMany({})]);
+  await Promise.all([BranchModel.deleteMany({}), FamilyModel.deleteMany({}), MemberModel.deleteMany({}), UserModel.deleteMany({}), SessionModel.deleteMany({}), ProfileModel.deleteMany({}), InterestModel.deleteMany({}), NoticeModel.deleteMany({})]);
 
   const places = await insertBranches(BRANCHES, null);
   const byName = async (name: string) => (await BranchModel.findOne({ name }).orFail().lean()) as BranchDoc;
@@ -275,6 +276,56 @@ async function main() {
     });
     profileCount++;
   }
+
+  // A few notices from the district committee, so the Community feed isn't empty.
+  const secretary = await UserModel.findOne({ role: 'committee' }).orFail().lean();
+  const districtBranch = await byName('Jalgaon District');
+  const amalnerBranch = await byName('Amalner');
+  const day = 86_400_000;
+  const noticeSeeds = [
+    {
+      title: 'Annual gathering on 15 November',
+      kind: 'meeting' as const,
+      pinned: true,
+      branch: districtBranch,
+      ago: 1,
+      body: 'The annual samaj gathering will be held at the Amalner samaj hall on Sunday, 15 November, from 10 am. Lunch is arranged. Families are requested to register their attendance with their branch committee.',
+    },
+    {
+      title: 'Scholarship forms for 2026-27',
+      kind: 'announcement' as const,
+      pinned: false,
+      branch: districtBranch,
+      ago: 3,
+      body: 'Students from samaj families who scored above 75% in 10th or 12th can apply for the samaj scholarship. Collect the form from the district office. Last date: 30 October.',
+    },
+    {
+      title: 'Congratulations to Gauri Karale',
+      kind: 'celebration' as const,
+      pinned: false,
+      branch: amalnerBranch,
+      ago: 5,
+      body: 'Gauri Karale of Amalner has completed her M.Sc. with distinction. The samaj congratulates her and her family.',
+    },
+    {
+      title: 'शोक संदेश',
+      kind: 'condolence' as const,
+      pinned: false,
+      branch: amalnerBranch,
+      ago: 8,
+      body: 'श्री. वसंत बागुल (अमळनेर) यांचे वृद्धापकाळाने निधन झाले. समाज त्यांच्या कुटुंबाच्या दुःखात सहभागी आहे.',
+    },
+  ];
+  await NoticeModel.insertMany(
+    noticeSeeds.map(({ branch, ago, ...n }) => ({
+      ...n,
+      branchId: branch._id,
+      branchAncestors: branch.ancestors,
+      authorUserId: secretary._id,
+      authorName: secretary.name,
+      publishedAt: new Date(Date.now() - ago * day),
+    })),
+  );
 
   process.stdout.write(
     `\nSeeded ${await BranchModel.countDocuments()} branches, ${families.length} families, ${people} people and ${profileCount} matrimonial profiles.\n\nSign in with any of these (password: ${DEV_PASSWORD}):\n` +

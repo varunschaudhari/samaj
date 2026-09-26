@@ -9,3 +9,4 @@ export * from './schemas/member';
 export * from './schemas/family';
 export * from './schemas/users';
 export * from './schemas/matrimony';
+export * from './schemas/notices';
