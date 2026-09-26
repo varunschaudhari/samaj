@@ -26,6 +26,7 @@ import { CommunityLayout } from '@/features/community/CommunityLayout';
 import { NoticesPage } from '@/features/community/NoticesPage';
 import { EventDetailPage } from '@/features/community/EventDetailPage';
 import { EventsPage } from '@/features/community/EventsPage';
+import { CommitteePage } from '@/features/community/CommitteePage';
 
 /** Hides a page from roles without the permission. The API enforces the same rule. */
 function RequirePermission({ permission, children }: { permission: Permission; children: ReactNode }) {
@@ -55,6 +56,7 @@ export const router = createBrowserRouter([
               { path: 'notices', element: <NoticesPage /> },
               { path: 'events', element: <EventsPage /> },
               { path: 'events/:id', element: <EventDetailPage /> },
+              { path: 'committee', element: <CommitteePage /> },
             ],
           },
           { path: '/directory', element: <DirectoryPage /> },

@@ -1,14 +1,15 @@
-import { CalendarDays, type LucideIcon, Megaphone } from 'lucide-react';
+import { CalendarDays, type LucideIcon, Megaphone, UsersRound } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Icon } from '@/components/ui';
 import { type MessageKey, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 
-/** Sections of the Community tab. Events and office-bearers join this list as they are built. */
+/** Sections of the Community tab. */
 export const COMMUNITY_SECTIONS: { to: string; label: MessageKey; icon: LucideIcon }[] = [
   { to: '/community/notices', label: 'community.notices', icon: Megaphone },
   { to: '/community/events', label: 'community.events', icon: CalendarDays },
+  { to: '/community/committee', label: 'community.committee', icon: UsersRound },
 ];
 
 export function CommunityLayout() {

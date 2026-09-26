@@ -35,10 +35,15 @@ export function VerificationNotice({ user }: { user: PublicUser }) {
       title={t('verify.pending.title')}
       body={t('verify.pending.body', { branch: branch ? branchName(branch, language) : '…' })}
       action={
-        <Link to={familyHref} className={buttonVariants()}>
-          <Icon icon={UserPlus} />
-          {t('verify.pending.action')}
-        </Link>
+        <div className="flex flex-col items-center gap-2">
+          <Link to={familyHref} className={buttonVariants()}>
+            <Icon icon={UserPlus} />
+            {t('verify.pending.action')}
+          </Link>
+          <Link to="/community/committee" className={buttonVariants({ variant: 'ghost' })}>
+            {t('verify.whoToCall')}
+          </Link>
+        </div>
       }
     />
   );

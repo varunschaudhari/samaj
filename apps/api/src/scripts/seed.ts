@@ -17,6 +17,7 @@ import { InterestModel } from '../models/interest.model';
 import { NoticeModel } from '../models/notice.model';
 import { EventModel } from '../models/event.model';
 import { RsvpModel } from '../models/rsvp.model';
+import { OfficeBearerModel } from '../models/office-bearer.model';
 import { ProfileModel } from '../models/profile.model';
 import { ineligibility } from '../services/matrimony.service';
 
@@ -175,7 +176,7 @@ function household(i: number): PersonSeed[] {
 
 async function main() {
   await connectDb(env.MONGODB_URI);
-  await Promise.all([BranchModel.deleteMany({}), FamilyModel.deleteMany({}), MemberModel.deleteMany({}), UserModel.deleteMany({}), SessionModel.deleteMany({}), ProfileModel.deleteMany({}), InterestModel.deleteMany({}), NoticeModel.deleteMany({}), EventModel.deleteMany({}), RsvpModel.deleteMany({})]);
+  await Promise.all([BranchModel.deleteMany({}), FamilyModel.deleteMany({}), MemberModel.deleteMany({}), UserModel.deleteMany({}), SessionModel.deleteMany({}), ProfileModel.deleteMany({}), InterestModel.deleteMany({}), NoticeModel.deleteMany({}), EventModel.deleteMany({}), RsvpModel.deleteMany({}), OfficeBearerModel.deleteMany({})]);
 
   const places = await insertBranches(BRANCHES, null);
   const byName = async (name: string) => (await BranchModel.findOne({ name }).orFail().lean()) as BranchDoc;
@@ -378,6 +379,19 @@ async function main() {
     const attending = await FamilyModel.find({ status: 'verified' }).limit(6).lean();
     await RsvpModel.insertMany(attending.map((f, i) => ({ eventId: gathering._id, familyId: f._id, people: 2 + (i % 4), byUserId: secretary._id })));
   }
+
+  // Office-bearers. The district secretary is the committee demo account, so its number is real in dev.
+  const bearers: { branch: typeof districtBranch; post: 'president' | 'vicePresident' | 'secretary' | 'treasurer' | 'member'; name: string; phone: string }[] = [
+    { branch: districtBranch, post: 'president', name: 'Ramesh Chaudhari', phone: '+919822101010' },
+    { branch: districtBranch, post: 'secretary', name: secretary.name, phone: secretary.phone },
+    { branch: districtBranch, post: 'treasurer', name: 'Dilip Karale', phone: '+919822101012' },
+    { branch: amalnerBranch, post: 'president', name: 'Prakash Wagh', phone: '+919822101020' },
+    { branch: amalnerBranch, post: 'secretary', name: 'Sunita Bagul', phone: '+919822101021' },
+    { branch: dharangaonBranch, post: 'secretary', name: 'Vasant Sonawane', phone: '+919822101030' },
+  ];
+  await OfficeBearerModel.insertMany(
+    bearers.map((b) => ({ branchId: b.branch._id, branchAncestors: b.branch.ancestors, post: b.post, name: b.name, phone: b.phone, updatedByUserId: secretary._id })),
+  );
 
   process.stdout.write(
     `\nSeeded ${await BranchModel.countDocuments()} branches, ${families.length} families, ${people} people and ${profileCount} matrimonial profiles.\n\nSign in with any of these (password: ${DEV_PASSWORD}):\n` +
