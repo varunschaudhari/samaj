@@ -6,6 +6,7 @@ import {
   Dashboard,
   HeartHandshake,
   House,
+  Mail,
   Megaphone,
   Palette,
   ShieldCheck,
@@ -45,6 +46,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/matrimony', label: 'nav.matrimony', icon: HeartHandshake, tabBarHideForRoles: ['committee', 'admin', 'superadmin'] },
   { to: '/review', label: 'nav.review', icon: ClipboardCheck, permission: 'member:verify', pendingBadge: true, hideForRoles: ['admin', 'superadmin'] },
   { to: '/admin', label: 'nav.admin', icon: ShieldCheck, permission: 'user:assign-role', pendingBadge: true },
+  // On phones invitations come in through Home.
+  { to: '/invitations', label: 'nav.invitations', icon: Mail, sidebarOnly: true },
   // On phones Profile is the avatar in the top bar.
   { to: '/profile', label: 'nav.profile', icon: UserRound, sidebarOnly: true },
   { to: '/styleguide', label: 'nav.styleguide', icon: Palette, devOnly: true },

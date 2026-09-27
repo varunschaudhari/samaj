@@ -104,6 +104,9 @@ export const router = createBrowserRouter([
           { path: '/families/:familyId', lazy: page(async () => (await import('@/features/families/FamilyPage')).FamilyPage) },
           { path: '/families/:familyId/tree', lazy: page(async () => (await import('@/features/families/FamilyTreePage')).FamilyTreePage) },
           { path: '/relation', lazy: page(async () => (await import('@/features/families/RelationPage')).RelationPage) },
+          { path: '/invitations', lazy: page(async () => (await import('@/features/invitations/InvitationsPage')).InvitationsPage) },
+          { path: '/invitations/new', lazy: page(async () => (await import('@/features/invitations/NewInvitationPage')).NewInvitationPage) },
+          { path: '/invitations/:id', lazy: page(async () => (await import('@/features/invitations/InvitationPage')).InvitationPage) },
           {
             path: '/matrimony',
             lazy: page(async () => (await import('@/features/matrimony/MatrimonyLayout')).MatrimonyLayout),

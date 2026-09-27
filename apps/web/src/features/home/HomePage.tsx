@@ -9,6 +9,7 @@ import {
   Dashboard,
   HeartHandshake,
   type AppIcon,
+  Mail,
   Megaphone,
   PhoneCall,
   RotateCw,
@@ -29,6 +30,7 @@ import { useDashboard } from '@/features/dashboard/api';
 import { useReviewCounts } from '@/features/families/api';
 import { useFamilyRequests } from '@/features/families/links-api';
 import { VerificationNotice } from '@/features/families/VerificationNotice';
+import { useMyInvitations } from '@/features/invitations/api';
 import { type MessageKey, formatDate, formatNumber, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 
@@ -110,7 +112,8 @@ function QuickTiles({ user, canBrowse }: { user: PublicUser; canBrowse: boolean 
     ...(canBrowse ? [{ to: '/directory', label: 'nav.directory', icon: BookUser, tone: 'bg-primary-soft text-primary' } as const] : []),
     { to: `/families/${user.familyId}`, label: 'nav.family', icon: UsersRound, tone: 'bg-zari-soft text-zari-fg' },
     { to: '/community/events', label: 'community.events', icon: CalendarDays, tone: 'bg-info-soft text-info' },
-    { to: '/community/notices', label: 'community.notices', icon: Megaphone, tone: 'bg-primary-soft text-primary' },
+    // Notices have their own section below; invitations need a way in on phones.
+    ...(canBrowse ? [{ to: '/invitations', label: 'nav.invitations', icon: Mail, tone: 'bg-primary-soft text-primary' } as const] : [{ to: '/community/notices', label: 'community.notices', icon: Megaphone, tone: 'bg-primary-soft text-primary' } as const]),
     ...(canBrowse ? [{ to: '/matrimony', label: 'nav.matrimony', icon: HeartHandshake, tone: 'bg-kumkum-soft text-kumkum' } as const] : []),
     // The committee are the people others call; they get their dashboard here instead.
     can(user.role, 'member:verify')
@@ -272,6 +275,33 @@ function FamilyRequestsCard({ user }: { user: PublicUser }) {
   );
 }
 
+/** Invitations the family hasn't answered yet, while answers are still open. */
+function InvitesCard({ user }: { user: PublicUser }) {
+  const t = useT();
+  const language = useLanguageStore((s) => s.language);
+  const mine = useMyInvitations(Boolean(user.familyId));
+  const waiting = (mine.data?.invited ?? []).filter((inv) => !inv.answered && !inv.closed);
+  if (waiting.length === 0) return null;
+  const only = waiting.length === 1 ? waiting[0] : undefined;
+  return (
+    <Link
+      to={only ? `/invitations/${only.id}` : '/invitations'}
+      className="flex items-center gap-4 rounded-md border border-zari/60 bg-surface p-4 shadow-card transition-colors duration-150 hover:border-zari"
+    >
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-kumkum-soft text-kumkum">
+        <Icon icon={Mail} size="lg" weight="duotone" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="font-semibold text-fg">{t('home.invites.title', { count: formatNumber(waiting.length, language) })}</span>
+        <span className="text-sm text-fg-muted">
+          {only ? `${t(`invite.kind.${only.kind}`)}${only.forNames ? `: ${only.forNames}` : ''} · ${t('invite.from', { name: only.host.headName })}` : t('home.invites.body')}
+        </span>
+      </span>
+      <Icon icon={ChevronRight} className="text-fg-muted" />
+    </Link>
+  );
+}
+
 function SectionHeading({ title, to, id }: { title: string; to: string; id: string }) {
   const t = useT();
   return (
@@ -408,6 +438,7 @@ export function HomePage() {
       <Hero user={user} canBrowse={canBrowse} />
       {!canBrowse && <VerificationNotice user={user} />}
       <FamilyRequestsCard user={user} />
+      {canBrowse && <InvitesCard user={user} />}
       {can(user.role, 'member:verify') && <WorkCard user={user} />}
       <QuickTiles user={user} canBrowse={canBrowse} />
       <div className="grid gap-6 lg:grid-cols-2">

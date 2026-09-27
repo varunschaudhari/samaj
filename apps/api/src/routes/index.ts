@@ -12,6 +12,7 @@ import { privacyRouter } from './privacy.routes';
 import { eventRouter } from './event.routes';
 import { noticeRouter } from './notice.routes';
 import { userRouter } from './user.routes';
+import { invitationRouter } from './invitation.routes';
 
 export const apiRouter = Router();
 
@@ -40,3 +41,4 @@ apiRouter.use('/moves', moveRouter);
 apiRouter.use('/people', peopleRouter);
 apiRouter.use('/member-approvals', approvalRouter);
 apiRouter.use('/privacy', privacyRouter);
+apiRouter.use('/invitations', invitationRouter);
