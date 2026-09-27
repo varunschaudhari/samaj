@@ -18,6 +18,8 @@ describe('memberInputSchema', () => {
       parentId: null,
       partnerId: null,
       adopted: false,
+      otherParentId: null,
+      formerPartner: false,
     });
   });
 

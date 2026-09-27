@@ -8,6 +8,7 @@ import {
   PARENT_CHOICES,
   PARTNER_CHOICES,
   PHOTO_MAX_BYTES,
+  SPOUSE_RELATIONS,
   type enrolFamilySchema,
   type familyUpdateSchema,
 } from '@samaj/shared';
@@ -140,6 +141,8 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     deathYear: m.deathYear ?? null,
     parentId: m.parentId ? String(m.parentId) : null,
     partnerId: m.partnerId ? String(m.partnerId) : null,
+    otherParentId: m.otherParentId ? String(m.otherParentId) : null,
+    formerPartner: m.formerPartner === true,
     ...(seesPending && { adopted: m.adopted === true }),
     ...(externalOf(m.externalParentId) && { externalParent: externalOf(m.externalParentId) }),
     ...(maher(m._id) && { movedFrom: maher(m._id) }),
@@ -250,6 +253,8 @@ async function checkTies(familyId: Types.ObjectId, input: MemberInputParsed, sel
   const ties = [
     ['parentId', input.parentId, PARENT_CHOICES[input.relation]],
     ['partnerId', input.partnerId, PARTNER_CHOICES[input.relation]],
+    // A child's other parent is one of their parent's spouses; the tree checks which.
+    ['otherParentId', input.otherParentId, SPOUSE_RELATIONS],
   ] as const;
   for (const [path, id, allowed] of ties) {
     if (!id) continue;
@@ -265,6 +270,7 @@ async function untie(familyId: Types.ObjectId, memberId: Types.ObjectId) {
   await Promise.all([
     MemberModel.updateMany({ familyId, parentId: memberId }, { $set: { parentId: null } }),
     MemberModel.updateMany({ familyId, partnerId: memberId }, { $set: { partnerId: null } }),
+    MemberModel.updateMany({ familyId, otherParentId: memberId }, { $set: { otherParentId: null } }),
   ]);
 }
 
@@ -324,6 +330,8 @@ export async function updateMember(viewer: Viewer, familyId: string, memberId: s
   member.parentId = input.parentId ? new Types.ObjectId(input.parentId) : null;
   member.partnerId = input.partnerId ? new Types.ObjectId(input.partnerId) : null;
   member.adopted = input.adopted;
+  member.otherParentId = input.otherParentId ? new Types.ObjectId(input.otherParentId) : null;
+  member.formerPartner = input.formerPartner;
   await member.save();
   // A son who is now a nephew is no longer anyone's father here.
   if (relationChanged) await untie(family._id, member._id);

@@ -114,6 +114,7 @@ export function MemberSheet({
             {member.isHead && <Badge tone="primary">{t('family.headBadge')}</Badge>}
             {member.deceased && <Badge>{t('member.deceasedBadge')}</Badge>}
             {member.adopted && <Badge>{t('member.adopted')}</Badge>}
+            {member.formerPartner && <Badge>{t('member.formerBadge')}</Badge>}
             {member.hasAccount && (
               <Badge tone="success" icon={BadgeCheck}>
                 {isSelf ? t('member.sheet.you') : t('family.signsIn')}
@@ -151,7 +152,20 @@ export function MemberSheet({
               </span>
             </Fact>
           )}
-          {partner && <Fact icon={HeartHandshake}>{t(member.gender === 'male' ? 'member.sheet.husbandOf' : 'member.sheet.wifeOf', { name: partner.name })}</Fact>}
+          {partner && (
+            <Fact icon={HeartHandshake}>
+              {t(
+                member.formerPartner
+                  ? member.gender === 'male'
+                    ? 'member.sheet.formerHusbandOf'
+                    : 'member.sheet.formerWifeOf'
+                  : member.gender === 'male'
+                    ? 'member.sheet.husbandOf'
+                    : 'member.sheet.wifeOf',
+                { name: partner.name },
+              )}
+            </Fact>
+          )}
           {member.movedFrom && (
             <Fact icon={House}>
               <span>

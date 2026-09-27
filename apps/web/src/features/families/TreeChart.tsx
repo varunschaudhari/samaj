@@ -28,7 +28,15 @@ export function usePersonLine() {
   const t = useT();
   const life = useLifeLabel();
   return (p: ChartPerson) =>
-    [p.isHead ? t('family.headBadge') : t(`relation.${p.relation}`), p.adopted ? t('member.adopted') : null, life(p), p.movedTo ? t('tree.married') : null].filter(Boolean).join(' · ');
+    [
+      p.isHead ? t('family.headBadge') : t(`relation.${p.relation}`),
+      p.adopted ? t('member.adopted') : null,
+      p.formerPartner ? t('member.formerBadge') : null,
+      life(p),
+      p.movedTo ? t('tree.married') : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
 }
 
 function PersonCard({ person, focused, matched, onOpen }: { person: ChartPerson; focused: boolean; matched: boolean; onOpen: (p: ChartPerson) => void }) {
@@ -188,7 +196,7 @@ export function TreeChart({
                   />
                 ))}
                 {layout.couples.map((c, i) => (
-                  <path key={`c${i}`} d={`M${c.x1},${c.y} H${c.x2}`} stroke="var(--zari)" strokeWidth={3} />
+                  <path key={`c${i}`} d={c.path} stroke={c.former ? 'var(--line-strong)' : 'var(--zari)'} strokeWidth={c.former ? 1.5 : 3} strokeDasharray={c.former ? '4 4' : undefined} />
                 ))}
                 {layout.stubs.map((s, i) => (
                   <path key={`s${i}`} d={`M${s.x},${s.y} V${s.y - 24}`} strokeDasharray="3 4" />

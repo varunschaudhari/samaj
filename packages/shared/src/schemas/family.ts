@@ -44,6 +44,21 @@ export type Relation = (typeof RELATIONS)[number];
 /** The family's own children and grandchildren: their parents are in the family. Anyone else's may be in another one. */
 export const CHILD_RELATIONS: readonly Relation[] = ['son', 'daughter', 'grandson', 'granddaughter', 'greatGrandson', 'greatGranddaughter', 'nephew', 'niece'];
 
+/** Someone who married into the family: they stand beside whoever they married. */
+export const SPOUSE_RELATIONS: readonly Relation[] = [
+  'spouse',
+  'mother',
+  'grandmother',
+  'greatGrandmother',
+  'aunt',
+  'maternalUncleWife',
+  'sisterInLaw',
+  'daughterInLaw',
+  'sonInLaw',
+  'granddaughterInLaw',
+  'grandsonInLaw',
+];
+
 /** Relations someone can be adopted into (दत्तक). Only the family and its committee see that they were. */
 export const ADOPTABLE_RELATIONS: readonly Relation[] = ['son', 'daughter', 'grandson', 'granddaughter', 'greatGrandson', 'greatGranddaughter', 'nephew', 'niece'];
 
@@ -148,6 +163,10 @@ const memberFields = z.object({
   parentId: optionalId,
   partnerId: optionalId,
   adopted: z.boolean().default(false),
+  /** A child's other parent, when their parent has had more than one spouse (a second marriage). */
+  otherParentId: optionalId,
+  /** Divorced or separated from whoever they married. Widowed is simply their partner having passed away. */
+  formerPartner: z.boolean().default(false),
 });
 
 type MemberFields = z.output<typeof memberFields>;
@@ -166,6 +185,8 @@ const tidy = <T extends MemberFields>(v: T): T => ({
   parentId: PARENT_CHOICES[v.relation] ? v.parentId : null,
   partnerId: PARTNER_CHOICES[v.relation] ? v.partnerId : null,
   adopted: v.adopted && ADOPTABLE_RELATIONS.includes(v.relation),
+  otherParentId: CHILD_RELATIONS.includes(v.relation) ? v.otherParentId : null,
+  formerPartner: v.formerPartner && SPOUSE_RELATIONS.includes(v.relation),
 });
 
 export const memberInputSchema = memberFields.superRefine(checkYears).transform(tidy);
@@ -210,7 +231,7 @@ export const enrolFamilySchema = z.object({
   place: optionalText(60).pipe(z.string().min(2, 'validation.placeMin').nullable()),
   gotra: gotraSchema,
   address: optionalText(200),
-  head: memberFields.omit({ relation: true, deceased: true, deathYear: true, parentId: true, partnerId: true, adopted: true }),
+  head: memberFields.omit({ relation: true, deceased: true, deathYear: true, parentId: true, partnerId: true, adopted: true, otherParentId: true, formerPartner: true }),
   /** The committee confirms the family agreed to be registered. */
   consent: z.literal(true, { error: 'validation.consentRequired' }),
 });
@@ -262,6 +283,10 @@ export interface FamilyMember {
   adopted?: boolean;
   /** Their parent, listed in another family (a head's father in his parents' home, a wife's father in her माहेर). */
   externalParent?: { id: string; name: string; family: LinkedFamily };
+  /** Their other parent, when their parent has had more than one spouse. */
+  otherParentId: string | null;
+  /** Divorced or separated from whoever they married. */
+  formerPartner: boolean;
 }
 
 /** Someone who was in this family and moved to another, usually after marriage. */

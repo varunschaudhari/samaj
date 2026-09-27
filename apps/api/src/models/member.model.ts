@@ -60,6 +60,10 @@ const memberSchema = new Schema(
     partnerId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
     /** Adopted into the family. Only the family and its committee see it. */
     adopted: { type: Boolean, default: false },
+    /** A child's other parent, when their parent has had more than one spouse. Same family. */
+    otherParentId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
+    /** Divorced or separated from whoever they married. */
+    formerPartner: { type: Boolean, default: false },
     /** Their parent, listed in another family linked to this one (a head's father, a wife's father in her माहेर). */
     externalParentId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
   },

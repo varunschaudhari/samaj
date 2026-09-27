@@ -38,6 +38,7 @@ interface Node {
   partner: string | null;
   storedParent: string | null;
   storedPartner: string | null;
+  storedOtherParent: string | null;
 }
 
 const words = (name: string) => name.toLowerCase().replace(/\./g, ' ').split(/\s+/).filter(Boolean);
@@ -250,7 +251,7 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
   // Everyone the viewer may see, household by household.
   type Household = { id: string; summary: LinkedFamily; generation: number; via: Placement['via']; canEdit: boolean; nodes: Node[] };
   const shown: Household[] = [];
-  const node = (householdId: string, person: TreePerson, stored: { parentId?: unknown; partnerId?: unknown } = {}): Node => ({
+  const node = (householdId: string, person: TreePerson, stored: { parentId?: unknown; partnerId?: unknown; otherParentId?: unknown } = {}): Node => ({
     person,
     householdId,
     relation: person.relation,
@@ -258,6 +259,7 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
     partner: null,
     storedParent: stored.parentId ? String(stored.parentId) : null,
     storedPartner: stored.partnerId ? String(stored.partnerId) : null,
+    storedOtherParent: stored.otherParentId ? String(stored.otherParentId) : null,
   });
   const rules = new Map<string, { canEdit: boolean; seesPending: boolean }>();
   for (const [id, at] of placed) {
@@ -286,6 +288,8 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
             deathYear: m.deathYear ?? null,
             parentId: null,
             partnerId: null,
+            otherParentId: null,
+            formerPartner: m.formerPartner === true,
             // Adoption is the family's own business: others see a son as a son.
             ...(seesPending && { adopted: m.adopted === true }),
           },
@@ -317,6 +321,8 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
           deathYear: o.member.deathYear ?? null,
           parentId: null,
           partnerId: null,
+          otherParentId: null,
+          formerPartner: false,
         }),
       );
     }
@@ -411,6 +417,11 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
       if (alias.has(n.person.id)) continue;
       n.person.parentId = tie(parentOf(n), n.person.id);
       n.person.partnerId = tie(n.partner, n.person.id);
+    }
+    // The other parent only if they really are the parent's partner.
+    for (const n of nodeBy.values()) {
+      const other = n.storedOtherParent ? tie(n.storedOtherParent, n.person.id) : null;
+      n.person.otherParentId = other && n.person.parentId && nodeBy.get(other)?.person.partnerId === n.person.parentId ? other : null;
     }
   };
   settle();

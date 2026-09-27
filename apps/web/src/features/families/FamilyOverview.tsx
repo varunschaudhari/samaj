@@ -118,8 +118,11 @@ export function FamilyChecklist({
   const options = (m: FamilyMember, allowed: readonly Relation[] | undefined) => (allowed ? family.members.filter((x) => x.id !== m.id && allowed.includes(x.relation)).length : 0);
   const openParent = (m: FamilyMember) => options(m, PARENT_CHOICES[m.relation]) > 1;
   const openPartner = (m: FamilyMember) => options(m, PARTNER_CHOICES[m.relation]) > 1;
-  const tieable = family.members.filter((m) => openParent(m) || openPartner(m));
-  const untied = tieable.filter((m) => (openParent(m) && !m.parentId) || (openPartner(m) && !m.partnerId));
+  // The head's children, when the head has had more than one spouse: whose are they?
+  const headSpouses = family.members.filter((m) => m.relation === 'spouse').length;
+  const openOther = (m: FamilyMember) => headSpouses > 1 && (m.relation === 'son' || m.relation === 'daughter');
+  const tieable = family.members.filter((m) => openParent(m) || openPartner(m) || openOther(m));
+  const untied = tieable.filter((m) => (openParent(m) && !m.parentId) || (openPartner(m) && !m.partnerId) || (openOther(m) && !m.otherParentId));
 
   const steps: Step[] = [
     { key: 'people', icon: Users, label: t('family.check.people'), done: family.members.length > 1, onFix: onAdd },

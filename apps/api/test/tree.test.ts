@@ -260,4 +260,25 @@ describe('GET /api/families/:id/tree', () => {
     expect(who.get('Vaishali Patil')?.partnerId).toBe(who.get('Mahesh Patil')?.id);
     expect(who.get('Neha Wagh')).toMatchObject({ generation: 2, partnerId: who.get('Aarav Wagh')?.id });
   });
+
+  it('keeps a second marriage apart: a former wife, and whose child each child is', async () => {
+    const own = await createFamily(branches.amalner, { account: 'member', people: [{ name: 'Anil Wagh' }] });
+    const add = (body: Record<string, unknown>) => api.post(`/api/families/${own.familyId}/members`).set('Cookie', own.cookie).send({ gender: 'male', consent: true, ...body });
+    const first = (await add({ name: 'Sunita Wagh', relation: 'spouse', gender: 'female', formerPartner: true })).body.family as FamilyDetail;
+    const sunita = first.members.find((m) => m.name === 'Sunita Wagh');
+    expect(sunita?.formerPartner).toBe(true);
+    const second = ((await add({ name: 'Meena Wagh', relation: 'spouse', gender: 'female' })).body.family as FamilyDetail).members.find((m) => m.name === 'Meena Wagh');
+    expect((await add({ name: 'Rohit Wagh', relation: 'son', otherParentId: sunita?.id })).status).toBe(201);
+    expect((await add({ name: 'Om Wagh', relation: 'son', otherParentId: second?.id })).status).toBe(201);
+    // The other parent is someone who married into the family.
+    const wrong = await add({ name: 'X Wagh', relation: 'son', otherParentId: own.memberIds[0] });
+    expect(wrong.body.error.issues).toEqual([{ path: 'otherParentId', message: 'validation.tieChoice' }]);
+
+    const t = await tree(own.cookie, own.familyId);
+    const who = byName(t);
+    expect(who.get('Sunita Wagh')).toMatchObject({ partnerId: own.memberIds[0], formerPartner: true });
+    expect(who.get('Meena Wagh')).toMatchObject({ partnerId: own.memberIds[0], formerPartner: false });
+    expect(who.get('Rohit Wagh')).toMatchObject({ parentId: own.memberIds[0], otherParentId: sunita?.id });
+    expect(who.get('Om Wagh')?.otherParentId).toBe(second?.id);
+  });
 });

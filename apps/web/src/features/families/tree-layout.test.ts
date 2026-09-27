@@ -16,6 +16,8 @@ const person = (id: string, relation: TreePerson['relation'], generation: number
   deathYear: null,
   parentId: null,
   partnerId: null,
+  otherParentId: null,
+  formerPartner: false,
   ...ties,
 });
 const treeOf = (members: TreePerson[]): FamilyTree => ({ rootId: 'f1', households: [{ family, canEdit: true, generation: 0, via: null, members }], side: [], truncated: false });
@@ -79,6 +81,27 @@ describe('layoutTree', () => {
     );
     const priya = joined.people.find((p) => p.id === 'Priya');
     expect(joined.connectors).toEqual([expect.objectContaining({ marriedIn: true, x2: (priya?.x ?? 0) + CARD_W / 2, y2: priya?.y })]);
+  });
+
+  it('puts each spouse’s children under that couple, a former spouse further out', () => {
+    const twice = layoutTree(
+      treeOf([
+        person('Anil', 'head', 0),
+        person('Sunita', 'spouse', 0, { gender: 'female', partnerId: 'Anil', formerPartner: true }),
+        person('Meena', 'spouse', 0, { gender: 'female', partnerId: 'Anil' }),
+        person('Rohit', 'son', 1, { parentId: 'Anil', otherParentId: 'Sunita', birthYear: 1990 }),
+        person('Om', 'son', 1, { parentId: 'Anil', otherParentId: 'Meena', birthYear: 2005 }),
+      ]),
+    );
+    const at2 = Object.fromEntries(twice.people.map((p) => [p.id, p]));
+    // Meena, the current wife, stands next to Anil; Sunita beyond her.
+    expect(at2.Meena?.x).toBeLessThan(at2.Sunita?.x ?? 0);
+    // Om (Meena's) comes before Rohit (Sunita's), though Rohit is older.
+    expect(at2.Om?.x).toBeLessThan(at2.Rohit?.x ?? 0);
+    const from = (id: string) => twice.connectors.find((c) => c.x2 === (at2[id]?.x ?? 0) + CARD_W / 2)?.x1;
+    expect(from('Om')).toBe(((at2.Anil?.x ?? 0) + (at2.Meena?.x ?? 0) + CARD_W) / 2);
+    expect(from('Rohit')).toBe(((at2.Anil?.x ?? 0) + (at2.Sunita?.x ?? 0) + CARD_W) / 2);
+    expect(twice.couples.map((c) => c.former)).toEqual([false, true]);
   });
 
   it('survives a loop in the data', () => {

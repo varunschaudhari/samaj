@@ -34,8 +34,8 @@ export interface ChartLayout {
    * wife's (or husband's) parents in their माहेर to where they stand now.
    */
   connectors: { x1: number; y1: number; midY: number; x2: number; y2: number; dashed: boolean; skips: boolean; marriedIn?: boolean }[];
-  /** Between partners standing side by side. */
-  couples: { x1: number; x2: number; y: number }[];
+  /** Between a person and each partner beside them: straight to the first, over the top to a second; dashed if they separated. */
+  couples: { path: string; former: boolean }[];
   /** Someone whose parents the family hasn't said yet: a short dashed stub above them. */
   stubs: { x: number; y: number }[];
   rows: { generation: number; y: number }[];
@@ -80,6 +80,11 @@ export function layoutTree(tree: FamilyTree): ChartLayout {
     unit.people.push(p);
     unitOf.set(p.id, unit);
   }
+  // A current spouse next to them, a former one further out.
+  for (const u of units) {
+    const [first, ...partners] = u.people;
+    if (first) u.people = [first, ...partners.sort((a, b) => Number(a.formerPartner) - Number(b.formerPartner))];
+  }
 
   // Under their parents' unit, unless that would make a loop.
   const parentUnit = (u: Unit) => {
@@ -101,7 +106,13 @@ export function layoutTree(tree: FamilyTree): ChartLayout {
     else roots.push(u);
   }
   const anchor = (u: Unit) => u.people[0] as ChartPerson;
-  for (const u of units) u.children.sort((a, b) => byAge(anchor(a), anchor(b)));
+  // Which of the parent's spouses a child's other parent is: the one named, or the current one.
+  const otherParent = (u: Unit, child: ChartPerson) => u.people.find((p) => p.id === child.otherParentId) ?? u.people.find((p, i) => i > 0 && !p.formerPartner) ?? u.people[1];
+  // Each spouse's children together, under them, oldest first.
+  for (const u of units) {
+    const side = (c: Unit) => u.people.indexOf(otherParent(u, anchor(c)) as ChartPerson);
+    u.children.sort((a, b) => side(a) - side(b) || byAge(anchor(a), anchor(b)));
+  }
   // The family the tree is drawn for comes first in its generation.
   roots.sort((a, b) => a.generation - b.generation || Number(anchor(b).rootHousehold) - Number(anchor(a).rootHousehold) || byAge(anchor(a), anchor(b)));
 
@@ -143,14 +154,20 @@ export function layoutTree(tree: FamilyTree): ChartLayout {
   const couples: ChartLayout['couples'] = [];
   for (const u of units) {
     const y = rowY(u.generation);
-    for (let i = 1; i < u.people.length; i++) {
-      const before = u.people[i - 1] as ChartPerson;
-      couples.push({ x1: before.x + CARD_W, x2: before.x + CARD_W + COUPLE_GAP, y: y + CARD_H / 2 });
-    }
+    const first = anchor(u);
+    u.people.slice(1).forEach((p, i) => {
+      const path =
+        i === 0
+          ? `M${first.x + CARD_W},${y + CARD_H / 2} H${p.x}`
+          : // Over the top of whoever stands between them.
+            `M${first.x + (CARD_W * 3) / 4},${y} V${y - 10} H${p.x + CARD_W / 2} V${y}`;
+      couples.push({ path, former: p.formerPartner });
+    });
     for (const c of u.children) {
       const child = anchor(c);
+      const other = otherParent(u, child);
       connectors.push({
-        x1: u.x + ownWidth(u) / 2,
+        x1: other ? (first.x + other.x + CARD_W) / 2 : first.x + CARD_W / 2,
         y1: y + CARD_H,
         midY: child.y - ROW_GAP / 2,
         x2: child.x + CARD_W / 2,

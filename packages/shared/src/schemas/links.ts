@@ -196,6 +196,10 @@ export interface TreePerson {
   partnerId: string | null;
   /** Adopted. Present only where the viewer sees the family's own details. */
   adopted?: boolean;
+  /** Their other parent (one of their parent's spouses), when the family said: a second marriage. */
+  otherParentId: string | null;
+  /** Divorced or separated from their partner. */
+  formerPartner: boolean;
   /** The same person, listed in other households here: shown once, as this entry. */
   alsoListed?: { memberId: string; familyId: string; headName: string }[];
 }
