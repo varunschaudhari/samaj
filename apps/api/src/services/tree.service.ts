@@ -94,8 +94,16 @@ function tieWithin(nodes: Node[]) {
         break;
       case 'father':
       case 'uncle':
+      case 'paternalAunt':
         n.parent = firstOf('grandfather', 'grandmother', 'greatGrandfather', 'greatGrandmother');
         break;
+      // The mother's brother and sister have her parents, wherever those are (her माहेर, usually).
+      case 'maternalUncle':
+      case 'maternalAunt': {
+        const mother = firstOf('mother');
+        if (mother) n.parent = { sameAs: mother };
+        break;
+      }
       case 'grandfather':
         n.parent = firstOf('greatGrandfather', 'greatGrandmother');
         break;

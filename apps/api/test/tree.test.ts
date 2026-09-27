@@ -233,4 +233,31 @@ describe('GET /api/families/:id/tree', () => {
     expect((await api.delete(`/api/people/same/${own.memberIds[1]}/${amit.memberIds[0]}`).set('Cookie', own.cookie)).status).toBe(204);
     expect(count(await tree(own.cookie, own.familyId), 'Amit Wagh')).toBe(1);
   });
+
+  it('places the mother’s side and a grandson’s wife', async () => {
+    const maher = await createFamily(branches.bhusawal, { people: [{ name: 'Suresh Patil' }] });
+    const own = await createFamily(branches.amalner, {
+      account: 'member',
+      people: [
+        { name: 'Rohit Wagh' },
+        { name: 'Sunita Wagh', relation: 'mother', gender: 'female' },
+        { name: 'Mahesh Patil', relation: 'maternalUncle' },
+        { name: 'Vaishali Patil', relation: 'maternalUncleWife', gender: 'female' },
+        { name: 'Om Wagh', relation: 'son' },
+        { name: 'Aarav Wagh', relation: 'grandson' },
+        { name: 'Neha Wagh', relation: 'granddaughterInLaw', gender: 'female' },
+      ],
+    });
+    await link(own.familyId, maher.familyId, 'inLaws');
+    await api.put(`/api/families/${own.familyId}/members/${own.memberIds[1]}/parent`).set('Cookie', own.cookie).send({ memberId: maher.memberIds[0] });
+
+    const t = await tree(own.cookie, own.familyId);
+    const who = byName(t);
+    // Sunita's father, drawn from her माहेर; her brother shares him.
+    expect(parentOf(t, 'Sunita Wagh')).toBe('Suresh Patil');
+    expect(parentOf(t, 'Mahesh Patil')).toBe('Suresh Patil');
+    expect(who.get('Mahesh Patil')?.generation).toBe(-1);
+    expect(who.get('Vaishali Patil')?.partnerId).toBe(who.get('Mahesh Patil')?.id);
+    expect(who.get('Neha Wagh')).toMatchObject({ generation: 2, partnerId: who.get('Aarav Wagh')?.id });
+  });
 });

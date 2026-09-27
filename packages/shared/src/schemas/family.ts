@@ -20,6 +20,10 @@ export const RELATIONS = [
   'greatGrandmother',
   'uncle',
   'aunt',
+  'paternalAunt',
+  'maternalUncle',
+  'maternalUncleWife',
+  'maternalAunt',
   'brother',
   'sister',
   'sisterInLaw',
@@ -29,6 +33,8 @@ export const RELATIONS = [
   'niece',
   'grandson',
   'granddaughter',
+  'granddaughterInLaw',
+  'grandsonInLaw',
   'greatGrandson',
   'greatGranddaughter',
   'other',
@@ -61,6 +67,9 @@ export const PARTNER_CHOICES: Partial<Record<Relation, readonly Relation[]>> = {
   sonInLaw: ['daughter'],
   sisterInLaw: ['brother'],
   aunt: ['uncle'],
+  maternalUncleWife: ['maternalUncle'],
+  granddaughterInLaw: ['grandson'],
+  grandsonInLaw: ['granddaughter'],
 };
 
 /** 'invited': someone was given a code to their own sign-in; 'joined': they used it. */
