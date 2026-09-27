@@ -1,7 +1,7 @@
 import { type PendingFamily, type ReviewSort, isGlobalRole } from '@samaj/shared';
 import { ChevronRight, ClipboardCheck, HeartHandshake, HourglassMedium, MapPin, UserPlus } from '@/components/ui/icons';
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { LIST_PAGE } from '@/components/layout/page-width';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { type ActiveFilter, Avatar, Badge, Button, EmptyState, ErrorState, Icon, ListToolbar, LoadMore, Skeleton, SortSelect, Tabs } from '@/components/ui';
@@ -98,6 +98,10 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
   const language = useLanguageStore((s) => s.language);
   const me = useMe();
   const [filters, setFilters] = useState<ReviewFilters>({ branchId: '', sort: 'oldest' });
+  // Opened from Home on one queue (?tab=profiles, ...).
+  const [params] = useSearchParams();
+  const tab = params.get('tab');
+  const startTab = tab && ['families', 'people', 'moves', 'profiles'].includes(tab) ? tab : undefined;
   const pending = usePendingFamilies(filters);
   const branchLabel = useBranchLabel(filters.branchId);
   const active: ActiveFilter[] = branchLabel
@@ -185,6 +189,7 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
       {embedded && <div className="flex justify-end">{enrolButton}</div>}
       <Tabs
         label={t('review.page.title')}
+        defaultValue={startTab}
         items={[
           {
             id: 'families',

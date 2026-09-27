@@ -2,7 +2,9 @@ import { type Notice, type PublicUser, can, isGlobalRole } from '@samaj/shared';
 import {
   BookUser,
   CalendarDays,
+  ArrowRight,
   ChevronRight,
+  CircleCheck,
   ClipboardCheck,
   Dashboard,
   HeartHandshake,
@@ -11,11 +13,12 @@ import {
   PhoneCall,
   RotateCw,
   Search,
+  UserPlus,
   UsersRound,
 } from '@/components/ui/icons';
 import { type FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Button, Icon, Skeleton, buttonVariants } from '@/components/ui';
+import { Button, Icon, Skeleton } from '@/components/ui';
 import { useMe } from '@/features/auth/api';
 import { branchName, useBranches } from '@/features/branches/api';
 import { EventCard, EventCardSkeleton } from '@/features/community/EventCard';
@@ -23,6 +26,7 @@ import { useEvents } from '@/features/community/events-api';
 import { KIND_STYLE } from '@/features/community/NoticeCard';
 import { useNotices } from '@/features/community/notices-api';
 import { useDashboard } from '@/features/dashboard/api';
+import { useReviewCounts } from '@/features/families/api';
 import { useFamilyRequests } from '@/features/families/links-api';
 import { VerificationNotice } from '@/features/families/VerificationNotice';
 import { type MessageKey, formatDate, formatNumber, useLanguageStore, useT } from '@/i18n';
@@ -134,58 +138,111 @@ function QuickTiles({ user, canBrowse }: { user: PublicUser; canBrowse: boolean 
   );
 }
 
-/** Committee and admins: the figures that need them, with the way to the full dashboard. */
+/** Committee and admins: what waits for them, queue by queue, beside the figures for their branches. */
 function WorkCard({ user }: { user: PublicUser }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
   const dashboard = useDashboard();
+  const counts = useReviewCounts(true);
   const d = dashboard.data;
+  const c = counts.data;
   const reviewHref = isGlobalRole(user.role) ? '/admin/review' : '/review';
-  const pending = d?.families.pending ?? 0;
-  const figures = d
+  const n = (v: number) => (v > 999 ? '999+' : formatNumber(v, language));
+
+  const queues: { tab: string; label: MessageKey; icon: AppIcon; count: number }[] = c
     ? [
-        { label: t('dashboard.waitingReview'), value: d.families.pending, strong: d.families.pending > 0 },
-        { label: t('dashboard.families'), value: d.families.verified + d.families.pending + d.families.rejected, strong: false },
-        { label: t('dashboard.members'), value: d.members, strong: false },
+        { tab: 'families', label: 'home.work.families', icon: ClipboardCheck, count: c.families },
+        { tab: 'people', label: 'home.work.people', icon: UserPlus, count: c.members },
+        { tab: 'moves', label: 'home.work.moves', icon: ArrowRight, count: c.moves },
+        { tab: 'profiles', label: 'home.work.profiles', icon: HeartHandshake, count: c.profiles },
+      ]
+    : [];
+  const waiting = queues.filter((q) => q.count > 0);
+  const figures: { label: MessageKey; value: number; icon: AppIcon; tone: string }[] = d
+    ? [
+        { label: 'home.work.verifiedFamilies', value: d.families.verified, icon: UsersRound, tone: 'bg-primary-soft text-primary' },
+        { label: 'dashboard.members', value: d.members, icon: BookUser, tone: 'bg-zari-soft text-zari-fg' },
+        { label: 'home.work.liveProfiles', value: d.matrimony.active, icon: HeartHandshake, tone: 'bg-kumkum-soft text-kumkum' },
+        { label: 'home.work.upcomingEvents', value: d.events.upcoming, icon: CalendarDays, tone: 'bg-info-soft text-info' },
       ]
     : [];
 
   return (
-    <section aria-labelledby="home-work" className="flex flex-col gap-4 rounded-md border border-line bg-surface p-4 shadow-card">
+    <section aria-labelledby="home-work" className="flex flex-col gap-4 rounded-md border border-line bg-surface p-4 shadow-card md:p-5">
       <div className="flex items-center justify-between gap-2">
         <h2 id="home-work" className="flex items-center gap-2 font-display text-lg font-semibold text-fg">
           <Icon icon={Dashboard} weight="duotone" className="text-primary" />
           {d?.scope ? branchName(d.scope, language) : t('dashboard.allBranches')}
         </h2>
         <Link to="/dashboard" className="flex min-h-touch items-center gap-0.5 px-1 text-sm font-semibold text-primary hover:underline">
-          {t('nav.dashboard')}
+          {t('home.work.fullDashboard')}
           <Icon icon={ChevronRight} size="sm" />
         </Link>
       </div>
-      {dashboard.isPending ? (
-        <div className="grid grid-cols-3 gap-3" aria-busy="true">
-          {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-14 rounded-sm" />
-          ))}
-        </div>
-      ) : dashboard.isError ? (
-        <InlineError onRetry={() => dashboard.refetch()} retrying={dashboard.isFetching} />
-      ) : (
-        <dl className="grid grid-cols-3 gap-3">
-          {figures.map((f) => (
-            <div key={f.label} className="flex flex-col-reverse gap-0.5 rounded-sm bg-surface-muted px-3 py-2">
-              <dt className="text-xs leading-tight text-fg-muted">{f.label}</dt>
-              <dd className={cn('font-display text-2xl leading-none font-semibold tabular-nums', f.strong ? 'text-kumkum' : 'text-fg')}>
-                {formatNumber(f.value, language)}
-              </dd>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* What needs them: one row per queue, each opening its own tab. */}
+        <div className="flex flex-col gap-2">
+          <h3 className="flex items-center justify-between gap-2 text-sm font-semibold text-fg">
+            {t('home.work.attention')}
+            {c && c.pending > 0 && <span className="rounded-full bg-kumkum px-2 py-0.5 text-xs font-semibold text-on-primary tabular-nums">{n(c.pending)}</span>}
+          </h3>
+          {counts.isPending ? (
+            <div className="flex flex-col gap-2" aria-busy="true">
+              {[0, 1].map((i) => (
+                <Skeleton key={i} className="h-12 rounded-md" />
+              ))}
             </div>
-          ))}
-        </dl>
-      )}
-      <Link to={reviewHref} className={cn(buttonVariants({ variant: pending > 0 ? 'primary' : 'secondary' }), 'self-start')}>
-        <Icon icon={ClipboardCheck} />
-        {pending > 0 ? t('home.review.waiting', { count: pending > 999 ? '999+' : formatNumber(pending, language) }) : t('home.review.open')}
-      </Link>
+          ) : counts.isError ? (
+            <InlineError onRetry={() => counts.refetch()} retrying={counts.isFetching} />
+          ) : waiting.length === 0 ? (
+            <div className="flex items-center gap-3 rounded-md border border-dashed border-line px-3 py-3 text-sm text-fg-muted">
+              <Icon icon={CircleCheck} weight="duotone" className="text-success" />
+              {t('home.review.none')}
+            </div>
+          ) : (
+            <ul className="flex flex-col divide-y divide-line overflow-hidden rounded-md border border-line">
+              {waiting.map((q) => (
+                <li key={q.tab}>
+                  <Link to={`${reviewHref}?tab=${q.tab}`} className="flex min-h-touch items-center gap-3 px-3 py-2.5 transition-colors duration-150 hover:bg-surface-muted">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-kumkum-soft text-kumkum">
+                      <Icon icon={q.icon} size="sm" />
+                    </span>
+                    <span className="min-w-0 flex-1 text-sm font-semibold text-fg">{t(q.label)}</span>
+                    <span className="font-display text-lg font-semibold text-kumkum tabular-nums">{n(q.count)}</span>
+                    <Icon icon={ChevronRight} size="sm" className="text-fg-muted" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* The branches at a glance. */}
+        {dashboard.isPending ? (
+          <div className="grid grid-cols-2 gap-2" aria-busy="true">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-20 rounded-md" />
+            ))}
+          </div>
+        ) : dashboard.isError ? (
+          <InlineError onRetry={() => dashboard.refetch()} retrying={dashboard.isFetching} />
+        ) : (
+          <dl className="grid grid-cols-2 gap-2 self-start">
+            {figures.map((f) => (
+              <div key={f.label} className="flex items-center gap-3 rounded-md bg-surface-muted px-3 py-3">
+                <span className={cn('flex size-10 shrink-0 items-center justify-center rounded-full', f.tone)}>
+                  <Icon icon={f.icon} weight="duotone" />
+                </span>
+                <div className="flex min-w-0 flex-col-reverse">
+                  <dt className="text-xs leading-tight text-fg-muted">{t(f.label)}</dt>
+                  <dd className="font-display text-2xl leading-tight font-semibold text-fg tabular-nums">{formatNumber(f.value, language)}</dd>
+                </div>
+              </div>
+            ))}
+          </dl>
+        )}
+      </div>
     </section>
   );
 }

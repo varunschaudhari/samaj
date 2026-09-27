@@ -127,6 +127,23 @@ export function usePendingFamilies(filters: ReviewFilters = { branchId: '', sort
   });
 }
 
+/** Everything waiting for the committee, queue by queue: the same total the Review badge shows. */
+export interface ReviewCounts {
+  pending: number;
+  families: number;
+  profiles: number;
+  members: number;
+  moves: number;
+}
+export function useReviewCounts(enabled: boolean) {
+  return useQuery({
+    queryKey: ['verifications', 'count', 'each'],
+    queryFn: async () => api.get<ReviewCounts>('/verifications/count'),
+    enabled,
+    refetchInterval: 5 * 60_000,
+  });
+}
+
 /** Badge count for the Review tab. Polls gently so new signups show up. */
 export function usePendingCount(enabled: boolean) {
   return useQuery({
