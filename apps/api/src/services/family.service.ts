@@ -315,6 +315,48 @@ export async function addMember(viewer: Viewer, familyId: string, input: MemberI
   return getFamily(viewer, familyId);
 }
 
+/** How the history names each field a person's edit changed. */
+const CHANGE_LABELS: Record<string, string> = {
+  name: 'name',
+  relation: 'relation',
+  gender: 'gender',
+  birthYear: 'birth year',
+  occupation: 'work',
+  education: 'education',
+  phone: 'mobile number',
+  deathYear: 'year of passing',
+  parentId: 'parent',
+  partnerId: 'wife or husband',
+  otherParentId: 'other parent',
+  birthFamilyId: 'birth family',
+  maidenName: 'name before marriage',
+};
+
+/** "birth year, parent (Rohit Wagh), passed away": what an edit changed, for the family's history. */
+async function describeChanges(member: HydratedDocument<MemberDoc>, oldName: string): Promise<string[]> {
+  const nameOf = async (id: unknown) => (id ? ((await MemberModel.findById(id, { name: 1 }).lean())?.name ?? null) : null);
+  return Promise.all(
+    member.directModifiedPaths().flatMap((path): (string | Promise<string>)[] => {
+      switch (path) {
+        case 'deceased':
+          return [member.deceased ? 'passed away' : 'no longer marked as passed away'];
+        case 'adopted':
+          return [member.adopted ? 'adopted' : 'no longer marked adopted'];
+        case 'formerPartner':
+          return [member.formerPartner ? 'no longer married' : 'married'];
+        case 'name':
+          return [`name (was ${oldName})`];
+        case 'parentId':
+        case 'partnerId':
+        case 'otherParentId':
+          return [nameOf(member.get(path)).then((name) => (name ? `${CHANGE_LABELS[path]} (${name})` : `${CHANGE_LABELS[path]} removed`))];
+        default:
+          return CHANGE_LABELS[path] ? [CHANGE_LABELS[path]] : [];
+      }
+    }),
+  );
+}
+
 export async function updateMember(viewer: Viewer, familyId: string, memberId: string, input: MemberInputParsed): Promise<FamilyDetail> {
   const family = await loadEditable(viewer, familyId);
   const member = await loadMemberOf(family, memberId);
@@ -328,6 +370,7 @@ export async function updateMember(viewer: Viewer, familyId: string, memberId: s
   const passedAway = input.deceased && !member.deceased;
   await checkTies(family._id, input, member._id, viewer);
   const relationChanged = !member.isHead && member.relation !== input.relation;
+  const oldName = member.name;
 
   member.name = input.name;
   member.relation = member.isHead ? 'head' : input.relation;
@@ -346,6 +389,7 @@ export async function updateMember(viewer: Viewer, familyId: string, memberId: s
   member.formerPartner = input.formerPartner;
   member.birthFamilyId = input.birthFamilyId ? new Types.ObjectId(input.birthFamilyId) : null;
   member.maidenName = input.maidenName;
+  const changes = await describeChanges(member, oldName);
   await member.save();
   // A son who is now a nephew is no longer anyone's father here.
   if (relationChanged) await untie(family._id, member._id);
@@ -358,8 +402,11 @@ export async function updateMember(viewer: Viewer, familyId: string, memberId: s
   if (member.userId) await UserModel.updateOne({ _id: member.userId }, { $set: { name: member.name } });
   await syncMember(member);
 
-  recordHistory(family, viewer, 'updated', `Updated ${member.name}`);
-  await family.save();
+  // Saving without changing anything leaves the history as it was.
+  if (changes.length > 0) {
+    recordHistory(family, viewer, 'updated', `Updated ${member.name}: ${changes.join(', ')}`);
+    await family.save();
+  }
   return getFamily(viewer, familyId);
 }
 

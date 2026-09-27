@@ -281,4 +281,22 @@ describe('GET /api/families/:id/tree', () => {
     expect(who.get('Rohit Wagh')).toMatchObject({ parentId: own.memberIds[0], otherParentId: sunita?.id });
     expect(who.get('Om Wagh')?.otherParentId).toBe(second?.id);
   });
+
+  it('says in the family history exactly what an edit changed', async () => {
+    const own = await createFamily(branches.amalner, { account: 'member', status: 'pending', people: [{ name: 'Anil Wagh' }, { name: 'Rohit Wagh', relation: 'son' }, { name: 'Sagar Wagh', relation: 'son' }] });
+    const [, rohit, sagar] = own.memberIds;
+    const added = (await api.post(`/api/families/${own.familyId}/members`).set('Cookie', own.cookie).send({ name: 'Aarav Wagh', relation: 'grandson', gender: 'male', parentId: rohit, consent: true }))
+      .body.family as FamilyDetail;
+    const aarav = added.members.find((m) => m.name === 'Aarav Wagh')?.id;
+    const edit = (body: Record<string, unknown>) =>
+      api.put(`/api/families/${own.familyId}/members/${aarav}`).set('Cookie', own.cookie).send({ name: 'Aarav Wagh', relation: 'grandson', gender: 'male', ...body });
+    const history = async () => ((await api.get(`/api/families/${own.familyId}`).set('Cookie', own.cookie)).body.family as FamilyDetail).history ?? [];
+
+    await edit({ birthYear: '2020', parentId: sagar });
+    expect((await history())[0]?.note).toBe('Updated Aarav Wagh: birth year, parent (Sagar Wagh)');
+    const entries = (await history()).length;
+    // The same again: nothing changed, nothing recorded.
+    await edit({ birthYear: '2020', parentId: sagar });
+    expect(await history()).toHaveLength(entries);
+  });
 });
