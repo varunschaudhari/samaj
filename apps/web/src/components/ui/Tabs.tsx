@@ -29,6 +29,8 @@ export function Tabs({ items, label, value, defaultValue, onValueChange, classNa
   const select = (id: string) => {
     if (value === undefined) setInternal(id);
     onValueChange?.(id);
+    // On a phone the strip scrolls sideways; bring the chosen tab fully into view.
+    tabRefs.current[items.findIndex((i) => i.id === id)]?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
   };
 
   const onKeyDown = (e: KeyboardEvent, index: number) => {
@@ -62,7 +64,7 @@ export function Tabs({ items, label, value, defaultValue, onValueChange, classNa
               onClick={() => select(item.id)}
               onKeyDown={(e) => onKeyDown(e, index)}
               className={cn(
-                '-mb-px min-h-touch shrink-0 border-b-2 px-4 text-sm font-semibold transition-colors duration-150',
+                '-mb-px min-h-touch shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors duration-150 sm:px-4',
                 selected ? 'border-primary text-primary' : 'border-transparent text-fg-muted hover:text-fg',
               )}
             >

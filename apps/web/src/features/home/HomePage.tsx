@@ -23,6 +23,7 @@ import { useEvents } from '@/features/community/events-api';
 import { KIND_STYLE } from '@/features/community/NoticeCard';
 import { useNotices } from '@/features/community/notices-api';
 import { useDashboard } from '@/features/dashboard/api';
+import { useFamilyRequests } from '@/features/families/links-api';
 import { VerificationNotice } from '@/features/families/VerificationNotice';
 import { type MessageKey, formatDate, formatNumber, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
@@ -189,6 +190,31 @@ function WorkCard({ user }: { user: PublicUser }) {
   );
 }
 
+/** Links and moves that wait for this family's answer. */
+function FamilyRequestsCard({ user }: { user: PublicUser }) {
+  const t = useT();
+  const language = useLanguageStore((s) => s.language);
+  const requests = useFamilyRequests(user.familyId);
+  const r = requests.data;
+  const waiting = r ? r.incomingLinks.length + r.movesOut.length : 0;
+  if (waiting === 0) return null;
+  return (
+    <Link
+      to={`/families/${user.familyId}#requests`}
+      className="flex items-center gap-4 rounded-md border border-zari/60 bg-zari-soft p-4 shadow-card transition-colors duration-150 hover:border-zari"
+    >
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-surface text-kumkum">
+        <Icon icon={HeartHandshake} size="lg" weight="duotone" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="font-semibold text-fg">{t('home.requests.title', { count: formatNumber(waiting, language) })}</span>
+        <span className="text-sm text-fg-muted">{t('home.requests.body')}</span>
+      </span>
+      <Icon icon={ChevronRight} className="text-fg-muted" />
+    </Link>
+  );
+}
+
 function SectionHeading({ title, to, id }: { title: string; to: string; id: string }) {
   const t = useT();
   return (
@@ -324,6 +350,7 @@ export function HomePage() {
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <Hero user={user} canBrowse={canBrowse} />
       {!canBrowse && <VerificationNotice user={user} />}
+      <FamilyRequestsCard user={user} />
       {can(user.role, 'member:verify') && <WorkCard user={user} />}
       <QuickTiles user={user} canBrowse={canBrowse} />
       <div className="grid gap-6 lg:grid-cols-2">

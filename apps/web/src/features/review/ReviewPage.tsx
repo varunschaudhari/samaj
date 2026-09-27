@@ -11,6 +11,8 @@ import { type ReviewFilters, usePendingFamilies } from '@/features/families/api'
 import { EnrolFamilyModal } from '@/features/families/EnrolFamilyModal';
 import { usePendingProfiles } from '@/features/matrimony/api';
 import { ProfileCardSkeleton, ProfileCardView } from '@/features/matrimony/ProfileCardView';
+import { usePendingMembers, usePendingMoves } from '@/features/families/links-api';
+import { PendingMembersList, PendingMovesList } from './ApprovalLists';
 import { formatDate, formatTotal, useLanguageStore, useT } from '@/i18n';
 
 /** Past a week, a waiting family is flagged red. */
@@ -111,6 +113,8 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
   }
 
   const profiles = usePendingProfiles(true);
+  const pendingMembers = usePendingMembers(true);
+  const pendingMoves = usePendingMoves(true);
   let profileBody;
   if (profiles.isPending) {
     profileBody = (
@@ -189,6 +193,8 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
               </div>
             ),
           },
+          { id: 'people', label: `${t('review.tab.people')}${count(pendingMembers.data?.length)}`, content: <PendingMembersList query={pendingMembers} /> },
+          { id: 'moves', label: `${t('review.tab.moves')}${count(pendingMoves.data?.length)}`, content: <PendingMovesList query={pendingMoves} /> },
           { id: 'profiles', label: `${t('review.tab.profiles')}${count(profiles.data?.length)}`, content: profileBody },
         ]}
       />

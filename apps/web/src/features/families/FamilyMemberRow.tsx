@@ -1,5 +1,5 @@
 import { type FamilyMember, formatPhone } from '@samaj/shared';
-import { GraduationCap, KeyRound, Pencil, Phone, Smartphone, Trash2 } from '@/components/ui/icons';
+import { GraduationCap, HourglassMedium, KeyRound, Pencil, Phone, Smartphone, Trash2 } from '@/components/ui/icons';
 import { Avatar, Badge, Icon, IconButton, Skeleton, buttonVariants } from '@/components/ui';
 import { useT } from '@/i18n';
 import { cn } from '@/lib/cn';
@@ -27,6 +27,11 @@ export function FamilyMemberRow({ member, canEdit, onEdit, onRemove, onResetPass
           <p className="font-display text-lg font-semibold break-words text-fg">{member.name}</p>
           {member.isHead && <Badge tone="primary">{t('family.headBadge')}</Badge>}
           {canEdit && member.hasAccount && <Badge>{t('family.signsIn')}</Badge>}
+          {member.approval === 'pending' && (
+            <Badge tone="warning" icon={HourglassMedium}>
+              {t('family.awaitingApproval')}
+            </Badge>
+          )}
         </div>
         <p className="text-sm text-fg-muted">{facts.join(' · ')}</p>
         {member.education && (

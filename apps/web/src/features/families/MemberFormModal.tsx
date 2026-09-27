@@ -57,8 +57,10 @@ export function MemberFormModal({ familyId, member, open, onClose }: MemberFormM
     save.mutate(
       { memberId: member?.id ?? null, input: values },
       {
-        onSuccess: () => {
-          toast.success(t(member ? 'family.memberSaved' : 'family.memberAdded', { name: values.name }));
+        onSuccess: ({ family }) => {
+          // Added to a verified family by the family itself: they wait for the committee.
+          const waits = !member && family.members.some((m) => m.name === values.name && m.approval === 'pending');
+          toast.success(t(member ? 'family.memberSaved' : waits ? 'family.memberAddedPending' : 'family.memberAdded', { name: values.name }));
           onClose();
         },
         onError: (err) => applyServerIssues(err, FIELDS, form.setError),

@@ -16,6 +16,7 @@ import { InviteCodeModal } from './InviteCodeModal';
 import { MemberFormModal } from './MemberFormModal';
 import { ResetCodeModal } from '@/features/users/ResetCodeModal';
 import { ReviewPanel } from './ReviewPanel';
+import { FamilyRequestsPanel, RelatedFamilies } from './FamilyLinks';
 
 /** /family: the signed-in user's own family. */
 export function MyFamilyRedirect() {
@@ -207,6 +208,7 @@ export function FamilyPage() {
 
       {isOwn && <OwnStatusNotice family={data} />}
       {canReview && data.status === 'pending' && <ReviewPanel family={data} />}
+      {canEdit && <FamilyRequestsPanel familyId={data.id} />}
 
       <Card className="flex flex-col gap-1">
         <dl className="divide-y divide-line">
@@ -221,6 +223,8 @@ export function FamilyPage() {
           </Button>
         )}
       </Card>
+
+      <RelatedFamilies family={data} />
 
       {data.history ? (
         <Tabs
