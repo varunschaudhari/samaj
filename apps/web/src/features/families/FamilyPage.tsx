@@ -1,37 +1,47 @@
-import { type FamilyDetail, type FamilyMember, gotraName } from '@samaj/shared';
-import { Clock, MapPin, Network, Pencil, SearchX, Send, TriangleAlert, UserPlus } from '@/components/ui/icons';
-import { type ReactNode, useState } from 'react';
+import { type FamilyDetail, type FamilyMember, type HistoryAction, RELATION_GENERATION, type Relation } from '@samaj/shared';
+import { useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { Button, Card, EmptyState, ErrorState, Icon, Modal, Skeleton, Tabs, buttonVariants, toast } from '@/components/ui';
+import { Button, Card, EmptyState, ErrorState, Icon, Modal, Skeleton, buttonVariants, toast } from '@/components/ui';
+import {
+  type AppIcon,
+  ArrowLeft,
+  ArrowRight,
+  BadgeCheck,
+  CircleCheck,
+  Clock,
+  KeyRound,
+  Network,
+  Pencil,
+  Plus,
+  SearchX,
+  Send,
+  Smartphone,
+  TriangleAlert,
+  UserPlus,
+  X,
+  XCircle,
+} from '@/components/ui/icons';
 import { useMe } from '@/features/auth/api';
-import { branchName, placeLabel } from '@/features/branches/api';
-import { formatDate, formatNumber, useErrorMessage, useLanguageStore, useT } from '@/i18n';
+import { branchName } from '@/features/branches/api';
+import { MemberPrivacyModal } from '@/features/privacy/PrivacyControls';
+import { ResetCodeModal } from '@/features/users/ResetCodeModal';
+import { type MessageKey, formatDate, useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { ApiError } from '@/lib/api';
+import { cn } from '@/lib/cn';
 import { useFamily, useRemoveMember, useReview } from './api';
 import { FamilyDetailsModal } from './FamilyDetailsModal';
+import { FamilyRequestsPanel, RelatedFamilies } from './FamilyLinks';
 import { FamilyMemberRow, FamilyMemberRowSkeleton } from './FamilyMemberRow';
-import { FamilyStatusBadge } from './FamilyStatusBadge';
+import { FamilyChecklist, FamilySummary } from './FamilyOverview';
 import { InviteCodeModal } from './InviteCodeModal';
 import { MemberFormModal } from './MemberFormModal';
-import { ResetCodeModal } from '@/features/users/ResetCodeModal';
+import { MemberSheet } from './MemberSheet';
 import { ReviewPanel } from './ReviewPanel';
-import { FamilyRequestsPanel, RelatedFamilies } from './FamilyLinks';
-import { MemberPrivacyModal } from '@/features/privacy/PrivacyControls';
 
 /** /family: the signed-in user's own family. */
 export function MyFamilyRedirect() {
   const me = useMe();
   return me.data ? <Navigate to={`/families/${me.data.familyId}`} replace /> : null;
-}
-
-function Detail({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5 py-2.5 sm:flex-row sm:gap-4">
-      <dt className="text-sm text-fg-muted sm:w-36 sm:shrink-0">{label}</dt>
-      <dd className="font-semibold break-words text-fg">{children}</dd>
-    </div>
-  );
 }
 
 /** Status notice for the family's own members: waiting, or asked to fix something. */
@@ -87,35 +97,82 @@ function OwnStatusNotice({ family }: { family: FamilyDetail }) {
   return null;
 }
 
+const HISTORY_ICON: Record<HistoryAction, AppIcon> = {
+  created: UserPlus,
+  updated: Pencil,
+  verified: BadgeCheck,
+  rejected: TriangleAlert,
+  resubmitted: Send,
+  invited: Smartphone,
+  joined: KeyRound,
+  memberApproved: CircleCheck,
+  memberRejected: XCircle,
+  linked: Network,
+  unlinked: X,
+  movedIn: ArrowRight,
+  movedOut: ArrowLeft,
+};
+
+/** "3 days ago", "yesterday", or the date when it's long past. */
+function useWhen() {
+  const language = useLanguageStore((s) => s.language);
+  const rtf = new Intl.RelativeTimeFormat(language === 'mr' ? 'mr-IN' : 'en-IN', { numeric: 'auto' });
+  return (iso: string) => {
+    const minutes = Math.round((new Date(iso).getTime() - Date.now()) / 60_000);
+    if (Math.abs(minutes) < 60) return rtf.format(minutes, 'minute');
+    if (Math.abs(minutes) < 24 * 60) return rtf.format(Math.round(minutes / 60), 'hour');
+    if (Math.abs(minutes) < 30 * 24 * 60) return rtf.format(Math.round(minutes / (24 * 60)), 'day');
+    return formatDate(iso, language);
+  };
+}
+
+/** Recent changes as a timeline; the rest on request. */
 function History({ family }: { family: FamilyDetail }) {
   const t = useT();
-  const language = useLanguageStore((s) => s.language);
-  if (!family.history?.length) return <p className="text-sm text-fg-muted">{t('family.history.empty')}</p>;
+  const when = useWhen();
+  const [all, setAll] = useState(false);
+  const entries = family.history ?? [];
+  const shown = all ? entries : entries.slice(0, 6);
   return (
-    <ol className="flex flex-col divide-y divide-line">
-      {family.history.map((h, i) => (
-        <li key={`${h.at}-${i}`} className="flex flex-col gap-0.5 py-2.5">
-          <p className="text-sm text-fg">
-            <span className="font-semibold">{t(`family.history.${h.action}`)}</span> {t('family.history.by', { name: h.byName })}
-          </p>
-          {h.note && <p className="text-sm text-fg-muted">{h.note}</p>}
-          <p className="text-xs text-fg-muted tabular-nums">{formatDate(h.at, language)}</p>
-        </li>
-      ))}
-    </ol>
+    <Card as="section" aria-labelledby="family-history" className="flex flex-col gap-3">
+      <h2 id="family-history" className="font-display text-lg font-semibold text-fg">
+        {t('family.tabHistory')}
+      </h2>
+      {entries.length === 0 ? (
+        <p className="text-sm text-fg-muted">{t('family.history.empty')}</p>
+      ) : (
+        <ol className="relative flex flex-col gap-4 before:absolute before:top-2 before:bottom-2 before:left-4 before:w-px before:bg-line">
+          {shown.map((h, i) => (
+            <li key={`${h.at}-${i}`} className="relative flex gap-3">
+              <span className="relative flex size-8 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-primary">
+                <Icon icon={HISTORY_ICON[h.action]} size="sm" />
+              </span>
+              <div className="flex min-w-0 flex-col">
+                <p className="text-sm text-fg">
+                  <span className="font-semibold">{t(`family.history.${h.action}`)}</span> {t('family.history.by', { name: h.byName })}
+                </p>
+                {h.note && <p className="text-sm break-words text-fg-muted">{h.note}</p>}
+                <p className="text-xs text-fg-muted">{when(h.at)}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+      {entries.length > 6 && (
+        <Button variant="ghost" size="sm" className="self-start" onClick={() => setAll((v) => !v)}>
+          {all ? t('family.history.less') : t('family.history.all', { count: entries.length })}
+        </Button>
+      )}
+    </Card>
   );
 }
 
 function FamilySkeleton() {
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5" aria-busy="true">
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-9 w-3/4" />
-        <Skeleton className="h-4 w-40" />
-      </div>
-      <Skeleton className="h-32 w-full rounded-md" />
-      <ul className="divide-y divide-line">
-        {[0, 1, 2].map((i) => (
+    <div className="mx-auto flex max-w-6xl flex-col gap-5" aria-busy="true">
+      <Skeleton className="h-52 w-full rounded-md" />
+      <ul className="grid gap-3 sm:grid-cols-2">
+        {[0, 1, 2, 3].map((i) => (
           <FamilyMemberRowSkeleton key={i} />
         ))}
       </ul>
@@ -123,21 +180,32 @@ function FamilySkeleton() {
   );
 }
 
+/** Generations, top to bottom, with a heading each. */
+const GROUPS: { generation: number; label: MessageKey }[] = [
+  { generation: -1, label: 'family.gen.parents' },
+  { generation: 0, label: 'family.gen.us' },
+  { generation: 1, label: 'family.gen.children' },
+  { generation: 2, label: 'family.gen.grandchildren' },
+];
+
+/** The first people most families add. */
+const QUICK_ADD: Relation[] = ['spouse', 'son', 'daughter', 'father', 'mother'];
+
 export function FamilyPage() {
   const { familyId = '' } = useParams();
   const t = useT();
-  const language = useLanguageStore((s) => s.language);
   const errorMessage = useErrorMessage();
   const me = useMe();
   const family = useFamily(familyId);
   const remove = useRemoveMember(familyId);
 
-  const [editing, setEditing] = useState<{ member: FamilyMember | null } | null>(null);
+  const [editing, setEditing] = useState<{ member: FamilyMember | null; relation?: Relation } | null>(null);
   const [removing, setRemoving] = useState<FamilyMember | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [resetTarget, setResetTarget] = useState<{ userId: string; name: string } | null>(null);
   const [inviting, setInviting] = useState<FamilyMember | null>(null);
   const [privacyFor, setPrivacyFor] = useState<FamilyMember | null>(null);
+  const [opened, setOpened] = useState<string | null>(null);
 
   if (family.isPending) return <FamilySkeleton />;
 
@@ -168,89 +236,104 @@ export function FamilyPage() {
   const data = family.data;
   const { canEdit, canReview } = data.permissions;
   const isOwn = me.data?.familyId === data.id;
+  const head = data.members.find((m) => m.isHead);
+  const sheetMember = data.members.find((m) => m.id === opened) ?? null;
+  const add = (relation?: Relation) => setEditing({ member: null, relation });
+
+  const groups = GROUPS.map((g) => ({ ...g, people: data.members.filter((m) => RELATION_GENERATION[m.relation] === g.generation) })).filter((g) => g.people.length > 0);
+  const hasSide = Boolean(data.history) || data.links.length > 0 || canEdit || data.permissions.canLink;
 
   const members = (
-    <div className="flex flex-col gap-3">
-      <ul className="divide-y divide-line">
-        {data.members.map((m) => (
-          <FamilyMemberRow
-            key={m.id}
-            member={m}
-            canEdit={canEdit}
-            onEdit={() => setEditing({ member: m })}
-            onRemove={() => setRemoving(m)}
-            onResetPassword={() => m.accountId && setResetTarget({ userId: m.accountId, name: m.name })}
-            onInvite={() => setInviting(m)}
-            onPrivacy={() => setPrivacyFor(m)}
-          />
-        ))}
-      </ul>
+    <section aria-labelledby="family-members" className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 id="family-members" className="font-display text-xl font-semibold text-fg">
+          {t('family.tabMembers')}
+        </h2>
+        {canEdit && data.members.length > 1 && (
+          <Button variant="secondary" size="sm" leadingIcon={Plus} onClick={() => add()}>
+            {t('family.addShort')}
+          </Button>
+        )}
+      </div>
+      {groups.map((g) => (
+        <div key={g.generation} className="flex flex-col gap-2">
+          <h3 className="text-xs font-semibold tracking-wide text-fg-muted uppercase">{t(g.label)}</h3>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {g.people.map((m) => (
+              <FamilyMemberRow key={m.id} member={m} isSelf={m.id === me.data?.memberId} onOpen={() => setOpened(m.id)} />
+            ))}
+          </ul>
+        </div>
+      ))}
       {canEdit && data.members.length === 1 && (
-        <EmptyState icon={UserPlus} title={t('family.onlyHead.title')} body={t('family.onlyHead.body')} />
+        <Card variant="muted" className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <p className="font-semibold text-fg">{t('family.onlyHead.title')}</p>
+            <p className="max-w-prose text-sm text-fg-muted">{t('family.onlyHead.body')}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {QUICK_ADD.map((r) => (
+              <Button key={r} variant="secondary" size="sm" leadingIcon={Plus} onClick={() => add(r)}>
+                {t(`relation.${r}`)}
+              </Button>
+            ))}
+            <Button variant="ghost" size="sm" onClick={() => add()}>
+              {t('family.addSomeoneElse')}
+            </Button>
+          </div>
+        </Card>
       )}
-      {canEdit && (
-        <Button leadingIcon={UserPlus} variant={data.members.length === 1 ? 'primary' : 'secondary'} className="self-start" onClick={() => setEditing({ member: null })}>
-          {t('family.addMember')}
-        </Button>
-      )}
-    </div>
+    </section>
   );
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5">
-      <PageHeader
-        title={t('family.title', { name: data.headName })}
-        description={
-          <span className="flex items-center gap-1">
-            <Icon icon={MapPin} size="sm" />
-            {placeLabel(data.place, data.branch, language)}
-          </span>
-        }
-        actions={
-          <>
-            <FamilyStatusBadge status={data.status} />
-            <Link to={`/families/${data.id}/tree`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-              <Icon icon={Network} />
-              {t('tree.open')}
-            </Link>
-          </>
-        }
-      />
-
-      {isOwn && <OwnStatusNotice family={data} />}
-      {canReview && data.status === 'pending' && <ReviewPanel family={data} />}
-      {canEdit && <FamilyRequestsPanel familyId={data.id} />}
-
-      <Card className="flex flex-col gap-1">
-        <dl className="divide-y divide-line">
-          <Detail label={t('family.place')}>{data.place}</Detail>
-          <Detail label={t('family.branch')}>{branchName(data.branch, language)}</Detail>
-          <Detail label={t('family.gotra')}>{gotraName(data.gotra, language) ?? t('family.gotraNone')}</Detail>
-          {data.address !== undefined && <Detail label={t('family.address')}>{data.address ?? '–'}</Detail>}
-        </dl>
-        {canEdit && (
-          <Button variant="ghost" size="sm" leadingIcon={Pencil} className="self-start" onClick={() => setDetailsOpen(true)}>
-            {t('family.editDetails')}
-          </Button>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+      <div className={cn('grid items-start gap-5', hasSide && 'lg:grid-cols-[minmax(0,1fr)_22rem]')}>
+        <div className="flex min-w-0 flex-col gap-5">
+          <FamilySummary family={data} onAdd={() => add()} onEditDetails={() => setDetailsOpen(true)} />
+          {isOwn && <OwnStatusNotice family={data} />}
+          {canReview && data.status === 'pending' && <ReviewPanel family={data} />}
+          {canEdit && <FamilyRequestsPanel familyId={data.id} />}
+          {members}
+        </div>
+        {hasSide && (
+          <aside className="flex min-w-0 flex-col gap-5">
+            <FamilyChecklist
+              family={data}
+              onAdd={() => add()}
+              onEditDetails={() => setDetailsOpen(true)}
+              onEditMember={(m) => setEditing({ member: m })}
+              onInvite={(m) => setInviting(m)}
+            />
+            <RelatedFamilies family={data} />
+            {data.history && <History family={data} />}
+          </aside>
         )}
-      </Card>
+      </div>
 
-      <RelatedFamilies family={data} />
-
-      {data.history ? (
-        <Tabs
-          label={t('family.title', { name: data.headName })}
-          items={[
-            { id: 'members', label: `${t('family.tabMembers')} (${formatNumber(data.members.length, language)})`, content: members },
-            { id: 'history', label: t('family.tabHistory'), content: <History family={data} /> },
-          ]}
-        />
-      ) : (
-        members
-      )}
-
+      <MemberSheet
+        member={sheetMember}
+        isSelf={sheetMember?.id === me.data?.memberId}
+        onClose={() => setOpened(null)}
+        actions={{
+          onEdit: canEdit ? () => sheetMember && setEditing({ member: sheetMember }) : undefined,
+          onPrivacy: () => sheetMember && setPrivacyFor(sheetMember),
+          onInvite: () => sheetMember && setInviting(sheetMember),
+          onResetPassword: () => {
+            if (sheetMember?.accountId) setResetTarget({ userId: sheetMember.accountId, name: sheetMember.name });
+          },
+          onRemove: canEdit ? () => sheetMember && setRemoving(sheetMember) : undefined,
+        }}
+      />
       <MemberPrivacyModal member={privacyFor} isSelf={privacyFor?.id === me.data?.memberId} onClose={() => setPrivacyFor(null)} />
-      <MemberFormModal familyId={data.id} member={editing?.member ?? null} open={editing !== null} onClose={() => setEditing(null)} />
+      <MemberFormModal
+        familyId={data.id}
+        member={editing?.member ?? null}
+        initialRelation={editing?.relation}
+        headGender={head?.gender}
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+      />
       <FamilyDetailsModal family={data} open={detailsOpen} onClose={() => setDetailsOpen(false)} />
       <ResetCodeModal target={resetTarget} onClose={() => setResetTarget(null)} />
       <InviteCodeModal
@@ -295,4 +378,3 @@ export function FamilyPage() {
     </div>
   );
 }
-

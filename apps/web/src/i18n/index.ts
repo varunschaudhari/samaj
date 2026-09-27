@@ -43,6 +43,12 @@ useLanguageStore.subscribe((state) => syncDocumentLanguage(state.language));
 const MARATHI_DIGITS = ['०', '१', '२', '३', '४', '५', '६', '७', '८', '९'];
 
 /** Numbers in Devanagari digits for Marathi, grouped Indian-style (1,24,800). */
+/** A year: no thousands separator, Devanagari digits in Marathi. */
+export function formatYear(value: number, language: Language): string {
+  const plain = String(value);
+  return language === 'mr' ? plain.replace(/\d/g, (d) => MARATHI_DIGITS[Number(d)] ?? d) : plain;
+}
+
 export function formatNumber(value: number, language: Language): string {
   const grouped = new Intl.NumberFormat('en-IN').format(value);
   return language === 'mr' ? grouped.replace(/\d/g, (d) => MARATHI_DIGITS[Number(d)] ?? d) : grouped;

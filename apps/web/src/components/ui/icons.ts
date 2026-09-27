@@ -22,6 +22,7 @@ export { UserMinus } from '@phosphor-icons/react/dist/csr/UserMinus';
 export { House } from '@phosphor-icons/react/dist/csr/House';
 export { HandHeart as HeartHandshake } from '@phosphor-icons/react/dist/csr/HandHeart';
 export { GraduationCap } from '@phosphor-icons/react/dist/csr/GraduationCap';
+export { Briefcase } from '@phosphor-icons/react/dist/csr/Briefcase';
 
 // Places and structure
 export { MapPin } from '@phosphor-icons/react/dist/csr/MapPin';
