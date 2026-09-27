@@ -144,7 +144,15 @@ export async function approveMove(viewer: Viewer, id: string): Promise<MemberMov
   member.familyStatus = to.status;
   member.approval = 'approved';
   member.addedByName = null;
+  // Ties were to people in the old family; the new family sets its own.
+  member.parentId = null;
+  member.partnerId = null;
+  member.adopted = false;
   await member.save();
+  await Promise.all([
+    MemberModel.updateMany({ familyId: from._id, parentId: member._id }, { $set: { parentId: null } }),
+    MemberModel.updateMany({ familyId: from._id, partnerId: member._id }, { $set: { partnerId: null } }),
+  ]);
 
   await InviteModel.deleteOne({ memberId: member._id });
   await closeForMarriage(member._id);

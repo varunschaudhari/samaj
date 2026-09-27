@@ -5,6 +5,8 @@ import {
   type HistoryAction,
   MAX_FAMILY_LINKS,
   type MemberInputParsed,
+  PARENT_CHOICES,
+  PARTNER_CHOICES,
   PHOTO_MAX_BYTES,
   type enrolFamilySchema,
   type familyUpdateSchema,
@@ -126,6 +128,9 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     canEditPrivacy: m.deceased ? false : m.userId ? String(m.userId) === viewer.id : canEdit,
     deceased: m.deceased === true,
     deathYear: m.deathYear ?? null,
+    parentId: m.parentId ? String(m.parentId) : null,
+    partnerId: m.partnerId ? String(m.partnerId) : null,
+    ...(seesPending && { adopted: m.adopted === true }),
     ...(maher(m._id) && { movedFrom: maher(m._id) }),
     };
   };
@@ -225,6 +230,33 @@ export async function updateFamily(viewer: Viewer, familyId: string, input: Fami
   return getFamily(viewer, familyId);
 }
 
+/**
+ * A chosen parent or partner must be someone in the same family whose
+ * relation fits: a grandchild's parent is a son or daughter, a
+ * daughter-in-law's husband a son.
+ */
+async function checkTies(familyId: Types.ObjectId, input: MemberInputParsed, self?: Types.ObjectId) {
+  const ties = [
+    ['parentId', input.parentId, PARENT_CHOICES[input.relation]],
+    ['partnerId', input.partnerId, PARTNER_CHOICES[input.relation]],
+  ] as const;
+  for (const [path, id, allowed] of ties) {
+    if (!id) continue;
+    const other = self && String(self) === id ? null : await MemberModel.findOne({ _id: id, familyId }, { relation: 1 }).lean();
+    if (!other || !allowed?.includes(other.relation)) {
+      throw new AppError(400, 'VALIDATION_FAILED', 'Pick someone from this family.', [{ path, message: 'validation.tieChoice' }]);
+    }
+  }
+}
+
+/** Nobody points at someone who left or whose relation no longer fits. */
+async function untie(familyId: Types.ObjectId, memberId: Types.ObjectId) {
+  await Promise.all([
+    MemberModel.updateMany({ familyId, parentId: memberId }, { $set: { parentId: null } }),
+    MemberModel.updateMany({ familyId, partnerId: memberId }, { $set: { partnerId: null } }),
+  ]);
+}
+
 export async function addMember(viewer: Viewer, familyId: string, input: MemberInputParsed): Promise<FamilyDetail> {
   const family = await loadEditable(viewer, familyId);
   if (input.relation === 'head') throw headRelationError();
@@ -232,6 +264,7 @@ export async function addMember(viewer: Viewer, familyId: string, input: MemberI
     throw new AppError(400, 'VALIDATION_FAILED', `A family can list up to ${MAX_FAMILY_MEMBERS} people.`);
   }
 
+  await checkTies(family._id, input);
   // A verified family's additions wait for the committee, unless a reviewer added them.
   const waits = family.status === 'verified' && !canReviewFamily(viewer, family);
   await MemberModel.create({
@@ -264,6 +297,8 @@ export async function updateMember(viewer: Viewer, familyId: string, memberId: s
     ]);
   }
   const passedAway = input.deceased && !member.deceased;
+  await checkTies(family._id, input, member._id);
+  const relationChanged = !member.isHead && member.relation !== input.relation;
 
   member.name = input.name;
   member.relation = member.isHead ? 'head' : input.relation;
@@ -275,7 +310,12 @@ export async function updateMember(viewer: Viewer, familyId: string, memberId: s
   if (!member.userId) member.phone = input.phone;
   member.deceased = input.deceased;
   member.deathYear = input.deathYear;
+  member.parentId = input.parentId ? new Types.ObjectId(input.parentId) : null;
+  member.partnerId = input.partnerId ? new Types.ObjectId(input.partnerId) : null;
+  member.adopted = input.adopted;
   await member.save();
+  // A son who is now a nephew is no longer anyone's father here.
+  if (relationChanged) await untie(family._id, member._id);
   if (passedAway) {
     // No profile or sign-in invite for someone who has passed away.
     await closeForRemovedMember(member._id);
@@ -301,6 +341,7 @@ export async function removeMember(viewer: Viewer, familyId: string, memberId: s
   await closeForRemovedMember(member._id);
   await InviteModel.deleteOne({ memberId: member._id });
   await member.deleteOne();
+  await untie(family._id, member._id);
   recordHistory(family, viewer, 'updated', `Removed ${member.name}`);
   await family.save();
   return getFamily(viewer, familyId);

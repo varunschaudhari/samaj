@@ -121,7 +121,7 @@ export function ProfilePage() {
       </Button>
 
       <ChangePasswordModal open={changingPassword} onClose={() => setChangingPassword(false)} />
-      {self && <MemberFormModal familyId={user.familyId} member={self} open={editing} onClose={() => setEditing(false)} />}
+      {self && <MemberFormModal familyId={user.familyId} member={self} members={family.data?.members ?? []} open={editing} onClose={() => setEditing(false)} />}
     </div>
   );
 }

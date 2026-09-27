@@ -53,6 +53,13 @@ const memberSchema = new Schema(
     /** Passed away: kept in the family and its tree, out of the directory, matrimony, sign-ins and counts. */
     deceased: { type: Boolean, default: false },
     deathYear: { type: Number, default: null },
+
+    /** Whose child they are, where the relation to the head doesn't say (which son a grandchild belongs to). Same family. */
+    parentId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
+    /** Whose wife or husband they are, for someone who married in. Same family. */
+    partnerId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
+    /** Adopted into the family. Only the family and its committee see it. */
+    adopted: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

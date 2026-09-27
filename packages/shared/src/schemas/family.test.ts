@@ -15,7 +15,18 @@ describe('memberInputSchema', () => {
       phone: '+919822055555',
       deceased: false,
       deathYear: null,
+      parentId: null,
+      partnerId: null,
+      adopted: false,
     });
+  });
+
+  it('keeps a chosen parent, partner or adoption only where the relation takes one', () => {
+    const id = '0123456789abcdef01234567';
+    expect(memberInputSchema.parse({ ...formValues, relation: 'grandson', parentId: id, adopted: true })).toMatchObject({ parentId: id, adopted: true });
+    expect(memberInputSchema.parse({ ...formValues, relation: 'son', parentId: id, partnerId: id })).toMatchObject({ parentId: null, partnerId: null });
+    expect(memberInputSchema.parse({ ...formValues, relation: 'daughterInLaw', gender: 'female', partnerId: id, adopted: true })).toMatchObject({ partnerId: id, adopted: false });
+    expect(memberInputSchema.parse({ ...formValues, relation: 'grandson', parentId: '' }).parentId).toBeNull();
   });
 
   it('drops the number of someone who has passed away, and a year of passing for the living', () => {

@@ -1,5 +1,16 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { type FamilyMember, GENDERS, type Gender, type MemberInput, RELATIONS, type Relation, memberInputSchema } from '@samaj/shared';
+import {
+  ADOPTABLE_RELATIONS,
+  type FamilyMember,
+  GENDERS,
+  type Gender,
+  type MemberInput,
+  PARENT_CHOICES,
+  PARTNER_CHOICES,
+  RELATIONS,
+  type Relation,
+  memberInputSchema,
+} from '@samaj/shared';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button, Checkbox, Chip, Input, Modal, toast } from '@/components/ui';
@@ -10,7 +21,7 @@ import { formatNumber, useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { useSaveMember } from './api';
 import { PhotoField } from './PhotoField';
 
-const FIELDS = ['name', 'relation', 'gender', 'birthYear', 'occupation', 'education', 'phone', 'deceased', 'deathYear'] as const;
+const FIELDS = ['name', 'relation', 'gender', 'birthYear', 'occupation', 'education', 'phone', 'deceased', 'deathYear', 'parentId', 'partnerId', 'adopted'] as const;
 
 /** The gender most relations imply, so picking "Son" fills it in. Spouse is the opposite of the head. */
 const RELATION_GENDER: Partial<Record<Relation, Gender>> = {
@@ -21,6 +32,8 @@ const RELATION_GENDER: Partial<Record<Relation, Gender>> = {
   uncle: 'male',
   brother: 'male',
   grandson: 'male',
+  greatGrandson: 'male',
+  nephew: 'male',
   sonInLaw: 'male',
   daughter: 'female',
   mother: 'female',
@@ -29,6 +42,9 @@ const RELATION_GENDER: Partial<Record<Relation, Gender>> = {
   aunt: 'female',
   sister: 'female',
   granddaughter: 'female',
+  greatGranddaughter: 'female',
+  niece: 'female',
+  sisterInLaw: 'female',
   daughterInLaw: 'female',
 };
 
@@ -46,6 +62,9 @@ function toFormValues(member: FamilyMember | null, relation?: Relation): MemberI
     phone: member?.phone ?? '',
     deceased: member?.deceased ?? false,
     deathYear: member?.deathYear ? String(member.deathYear) : '',
+    parentId: member?.parentId ?? '',
+    partnerId: member?.partnerId ?? '',
+    adopted: member?.adopted ?? false,
   };
 }
 
@@ -59,9 +78,11 @@ interface MemberFormModalProps {
   initialRelation?: Relation;
   /** For "spouse": the head's gender, so the spouse's can be filled in. */
   headGender?: Gender;
+  /** The family's people, to choose whose child or wife someone is. */
+  members: FamilyMember[];
 }
 
-export function MemberFormModal({ familyId, member, open, onClose, initialRelation, headGender }: MemberFormModalProps) {
+export function MemberFormModal({ familyId, member, open, onClose, initialRelation, headGender, members }: MemberFormModalProps) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
   const errorMessage = useErrorMessage();
@@ -99,10 +120,21 @@ export function MemberFormModal({ familyId, member, open, onClose, initialRelati
   const gender = form.watch('gender');
   const birthYear = form.watch('birthYear');
   const deceased = form.watch('deceased') ?? false;
+  const parentId = form.watch('parentId');
+  const partnerId = form.watch('partnerId');
+  // Who they could be the child or partner of, when the relation leaves it open.
+  const optionsFor = (allowed: readonly Relation[] | undefined) => (allowed ? members.filter((m) => m.id !== member?.id && allowed.includes(m.relation)) : []);
+  const parentOptions = optionsFor(PARENT_CHOICES[relation]);
+  const partnerOptions = optionsFor(PARTNER_CHOICES[relation]);
+  const onlyOne = (options: FamilyMember[]) => (options.length === 1 ? (options[0]?.id ?? null) : null);
   const age = /^\d{4}$/.test(String(birthYear ?? '')) ? new Date().getFullYear() - Number(birthYear) : null;
 
   const pickRelation = (r: Relation) => {
     form.setValue('relation', r, { shouldValidate: form.formState.isSubmitted });
+    // A choice made for the old relation doesn't carry over.
+    form.setValue('parentId', '');
+    form.setValue('partnerId', '');
+    if (!ADOPTABLE_RELATIONS.includes(r)) form.setValue('adopted', false);
     const implied = r === 'spouse' ? (headGender === 'male' ? 'female' : headGender === 'female' ? 'male' : undefined) : RELATION_GENDER[r];
     if (implied && !genderChosen.current) form.setValue('gender', implied, { shouldValidate: form.formState.isSubmitted });
   };
@@ -117,7 +149,16 @@ export function MemberFormModal({ familyId, member, open, onClose, initialRelati
       return;
     }
     save.mutate(
-      { memberId: member?.id ?? null, input: member || values.deceased ? values : { ...values, consent: true } },
+      {
+        memberId: member?.id ?? null,
+        input: {
+          ...values,
+          // With only one person it could be, say so, so a second son added later doesn't make it unclear.
+          parentId: values.parentId || onlyOne(parentOptions),
+          partnerId: values.partnerId || onlyOne(partnerOptions),
+          ...(!member && !values.deceased && { consent: true as const }),
+        },
+      },
       {
         onSuccess: ({ family }) => {
           // Added to a verified family by the family itself: they wait for the committee.
@@ -191,6 +232,42 @@ export function MemberFormModal({ familyId, member, open, onClose, initialRelati
             </fieldset>
           )}
 
+          {parentOptions.length > 1 && (
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-1 text-sm font-semibold text-fg">{t('member.parentChoice')}</legend>
+              <div className="flex flex-wrap gap-2">
+                {parentOptions.map((m) => (
+                  <Chip key={m.id} selected={parentId === m.id} onClick={() => form.setValue('parentId', parentId === m.id ? '' : m.id)} className="px-3">
+                    {m.name}
+                  </Chip>
+                ))}
+              </div>
+              <p className="text-sm text-fg-muted">{t('member.parentChoiceHint')}</p>
+              {errors.parentId && (
+                <p role="alert" className="text-sm text-danger">
+                  {fieldError(t, errors.parentId.message)}
+                </p>
+              )}
+            </fieldset>
+          )}
+          {partnerOptions.length > 1 && (
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-1 text-sm font-semibold text-fg">{t(gender === 'male' ? 'member.partnerChoice.husband' : 'member.partnerChoice.wife')}</legend>
+              <div className="flex flex-wrap gap-2">
+                {partnerOptions.map((m) => (
+                  <Chip key={m.id} selected={partnerId === m.id} onClick={() => form.setValue('partnerId', partnerId === m.id ? '' : m.id)} className="px-3">
+                    {m.name}
+                  </Chip>
+                ))}
+              </div>
+              {errors.partnerId && (
+                <p role="alert" className="text-sm text-danger">
+                  {fieldError(t, errors.partnerId.message)}
+                </p>
+              )}
+            </fieldset>
+          )}
+
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-1 text-sm font-semibold text-fg">{t('member.gender')}</legend>
             <div className="flex flex-wrap gap-2">
@@ -206,6 +283,7 @@ export function MemberFormModal({ familyId, member, open, onClose, initialRelati
               </p>
             )}
           </fieldset>
+          {ADOPTABLE_RELATIONS.includes(relation) && <Checkbox label={t('member.adopted')} hint={t('member.adoptedHint')} {...form.register('adopted')} />}
 
           <Input
             label={t('member.birthYear')}

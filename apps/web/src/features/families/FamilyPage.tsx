@@ -1,6 +1,6 @@
 import { type FamilyDetail, type FamilyMember, type HistoryAction, RELATION_GENERATION, type Relation } from '@samaj/shared';
 import { useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router';
+import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { Button, Card, EmptyState, ErrorState, Icon, Modal, Skeleton, buttonVariants, toast } from '@/components/ui';
 import {
   type AppIcon,
@@ -190,6 +190,7 @@ const GROUPS: { generation: number; label: MessageKey }[] = [
   { generation: 0, label: 'family.gen.us' },
   { generation: 1, label: 'family.gen.children' },
   { generation: 2, label: 'family.gen.grandchildren' },
+  { generation: 3, label: 'family.gen.greatGrandchildren' },
 ];
 
 /** The first people most families add. */
@@ -202,6 +203,7 @@ export function FamilyPage() {
   const me = useMe();
   const family = useFamily(familyId);
   const remove = useRemoveMember(familyId);
+  const navigate = useNavigate();
 
   const [editing, setEditing] = useState<{ member: FamilyMember | null; relation?: Relation } | null>(null);
   const [removing, setRemoving] = useState<FamilyMember | null>(null);
@@ -338,6 +340,7 @@ export function FamilyPage() {
       <EldersModal familyId={data.id} pair={elders} onClose={() => setElders(null)} />
       <MemberSheet
         member={sheetMember}
+        members={data.members}
         isSelf={sheetMember?.id === me.data?.memberId}
         onClose={() => setOpened(null)}
         actions={{
@@ -348,6 +351,7 @@ export function FamilyPage() {
             if (sheetMember?.accountId) setResetTarget({ userId: sheetMember.accountId, name: sheetMember.name });
           },
           onRemove: canEdit ? () => sheetMember && setRemoving(sheetMember) : undefined,
+          onShowInTree: () => sheetMember && navigate(`/families/${data.id}/tree?focus=${sheetMember.id}`),
         }}
       />
       <MemberPrivacyModal member={privacyFor} isSelf={privacyFor?.id === me.data?.memberId} onClose={() => setPrivacyFor(null)} />
@@ -356,6 +360,7 @@ export function FamilyPage() {
         member={editing?.member ?? null}
         initialRelation={editing?.relation}
         headGender={head?.gender}
+        members={data.members}
         open={editing !== null}
         onClose={() => setEditing(null)}
       />

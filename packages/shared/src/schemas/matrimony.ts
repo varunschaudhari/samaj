@@ -19,7 +19,7 @@ import { personNameSchema } from './auth';
  * Relations that can have a profile. Spouses, parents and in-laws are already
  * married. A head of family qualifies only when the family has no spouse listed.
  */
-export const ELIGIBLE_RELATIONS = ['son', 'daughter', 'brother', 'sister', 'grandson', 'granddaughter', 'other'] as const;
+export const ELIGIBLE_RELATIONS = ['son', 'daughter', 'brother', 'sister', 'nephew', 'niece', 'grandson', 'granddaughter', 'greatGrandson', 'greatGranddaughter', 'other'] as const;
 
 /** Legal minimum marriage age in India. */
 export const MIN_MARRIAGE_AGE: Record<Gender, number> = { male: 21, female: 18, other: 18 };

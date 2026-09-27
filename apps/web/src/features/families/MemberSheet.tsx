@@ -9,6 +9,7 @@ import {
   ChevronRight,
   EyeOff,
   GraduationCap,
+  HeartHandshake,
   HourglassMedium,
   House,
   KeyRound,
@@ -18,6 +19,8 @@ import {
   Smartphone,
   Trash2,
   UserRound,
+  Users,
+  Network,
 } from '@/components/ui/icons';
 import { placeLabel } from '@/features/branches/api';
 import { formatYear, useLanguageStore, useT } from '@/i18n';
@@ -30,6 +33,7 @@ export interface MemberActions {
   onInvite?: () => void;
   onResetPassword?: () => void;
   onRemove?: () => void;
+  onShowInTree?: () => void;
 }
 
 function Action({ icon, label, hint, onClick, danger = false }: { icon: AppIcon; label: string; hint?: string; onClick: () => void; danger?: boolean }) {
@@ -70,7 +74,20 @@ function Fact({ icon, children }: { icon: AppIcon; children: ReactNode }) {
  * everything the viewer may do for them, each with a name instead of an icon
  * to guess at.
  */
-export function MemberSheet({ member, isSelf, actions, onClose }: { member: FamilyMember | null; isSelf: boolean; actions: MemberActions; onClose: () => void }) {
+export function MemberSheet({
+  member,
+  members,
+  isSelf,
+  actions,
+  onClose,
+}: {
+  member: FamilyMember | null;
+  /** The rest of the family, to name whose child or partner they are. */
+  members: FamilyMember[];
+  isSelf: boolean;
+  actions: MemberActions;
+  onClose: () => void;
+}) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
   const displayName = useDisplayName();
@@ -83,6 +100,8 @@ export function MemberSheet({ member, isSelf, actions, onClose }: { member: Fami
     fn?.();
   };
   const removable = Boolean(actions.onRemove) && !member.isHead && !member.hasAccount;
+  const parent = member.parentId ? members.find((m) => m.id === member.parentId) : undefined;
+  const partner = member.partnerId ? members.find((m) => m.id === member.partnerId) : undefined;
 
   return (
     <Modal open onClose={onClose} title={displayName(member)} description={[t(`relation.${member.relation}`), life(member)].filter(Boolean).join(' · ')}>
@@ -92,6 +111,7 @@ export function MemberSheet({ member, isSelf, actions, onClose }: { member: Fami
           <div className="flex flex-wrap gap-1.5">
             {member.isHead && <Badge tone="primary">{t('family.headBadge')}</Badge>}
             {member.deceased && <Badge>{t('member.deceasedBadge')}</Badge>}
+            {member.adopted && <Badge>{t('member.adopted')}</Badge>}
             {member.hasAccount && (
               <Badge tone="success" icon={BadgeCheck}>
                 {isSelf ? t('member.sheet.you') : t('family.signsIn')}
@@ -114,6 +134,8 @@ export function MemberSheet({ member, isSelf, actions, onClose }: { member: Fami
           </Fact>
           {member.occupation && <Fact icon={Briefcase}>{member.occupation}</Fact>}
           {member.education && <Fact icon={GraduationCap}>{member.education}</Fact>}
+          {parent && <Fact icon={Users}>{t('member.sheet.childOf', { name: parent.name })}</Fact>}
+          {partner && <Fact icon={HeartHandshake}>{t(member.gender === 'male' ? 'member.sheet.husbandOf' : 'member.sheet.wifeOf', { name: partner.name })}</Fact>}
           {member.movedFrom && (
             <Fact icon={House}>
               <span>
@@ -141,9 +163,10 @@ export function MemberSheet({ member, isSelf, actions, onClose }: { member: Fami
           </a>
         )}
 
-        {(actions.onEdit || actions.onPrivacy || member.canInvite || member.canResetPassword || removable) && (
+        {(actions.onEdit || actions.onShowInTree || actions.onPrivacy || member.canInvite || member.canResetPassword || removable) && (
           <ul className="-mx-3 flex flex-col">
             {actions.onEdit && <Action icon={Pencil} label={t('member.sheet.edit')} hint={t('member.sheet.editHint')} onClick={run(actions.onEdit)} />}
+            {actions.onShowInTree && <Action icon={Network} label={t('member.sheet.showInTree')} hint={t('member.sheet.showInTreeHint')} onClick={run(actions.onShowInTree)} />}
             {actions.onPrivacy && member.canEditPrivacy && (
               <Action icon={ShieldCheck} label={t('member.sheet.privacy')} hint={t('member.sheet.privacyHint')} onClick={run(actions.onPrivacy)} />
             )}

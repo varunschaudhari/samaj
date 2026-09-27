@@ -13,7 +13,7 @@ export function FamilyMemberRow({ member, isSelf, onOpen }: { member: FamilyMemb
   const t = useT();
   const displayName = useDisplayName();
   const life = useLifeLabel();
-  const facts = [t(`relation.${member.relation}`), life(member), member.occupation].filter(Boolean);
+  const facts = [t(`relation.${member.relation}`), member.adopted ? t('member.adopted') : null, life(member), member.occupation].filter(Boolean);
 
   return (
     <li>

@@ -22,13 +22,43 @@ export const RELATIONS = [
   'aunt',
   'brother',
   'sister',
+  'sisterInLaw',
   'daughterInLaw',
   'sonInLaw',
+  'nephew',
+  'niece',
   'grandson',
   'granddaughter',
+  'greatGrandson',
+  'greatGranddaughter',
   'other',
 ] as const;
 export type Relation = (typeof RELATIONS)[number];
+
+/** Relations someone can be adopted into (दत्तक). Only the family and its committee see that they were. */
+export const ADOPTABLE_RELATIONS: readonly Relation[] = ['son', 'daughter', 'grandson', 'granddaughter', 'greatGrandson', 'greatGranddaughter', 'nephew', 'niece'];
+
+/**
+ * Whose child someone is, where the relation to the head doesn't say: which
+ * son a grandchild belongs to, which brother a nephew. The family picks from
+ * the people with these relations; with only one of them, it is that one.
+ */
+export const PARENT_CHOICES: Partial<Record<Relation, readonly Relation[]>> = {
+  grandson: ['son', 'daughter'],
+  granddaughter: ['son', 'daughter'],
+  greatGrandson: ['grandson', 'granddaughter'],
+  greatGranddaughter: ['grandson', 'granddaughter'],
+  nephew: ['brother', 'sister'],
+  niece: ['brother', 'sister'],
+};
+
+/** Whose wife or husband someone who married into the family is. */
+export const PARTNER_CHOICES: Partial<Record<Relation, readonly Relation[]>> = {
+  daughterInLaw: ['son'],
+  sonInLaw: ['daughter'],
+  sisterInLaw: ['brother'],
+  aunt: ['uncle'],
+};
 
 /** 'invited': someone was given a code to their own sign-in; 'joined': they used it. */
 export const HISTORY_ACTIONS = [
@@ -86,6 +116,11 @@ const yearSchema = (message: string) =>
 
 export const birthYearSchema = yearSchema('validation.birthYear');
 
+const optionalId = z
+  .union([z.literal(''), objectIdSchema])
+  .nullish()
+  .transform((v) => v || null);
+
 const memberFields = z.object({
   name: personNameSchema,
   relation: z.enum(RELATIONS, { error: 'validation.relation' }),
@@ -97,6 +132,10 @@ const memberFields = z.object({
   /** Kept in the family and its tree, out of the directory, matrimony and sign-ins. */
   deceased: z.boolean().default(false),
   deathYear: yearSchema('validation.deathYear'),
+  /** See PARENT_CHOICES and PARTNER_CHOICES; blank when the relation says it all. */
+  parentId: optionalId,
+  partnerId: optionalId,
+  adopted: z.boolean().default(false),
 });
 
 type MemberFields = z.output<typeof memberFields>;
@@ -107,8 +146,15 @@ function checkYears(v: MemberFields, ctx: z.RefinementCtx) {
   }
 }
 
-/** Someone who has passed away has no number and no year of passing unless they have. */
-const tidy = <T extends MemberFields>(v: T): T => (v.deceased ? { ...v, phone: null } : { ...v, deathYear: null });
+/** Drop what doesn't apply: a number for someone who has passed away, ties the relation doesn't take. */
+const tidy = <T extends MemberFields>(v: T): T => ({
+  ...v,
+  phone: v.deceased ? null : v.phone,
+  deathYear: v.deceased ? v.deathYear : null,
+  parentId: PARENT_CHOICES[v.relation] ? v.parentId : null,
+  partnerId: PARTNER_CHOICES[v.relation] ? v.partnerId : null,
+  adopted: v.adopted && ADOPTABLE_RELATIONS.includes(v.relation),
+});
 
 export const memberInputSchema = memberFields.superRefine(checkYears).transform(tidy);
 export type MemberInput = z.input<typeof memberInputSchema>;
@@ -152,7 +198,7 @@ export const enrolFamilySchema = z.object({
   place: optionalText(60).pipe(z.string().min(2, 'validation.placeMin').nullable()),
   gotra: gotraSchema,
   address: optionalText(200),
-  head: memberFields.omit({ relation: true, deceased: true, deathYear: true }),
+  head: memberFields.omit({ relation: true, deceased: true, deathYear: true, parentId: true, partnerId: true, adopted: true }),
   /** The committee confirms the family agreed to be registered. */
   consent: z.literal(true, { error: 'validation.consentRequired' }),
 });
@@ -196,6 +242,12 @@ export interface FamilyMember {
   /** Passed away: shown as "Late" (कै.) in the family and its tree only. */
   deceased: boolean;
   deathYear: number | null;
+  /** Whose child they are, when the family said (grandchildren, nephews, nieces). Null: worked out from the relation. */
+  parentId: string | null;
+  /** Whose wife or husband they are, for someone who married in, when the family said. */
+  partnerId: string | null;
+  /** Adopted into the family. Present for the family and its committee only. */
+  adopted?: boolean;
 }
 
 /** Someone who was in this family and moved to another, usually after marriage. */

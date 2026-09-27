@@ -1,4 +1,4 @@
-import { type FamilyDetail, type FamilyMember, gotraName } from '@samaj/shared';
+import { type FamilyDetail, type FamilyMember, PARENT_CHOICES, PARTNER_CHOICES, type Relation, gotraName } from '@samaj/shared';
 import { Link } from 'react-router';
 import { Avatar, Button, Card, Icon, buttonVariants } from '@/components/ui';
 import { type AppIcon, Camera, ChevronRight, CircleCheck, MapPin, Network, Pencil, Smartphone, UserPlus, Users } from '@/components/ui/icons';
@@ -114,6 +114,12 @@ export function FamilyChecklist({
   // Adults already listed with a number, who could sign in themselves.
   const couldSignIn = family.members.filter((m) => m.canInvite && m.phone && (ageOf(m) ?? 0) >= 18);
   const first = <T,>(list: T[]) => list[0] as T;
+  // People the tree can't place until the family says whose child or wife they are.
+  const options = (m: FamilyMember, allowed: readonly Relation[] | undefined) => (allowed ? family.members.filter((x) => x.id !== m.id && allowed.includes(x.relation)).length : 0);
+  const openParent = (m: FamilyMember) => options(m, PARENT_CHOICES[m.relation]) > 1;
+  const openPartner = (m: FamilyMember) => options(m, PARTNER_CHOICES[m.relation]) > 1;
+  const tieable = family.members.filter((m) => openParent(m) || openPartner(m));
+  const untied = tieable.filter((m) => (openParent(m) && !m.parentId) || (openPartner(m) && !m.partnerId));
 
   const steps: Step[] = [
     { key: 'people', icon: Users, label: t('family.check.people'), done: family.members.length > 1, onFix: onAdd },
@@ -133,6 +139,17 @@ export function FamilyChecklist({
       done: noPhoto.length === 0,
       onFix: () => onEditMember(first(noPhoto)),
     },
+    ...(tieable.length > 0
+      ? [
+          {
+            key: 'ties',
+            icon: Network,
+            label: t('family.check.ties', { count: formatNumber(untied.length, language) }),
+            done: untied.length === 0,
+            onFix: () => onEditMember(first(untied)),
+          },
+        ]
+      : []),
   ];
   const done = steps.filter((s) => s.done).length;
   const pct = Math.round((done / steps.length) * 100);

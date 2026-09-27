@@ -1,0 +1,86 @@
+import type { FamilyTree, TreePerson } from '@samaj/shared';
+import { describe, expect, it } from 'vitest';
+import { CARD_H, CARD_W, findPeople, layoutTree } from './tree-layout';
+
+const family = { id: 'f1', headName: 'Anil Wagh', place: 'Bhusawal', branch: { id: 'b1', name: 'Bhusawal', nameMr: 'भुसावळ' }, canView: true };
+const person = (id: string, relation: TreePerson['relation'], generation: number, ties: Partial<TreePerson> = {}): TreePerson => ({
+  id,
+  name: `${id} Wagh`,
+  relation,
+  gender: 'male',
+  birthYear: null,
+  photoUrl: null,
+  isHead: relation === 'head',
+  generation,
+  deceased: false,
+  deathYear: null,
+  parentId: null,
+  partnerId: null,
+  ...ties,
+});
+const treeOf = (members: TreePerson[]): FamilyTree => ({ rootId: 'f1', households: [{ family, generation: 0, via: null, members }], side: [], truncated: false });
+
+describe('layoutTree', () => {
+  const tree = treeOf([
+    person('Anil', 'head', 0),
+    person('Sunita', 'spouse', 0, { gender: 'female', partnerId: 'Anil' }),
+    person('Rohit', 'son', 1, { parentId: 'Anil', birthYear: 1990 }),
+    person('Kavya', 'daughterInLaw', 1, { gender: 'female', partnerId: 'Rohit' }),
+    person('Sagar', 'son', 1, { parentId: 'Anil', birthYear: 1994 }),
+    person('Aarav', 'grandson', 2, { parentId: 'Rohit' }),
+    person('Isha', 'granddaughter', 2, { gender: 'female', parentId: 'Sagar', adopted: true }),
+    person('Dev', 'grandson', 2),
+  ]);
+  const layout = layoutTree(tree);
+  const at = Object.fromEntries(layout.people.map((p) => [p.id, p]));
+
+  it('puts each generation on its own row, partners side by side', () => {
+    expect(at.Anil?.y).toBe(at.Sunita?.y);
+    expect(at.Rohit?.y).toBeGreaterThan(at.Anil?.y ?? 0);
+    expect(at.Aarav?.y).toBeGreaterThan(at.Rohit?.y ?? 0);
+    expect(at.Kavya?.y).toBe(at.Rohit?.y);
+    expect(at.Kavya?.x).toBeGreaterThan(at.Rohit?.x ?? 0);
+    // Older son first.
+    expect(at.Rohit?.x).toBeLessThan(at.Sagar?.x ?? 0);
+  });
+
+  it('centres parents over their children and keeps children under their own parents', () => {
+    const middle = ((at.Rohit?.x ?? 0) + (at.Sagar?.x ?? 0) + CARD_W) / 2;
+    const couple = ((at.Anil?.x ?? 0) + (at.Sunita?.x ?? 0) + CARD_W) / 2;
+    expect(Math.abs(couple - middle)).toBeLessThan(1);
+    expect(Math.abs((at.Aarav?.x ?? 0) - (at.Rohit?.x ?? 0))).toBeLessThan(CARD_W);
+    expect(Math.abs((at.Isha?.x ?? 0) - (at.Sagar?.x ?? 0))).toBeLessThan(CARD_W);
+  });
+
+  it('never overlaps two cards', () => {
+    for (const a of layout.people) {
+      for (const b of layout.people) {
+        if (a === b || a.y !== b.y) continue;
+        expect(Math.abs(a.x - b.x)).toBeGreaterThanOrEqual(CARD_W);
+      }
+    }
+    expect(layout.height).toBeGreaterThanOrEqual((at.Aarav?.y ?? 0) + CARD_H);
+  });
+
+  it('draws adoption dashed, and marks a grandchild whose parents nobody set', () => {
+    expect(layout.connectors.filter((c) => c.dashed)).toHaveLength(1);
+    // Anil to his two sons, Rohit to Aarav, Sagar to Isha.
+    expect(layout.connectors).toHaveLength(4);
+    expect(layout.stubs).toEqual([{ x: (at.Dev?.x ?? 0) + CARD_W / 2, y: at.Dev?.y }]);
+  });
+
+  it('survives a loop in the data', () => {
+    const loop = layoutTree(treeOf([person('A', 'son', 1, { parentId: 'B' }), person('B', 'son', 1, { parentId: 'A' })]));
+    expect(loop.people).toHaveLength(2);
+  });
+});
+
+describe('findPeople', () => {
+  const people = [{ name: 'Rohit Anil Wagh' }, { name: 'Rohini Patil' }, { name: 'Sagar Wagh' }];
+  it('matches the start of any word, every word typed', () => {
+    expect(findPeople(people, 'roh').map((p) => p.name)).toEqual(['Rohit Anil Wagh', 'Rohini Patil']);
+    expect(findPeople(people, 'roh wa').map((p) => p.name)).toEqual(['Rohit Anil Wagh']);
+    expect(findPeople(people, 'WAGH').length).toBe(2);
+    expect(findPeople(people, '  ')).toEqual([]);
+  });
+});

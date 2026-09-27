@@ -142,13 +142,18 @@ export const RELATION_GENERATION: Record<Relation, number> = {
   spouse: 0,
   brother: 0,
   sister: 0,
+  sisterInLaw: 0,
   other: 0,
   son: 1,
   daughter: 1,
   daughterInLaw: 1,
   sonInLaw: 1,
+  nephew: 1,
+  niece: 1,
   grandson: 2,
   granddaughter: 2,
+  greatGrandson: 3,
+  greatGranddaughter: 3,
 };
 
 /** How far the tree reaches above and below the family it's drawn for, and how many households it holds. */
@@ -169,6 +174,12 @@ export interface TreePerson {
   movedTo?: LinkedFamily;
   deceased: boolean;
   deathYear: number | null;
+  /** Their parent in the tree: someone in any household shown, or null when not known. */
+  parentId: string | null;
+  /** The person they married into the family, shown beside them. */
+  partnerId: string | null;
+  /** Adopted. Present only where the viewer sees the family's own details. */
+  adopted?: boolean;
 }
 
 export interface TreeHousehold {
