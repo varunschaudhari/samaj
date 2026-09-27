@@ -46,7 +46,7 @@ export function EventsPage() {
   let body;
   if (events.isPending) {
     body = (
-      <ul className="flex flex-col gap-3" aria-busy="true" aria-label={t('common.loading')}>
+      <ul className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3" aria-busy="true" aria-label={t('common.loading')}>
         {[0, 1, 2].map((i) => (
           <EventCardSkeleton key={i} />
         ))}
@@ -81,7 +81,7 @@ export function EventsPage() {
       );
   } else {
     body = (
-      <ul className="flex flex-col gap-3" aria-busy={events.isPlaceholderData || undefined}>
+      <ul className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3" aria-busy={events.isPlaceholderData || undefined}>
         {shown.map((e) => (
           <EventCard key={e.id} event={e} />
         ))}

@@ -26,7 +26,7 @@ export function NoticesPage() {
   let body;
   if (notices.isPending) {
     body = (
-      <ul className="flex flex-col gap-3" aria-busy="true" aria-label={t('common.loading')}>
+      <ul className="gap-4 md:columns-2 2xl:columns-3 [&>li]:mb-4 [&>li]:break-inside-avoid" aria-busy="true" aria-label={t('common.loading')}>
         {[0, 1, 2].map((i) => (
           <NoticeCardSkeleton key={i} />
         ))}
@@ -48,7 +48,7 @@ export function NoticesPage() {
   } else {
     body = (
       <div className="flex flex-col gap-4">
-        <ul className="flex flex-col gap-3" aria-busy={notices.isPlaceholderData || undefined}>
+        <ul className="gap-4 md:columns-2 2xl:columns-3 [&>li]:mb-4 [&>li]:break-inside-avoid" aria-busy={notices.isPlaceholderData || undefined}>
           {all.map((n) => (
             <NoticeCard key={n.id} notice={n} onEdit={() => setEditing(n)} onRemove={() => setRemoving(n)} />
           ))}

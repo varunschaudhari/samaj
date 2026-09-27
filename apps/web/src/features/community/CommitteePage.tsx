@@ -186,6 +186,7 @@ export function CommitteePage() {
           }
         />
       )}
+      <div className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3">
       {groups.map((g) => (
         <Card as="section" key={g.branch.id} className="flex flex-col gap-2" aria-labelledby={`committee-${g.branch.id}`}>
           <h2 id={`committee-${g.branch.id}`} className="font-display text-xl font-semibold text-fg">
@@ -230,6 +231,7 @@ export function CommitteePage() {
           )}
         </Card>
       ))}
+      </div>
 
       <BearerModal target={target} onClose={() => setTarget(null)} />
       <Modal

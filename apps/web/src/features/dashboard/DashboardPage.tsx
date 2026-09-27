@@ -1,6 +1,7 @@
 import { type Dashboard, type DashboardBranchRow, can, isGlobalRole } from '@samaj/shared';
 import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
+import { LIST_PAGE } from '@/components/layout/page-width';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge, Button, Card, ErrorState, Icon, IconButton, ListToolbar, Skeleton, SortSelect, buttonVariants } from '@/components/ui';
 import {
@@ -397,7 +398,7 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-5">
+    <div className={`${LIST_PAGE} gap-5`}>
       <PageHeader
         title={t('dashboard.title')}
         description={

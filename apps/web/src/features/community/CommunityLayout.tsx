@@ -1,5 +1,6 @@
 import { CalendarDays, type AppIcon, Megaphone, UsersRound } from '@/components/ui/icons';
 import { NavLink, Outlet } from 'react-router';
+import { LIST_PAGE } from '@/components/layout/page-width';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Icon } from '@/components/ui';
 import { type MessageKey, useT } from '@/i18n';
@@ -15,7 +16,7 @@ export const COMMUNITY_SECTIONS: { to: string; label: MessageKey; icon: AppIcon 
 export function CommunityLayout() {
   const t = useT();
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5">
+    <div className={`${LIST_PAGE} gap-5`}>
       <PageHeader title={t('community.title')} description={t('community.subtitle')} />
       {COMMUNITY_SECTIONS.length > 1 && (
         <nav aria-label={t('community.title')} className="flex border-b border-line">

@@ -8,7 +8,8 @@ import { ReasonModal } from '@/features/families/FamilyLinks';
 import { useApproveMember, useApproveMove, useDeclineMove, useRejectMember } from '@/features/families/links-api';
 import { formatDate, useErrorMessage, useLanguageStore, useT } from '@/i18n';
 
-const LIST = 'divide-y divide-line overflow-hidden rounded-md border border-line bg-surface shadow-card';
+// One card per request; side by side on wide screens.
+const LIST = 'grid gap-3 xl:grid-cols-2 2xl:grid-cols-3 [&>li]:rounded-md [&>li]:border [&>li]:border-line [&>li]:bg-surface [&>li]:shadow-card';
 
 function ListSkeleton() {
   return (

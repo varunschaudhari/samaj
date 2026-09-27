@@ -149,7 +149,7 @@ export function BranchesPage() {
                 {places.length === 0 ? (
                   <p className="py-3 text-sm text-fg-muted">{t('branches.noPlaces')}</p>
                 ) : (
-                  <ul className="divide-y divide-line">
+                  <ul className="grid md:grid-cols-2 md:gap-x-6 2xl:grid-cols-3 [&>li]:border-b [&>li]:border-line" aria-label={t('branches.placesIn', { name: branchName(district, language) })}>
                     {places.map((place) => (
                       <li key={place.id} className="pl-3">
                         <BranchRow

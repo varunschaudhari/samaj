@@ -16,7 +16,7 @@ export function MyProfilesPage() {
 
   if (mine.isPending) {
     return (
-      <ul className="grid gap-3 md:grid-cols-2" aria-busy="true">
+      <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-busy="true">
         {[0, 1].map((i) => (
           <ProfileCardSkeleton key={i} />
         ))}
@@ -48,7 +48,7 @@ export function MyProfilesPage() {
           }
         />
       ) : (
-        <ul className="grid gap-3 md:grid-cols-2">
+        <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {profiles.map((p) => (
             <ProfileCardView key={p.id} profile={p} href={`/matrimony/profiles/${p.id}`} showStatus />
           ))}

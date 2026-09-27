@@ -104,7 +104,7 @@ export function SearchPage() {
   let body;
   if (results.isPending) {
     body = (
-      <ul className="grid gap-3 md:grid-cols-2" aria-busy="true" aria-label={t('common.loading')}>
+      <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-busy="true" aria-label={t('common.loading')}>
         {[0, 1, 2, 3].map((i) => (
           <ProfileCardSkeleton key={i} />
         ))}
@@ -130,7 +130,7 @@ export function SearchPage() {
   } else {
     body = (
       <div className="flex flex-col gap-4">
-        <ul className="grid gap-3 md:grid-cols-2" aria-busy={results.isPlaceholderData || undefined}>
+        <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-busy={results.isPlaceholderData || undefined}>
           {items.map((p) => (
             <ProfileCardView key={p.id} profile={p} href={`/matrimony/profiles/${p.id}?from=${forProfile}`} />
           ))}

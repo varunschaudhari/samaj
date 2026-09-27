@@ -1,6 +1,7 @@
 import { can } from '@samaj/shared';
 import { ClipboardCheck, Network, Users } from '@/components/ui/icons';
 import { Navigate, NavLink, Outlet } from 'react-router';
+import { LIST_PAGE } from '@/components/layout/page-width';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Icon } from '@/components/ui';
 import { useMe } from '@/features/auth/api';
@@ -21,7 +22,7 @@ export function AdminLayout() {
   const sections = SECTIONS.filter((s) => role && can(role, s.permission));
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5">
+    <div className={`${LIST_PAGE} gap-5`}>
       <PageHeader title={t('admin.title')} />
       <nav aria-label={t('admin.title')} className="flex gap-1 border-b border-line">
         {sections.map((s) => (

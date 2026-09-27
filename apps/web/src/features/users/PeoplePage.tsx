@@ -3,6 +3,8 @@ import { ChevronRight, SearchX, Users } from '@/components/ui/icons';
 import { useState } from 'react';
 import { type ActiveFilter, Avatar, Badge, Button, EmptyState, ErrorState, Icon, ListToolbar, LoadMore, Select, Skeleton } from '@/components/ui';
 import { branchName } from '@/features/branches/api';
+import { FamilyStatusBadge } from '@/features/families/FamilyStatusBadge';
+import { cn } from '@/lib/cn';
 import { BranchSelect, useBranchLabel } from '@/features/branches/BranchSelect';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatTotal, useLanguageStore, useT } from '@/i18n';
@@ -14,6 +16,24 @@ const LIST = 'divide-y divide-line overflow-hidden rounded-md border border-line
 
 const ROLE_TONE: Record<Role, 'neutral' | 'primary' | 'kumkum' | 'zari'> = { member: 'neutral', committee: 'primary', admin: 'kumkum', superadmin: 'zari' };
 
+/** Columns from lg up; phones show each account as a compact row. */
+const COLUMNS = 'lg:grid lg:grid-cols-[2.5rem_minmax(14rem,2fr)_minmax(9rem,1fr)_minmax(10rem,1.4fr)_minmax(7rem,0.8fr)_minmax(13rem,1.2fr)_1.5rem] lg:gap-4';
+
+function UserListHeader() {
+  const t = useT();
+  return (
+    <li aria-hidden="true" className={cn('hidden items-center bg-surface-muted px-4 py-2.5 text-xs font-semibold tracking-wide text-fg-muted uppercase', COLUMNS)}>
+      <span />
+      <span>{t('directory.col.name')}</span>
+      <span>{t('directory.col.phone')}</span>
+      <span>{t('directory.filterBranch')}</span>
+      <span>{t('people.role')}</span>
+      <span>{t('people.col.family')}</span>
+      <span />
+    </li>
+  );
+}
+
 function UserRow({ user, onOpen }: { user: AdminUser; onOpen: () => void }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
@@ -22,16 +42,26 @@ function UserRow({ user, onOpen }: { user: AdminUser; onOpen: () => void }) {
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-surface-muted"
+        className={cn('flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-surface-muted lg:py-2.5', COLUMNS)}
       >
         <Avatar name={user.name} size="md" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-semibold break-words text-fg">{user.name}</span>
-            <Badge tone={ROLE_TONE[user.role]}>{t(`role.${user.role}`)}</Badge>
+            <Badge tone={ROLE_TONE[user.role]} className="lg:hidden">
+              {t(`role.${user.role}`)}
+            </Badge>
           </span>
-          <span className="text-sm text-fg-muted tabular-nums">{formatPhone(user.phone)}</span>
-          <span className="truncate text-sm text-fg-muted">{branchName(user.branch, language)}</span>
+          <span className="text-sm text-fg-muted tabular-nums lg:hidden">{formatPhone(user.phone)}</span>
+          <span className="truncate text-sm text-fg-muted lg:hidden">{branchName(user.branch, language)}</span>
+        </span>
+        <span className="hidden text-sm text-fg tabular-nums lg:block">{formatPhone(user.phone)}</span>
+        <span className="hidden truncate text-sm text-fg lg:block">{branchName(user.branch, language)}</span>
+        <span className="hidden lg:block">
+          <Badge tone={ROLE_TONE[user.role]}>{t(`role.${user.role}`)}</Badge>
+        </span>
+        <span className="hidden lg:block">
+          <FamilyStatusBadge status={user.familyStatus} />
         </span>
         <Icon icon={ChevronRight} className="text-fg-muted" />
       </button>
@@ -41,12 +71,17 @@ function UserRow({ user, onOpen }: { user: AdminUser; onOpen: () => void }) {
 
 function UserRowSkeleton() {
   return (
-    <li className="flex items-center gap-3 px-4 py-3" aria-hidden="true">
+    <li className={cn('flex items-center gap-3 px-4 py-3 lg:py-2.5', COLUMNS)} aria-hidden="true">
       <Skeleton className="size-10 rounded-full" />
       <div className="flex flex-1 flex-col gap-2">
         <Skeleton className="h-4 w-1/2" />
-        <Skeleton className="h-3.5 w-1/3" />
+        <Skeleton className="h-3.5 w-1/3 lg:hidden" />
       </div>
+      <Skeleton className="hidden h-4 w-3/4 lg:block" />
+      <Skeleton className="hidden h-4 w-2/3 lg:block" />
+      <Skeleton className="hidden h-5 w-20 lg:block" />
+      <Skeleton className="hidden h-5 w-20 lg:block" />
+      <span />
     </li>
   );
 }
@@ -81,6 +116,7 @@ export function PeoplePage() {
   if (users.isPending) {
     body = (
       <ul className={LIST} aria-busy="true" aria-label={t('common.loading')}>
+        <UserListHeader />
         {[0, 1, 2, 3].map((i) => (
           <UserRowSkeleton key={i} />
         ))}
@@ -107,6 +143,7 @@ export function PeoplePage() {
     body = (
       <div className="flex flex-col gap-3">
         <ul className={LIST} aria-busy={users.isPlaceholderData || undefined}>
+          <UserListHeader />
           {items.map((u) => (
             <UserRow key={u.id} user={u} onOpen={() => setOpenId(u.id)} />
           ))}

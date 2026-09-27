@@ -1,5 +1,6 @@
 import { HeartHandshake, Inbox, Search, UserRound } from '@/components/ui/icons';
 import { Navigate, NavLink, Outlet } from 'react-router';
+import { LIST_PAGE } from '@/components/layout/page-width';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EmptyState, Icon, Skeleton } from '@/components/ui';
 import { useMe } from '@/features/auth/api';
@@ -33,7 +34,7 @@ export function MatrimonyLayout() {
   ];
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-5">
+    <div className={`${LIST_PAGE} gap-5`}>
       <PageHeader title={t('matrimony.title')} description={t('matrimony.subtitle')} />
       <nav aria-label={t('matrimony.title')} className="flex border-b border-line">
         {sections.map((s) => (

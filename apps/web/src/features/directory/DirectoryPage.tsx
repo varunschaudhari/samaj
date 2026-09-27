@@ -3,6 +3,8 @@ import { Globe, Info, MapPin, SearchX, Users, X } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { LIST_PAGE } from '@/components/layout/page-width';
+import { cn } from '@/lib/cn';
 import { type ActiveFilter, Button, Chip, ChipRow, EmptyState, ErrorState, Icon, ListToolbar, LoadMore, Select, Skeleton } from '@/components/ui';
 import { useMe } from '@/features/auth/api';
 import { VerificationNotice } from '@/features/families/VerificationNotice';
@@ -12,7 +14,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatTotal, useLanguageStore, useT } from '@/i18n';
 import { gotraOptions } from '@/features/families/gotra-options';
 import { type DirectoryFilters, useMembers } from './api';
-import { MemberCard, MemberCardSkeleton } from './MemberCard';
+import { MemberCard, MemberCardSkeleton, MemberListHeader } from './MemberCard';
 
 const SKELETON_COUNT = 8;
 const LIST = 'divide-y divide-line overflow-hidden rounded-md border border-line bg-surface shadow-card';
@@ -155,6 +157,7 @@ function Directory() {
     // 1. Loading: skeletons in the same grid the cards will fill.
     body = (
       <ul className={LIST} aria-busy="true" aria-label={t('common.loading')}>
+        <MemberListHeader />
         {Array.from({ length: SKELETON_COUNT }, (_, i) => (
           <MemberCardSkeleton key={i} />
         ))}
@@ -186,6 +189,7 @@ function Directory() {
     body = (
       <div className="flex flex-col gap-4">
         <ul className={LIST} aria-busy={members.isPlaceholderData || undefined}>
+          <MemberListHeader />
           {items.map((m) => (
             <MemberCard key={m.id} member={m} />
           ))}
@@ -197,7 +201,7 @@ function Directory() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4">
+    <div className={cn(LIST_PAGE, 'gap-4')}>
       <PageHeader title={t('directory.title')} description={t('directory.subtitle')} />
       <Filters
         key={filtersKey}

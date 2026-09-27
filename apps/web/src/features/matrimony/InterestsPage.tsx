@@ -78,7 +78,7 @@ function Section({ title, items }: { title: string; items: InterestItem[] }) {
   return (
     <section className="flex flex-col gap-3">
       <h2 className="font-display text-lg font-semibold text-fg">{title}</h2>
-      <ul className="flex flex-col gap-3">
+      <ul className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
         {items.map((i) => (
           <InterestRow key={i.id} item={i} />
         ))}
