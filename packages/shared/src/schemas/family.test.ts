@@ -13,7 +13,16 @@ describe('memberInputSchema', () => {
       occupation: null,
       education: 'B.E.',
       phone: '+919822055555',
+      deceased: false,
+      deathYear: null,
     });
+  });
+
+  it('drops the number of someone who has passed away, and a year of passing for the living', () => {
+    expect(memberInputSchema.parse({ ...formValues, deceased: true, deathYear: '2020' })).toMatchObject({ phone: null, deathYear: 2020 });
+    expect(memberInputSchema.parse({ ...formValues, deathYear: '2020' })).toMatchObject({ deathYear: null });
+    const backwards = memberInputSchema.safeParse({ ...formValues, deceased: true, deathYear: '1990' });
+    expect(backwards.error?.issues[0]).toMatchObject({ path: ['deathYear'], message: 'validation.deathBeforeBirth' });
   });
 
   // The web app parses, sends the parsed values, and the API parses them again.
@@ -26,7 +35,7 @@ describe('memberInputSchema', () => {
     expect(memberInputSchema.parse({ name: 'Rohit Wagh', relation: 'son', gender: 'male' })).toMatchObject({ birthYear: null, occupation: null, phone: null });
   });
 
-  it.each(['95', '1850', '3000', 'abcd', '1995.5'])('rejects birth year %s', (birthYear) => {
+  it.each(['95', '1790', '3000', 'abcd', '1995.5'])('rejects birth year %s', (birthYear) => {
     const result = memberInputSchema.safeParse({ ...formValues, birthYear });
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.message).toBe('validation.birthYear');

@@ -94,6 +94,8 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
             photoUrl: photoUrl(m),
             isHead: m.isHead,
             generation: at.generation + RELATION_GENERATION[m.relation],
+            deceased: m.deceased === true,
+            deathYear: m.deathYear ?? null,
           }))
           .concat(
             movedOut
@@ -111,6 +113,8 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
                   isHead: false,
                   generation: at.generation + RELATION_GENERATION[relation],
                   movedTo: o.family,
+                  deceased: o.member.deceased === true,
+                  deathYear: o.member.deathYear ?? null,
                 };
               }),
           ),

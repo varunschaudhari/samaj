@@ -130,8 +130,14 @@ export interface PendingMember {
 
 /** Generations above (negative) or below the head, by relation to the head. */
 export const RELATION_GENERATION: Record<Relation, number> = {
+  greatGrandfather: -3,
+  greatGrandmother: -3,
+  grandfather: -2,
+  grandmother: -2,
   father: -1,
   mother: -1,
+  uncle: -1,
+  aunt: -1,
   head: 0,
   spouse: 0,
   brother: 0,
@@ -161,6 +167,8 @@ export interface TreePerson {
   generation: number;
   /** They moved out, usually by marriage, and are in this family now. */
   movedTo?: LinkedFamily;
+  deceased: boolean;
+  deathYear: number | null;
 }
 
 export interface TreeHousehold {

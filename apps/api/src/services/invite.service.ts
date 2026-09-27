@@ -23,6 +23,7 @@ export async function createInvite(viewer: Viewer, familyId: string, memberId: s
   const family = await loadEditable(viewer, familyId);
   const member = await loadMemberOf(family, memberId);
   if (member.userId) throw new AppError(409, 'CONFLICT', `${member.name} already has their own sign-in.`);
+  if (member.deceased) throw new AppError(409, 'CONFLICT', `${member.name} is listed as passed away.`);
   if (member.approval === 'pending') {
     throw new AppError(409, 'CONFLICT', `${member.name} is waiting for the committee to approve them.`, [{ path: 'memberId', message: 'validation.memberPending' }]);
   }

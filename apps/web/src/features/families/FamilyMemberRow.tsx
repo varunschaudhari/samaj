@@ -1,7 +1,9 @@
 import type { FamilyMember } from '@samaj/shared';
 import { Avatar, Badge, Icon, Skeleton } from '@/components/ui';
 import { ChevronRight, EyeOff, HourglassMedium } from '@/components/ui/icons';
-import { formatNumber, useLanguageStore, useT } from '@/i18n';
+import { useT } from '@/i18n';
+import { cn } from '@/lib/cn';
+import { useDisplayName, useLifeLabel } from './life';
 
 /**
  * One person on the family page. The whole tile opens their card, where the
@@ -9,21 +11,24 @@ import { formatNumber, useLanguageStore, useT } from '@/i18n';
  */
 export function FamilyMemberRow({ member, isSelf, onOpen }: { member: FamilyMember; isSelf: boolean; onOpen: () => void }) {
   const t = useT();
-  const language = useLanguageStore((s) => s.language);
-  const age = member.birthYear ? new Date().getFullYear() - member.birthYear : null;
-  const facts = [t(`relation.${member.relation}`), age !== null ? t('family.age', { age: formatNumber(age, language) }) : null, member.occupation].filter(Boolean);
+  const displayName = useDisplayName();
+  const life = useLifeLabel();
+  const facts = [t(`relation.${member.relation}`), life(member), member.occupation].filter(Boolean);
 
   return (
     <li>
       <button
         type="button"
         onClick={onOpen}
-        className="flex h-full w-full items-center gap-3 rounded-md border border-line bg-surface p-3 text-left shadow-card transition-colors duration-150 hover:border-line-strong"
+        className={cn(
+          'flex h-full w-full items-center gap-3 rounded-md border border-line p-3 text-left shadow-card transition-colors duration-150 hover:border-line-strong',
+          member.deceased ? 'bg-surface-muted' : 'bg-surface',
+        )}
       >
-        <Avatar name={member.name} src={member.photoUrl} size="lg" />
+        <Avatar name={member.name} src={member.photoUrl} size="lg" className={cn(member.deceased && 'grayscale')} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-semibold break-words text-fg">{member.name}</span>
+            <span className="font-semibold break-words text-fg">{displayName(member)}</span>
             {member.isHead && <Badge tone="primary">{t('family.headBadge')}</Badge>}
             {isSelf && <Badge tone="success">{t('member.sheet.you')}</Badge>}
           </span>

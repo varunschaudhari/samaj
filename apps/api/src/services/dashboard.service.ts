@@ -39,11 +39,12 @@ async function build(scopeId: string | null): Promise<Dashboard> {
   ]);
 
   const count = (status: FamilyStatus) => FamilyModel.countDocuments({ status, ...within });
-  const [verified, pending, rejected, members, active, pendingProfiles, upcoming, recentNotices, submissions, branches] = await Promise.all([
+  const [verified, pending, rejected, everyone, deceased, active, pendingProfiles, upcoming, recentNotices, submissions, branches] = await Promise.all([
     count('verified'),
     count('pending'),
     count('rejected'),
     MemberModel.countDocuments({ familyStatus: 'verified', ...within }),
+    MemberModel.countDocuments({ familyStatus: 'verified', deceased: true, ...within }),
     ProfileModel.countDocuments({ status: 'active', ...within }),
     ProfileModel.countDocuments({ status: 'pending', ...within }),
     EventModel.countDocuments({ removedAt: null, startsAt: { $gte: now }, ...within }),
@@ -55,7 +56,8 @@ async function build(scopeId: string | null): Promise<Dashboard> {
   return {
     scope: scope ? { id: String(scope._id), name: scope.name, nameMr: scope.nameMr, kind: scope.kind } : null,
     families: { verified, pending, rejected },
-    members,
+    // Living people: those who have passed away stay in their families, not in the count.
+    members: everyone - deceased,
     matrimony: { active, pending: pendingProfiles },
     events: { upcoming },
     notices: { last30Days: recentNotices },

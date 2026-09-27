@@ -59,7 +59,7 @@ export async function requestMove(viewer: Viewer, input: MoveInput): Promise<Mem
   if (!member) throw notFound('That person is no longer in the directory.');
   if (String(member.familyId) === String(to._id)) throw new AppError(400, 'VALIDATION_FAILED', 'This person is already in your family.', issue('validation.moveSameFamily'));
   const from = await loadFamily(String(member.familyId));
-  if (!canViewFamily(viewer, from) || member.approval === 'pending') throw notFound('That person is no longer in the directory.');
+  if (!canViewFamily(viewer, from) || member.approval === 'pending' || member.deceased) throw notFound('That person is no longer in the directory.');
   if (member.isHead) {
     throw new AppError(400, 'VALIDATION_FAILED', 'A family head can’t move. Their family chooses a new head first.', issue('validation.moveHead'));
   }

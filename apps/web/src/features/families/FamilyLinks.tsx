@@ -80,7 +80,7 @@ export function RelatedFamilies({ family }: { family: FamilyDetail }) {
   const [moving, setMoving] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const { links, permissions } = family;
-  const movable = family.members.filter((m) => !m.isHead && m.approval === 'approved');
+  const movable = family.members.filter((m) => !m.isHead && m.approval === 'approved' && !m.deceased);
   const canMove = permissions.canRequestMove && movable.length > 0;
   if (links.length === 0 && !permissions.canLink && !canMove) return null;
 

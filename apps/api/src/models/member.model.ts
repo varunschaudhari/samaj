@@ -49,6 +49,10 @@ const memberSchema = new Schema(
     /** Whoever listed this person confirmed they agree (or is their parent or guardian). */
     consentByUserId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     consentAt: { type: Date, default: null },
+
+    /** Passed away: kept in the family and its tree, out of the directory, matrimony, sign-ins and counts. */
+    deceased: { type: Boolean, default: false },
+    deathYear: { type: Number, default: null },
   },
   { timestamps: true },
 );
@@ -72,6 +76,9 @@ memberSchema.index({ branchId: 1, place: 1 });
 memberSchema.index({ familyId: 1, isHead: 1 });
 // The committee's queue of people added to verified families.
 memberSchema.index({ approval: 1, branchPath: 1, createdAt: 1 }, { partialFilterExpression: { approval: 'pending' } });
+
+// The dashboard's count of living people subtracts these, keeping its main count on the index.
+memberSchema.index({ familyStatus: 1, branchPath: 1 }, { partialFilterExpression: { deceased: true } });
 
 export type MemberDoc = InferSchemaType<typeof memberSchema> & { _id: Types.ObjectId };
 export const MemberModel = model('Member', memberSchema);

@@ -118,12 +118,14 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     hasAccount: m.userId !== null,
     canResetPassword,
     ...(canResetPassword && { accountId: String(m.userId) }),
-    canInvite: canEdit && m.userId === null && m.approval !== 'pending',
+    canInvite: canEdit && m.userId === null && m.approval !== 'pending' && !m.deceased,
     // Records from before approvals existed have no value: they were listed already.
     approval: m.approval ?? 'approved',
     ...(seesPending && { privacy: { phoneVisibility: m.phoneVisibility ?? 'committee', listed: m.listed !== false } }),
     // An account holder decides for themselves; the family decides for those without one.
-    canEditPrivacy: m.userId ? String(m.userId) === viewer.id : canEdit,
+    canEditPrivacy: m.deceased ? false : m.userId ? String(m.userId) === viewer.id : canEdit,
+    deceased: m.deceased === true,
+    deathYear: m.deathYear ?? null,
     ...(maher(m._id) && { movedFrom: maher(m._id) }),
     };
   };
@@ -243,8 +245,8 @@ export async function addMember(viewer: Viewer, familyId: string, input: MemberI
     familyStatus: waits ? 'pending' : family.status,
     approval: waits ? 'pending' : 'approved',
     addedByName: viewer.name,
-    consentByUserId: new Types.ObjectId(viewer.id),
-    consentAt: new Date(),
+    consentByUserId: input.deceased ? null : new Types.ObjectId(viewer.id),
+    consentAt: input.deceased ? null : new Date(),
   });
   recordHistory(family, viewer, 'updated', waits ? `Added ${input.name}, waiting for the committee` : `Added ${input.name}`);
   await family.save();
@@ -256,6 +258,12 @@ export async function updateMember(viewer: Viewer, familyId: string, memberId: s
   const member = await loadMemberOf(family, memberId);
 
   if (!member.isHead && input.relation === 'head') throw headRelationError();
+  if (input.deceased && !member.deceased && (member.isHead || member.userId)) {
+    throw new AppError(400, 'VALIDATION_FAILED', 'The family head, and anyone with their own sign-in, can’t be marked as passed away here. Ask your branch committee.', [
+      { path: 'deceased', message: member.isHead ? 'validation.deceasedHead' : 'validation.deceasedAccount' },
+    ]);
+  }
+  const passedAway = input.deceased && !member.deceased;
 
   member.name = input.name;
   member.relation = member.isHead ? 'head' : input.relation;
@@ -265,7 +273,14 @@ export async function updateMember(viewer: Viewer, familyId: string, memberId: s
   member.education = input.education;
   // An account holder's phone is their sign-in, so it can't be changed from here.
   if (!member.userId) member.phone = input.phone;
+  member.deceased = input.deceased;
+  member.deathYear = input.deathYear;
   await member.save();
+  if (passedAway) {
+    // No profile or sign-in invite for someone who has passed away.
+    await closeForRemovedMember(member._id);
+    await InviteModel.deleteOne({ memberId: member._id });
+  }
 
   if (member.userId) await UserModel.updateOne({ _id: member.userId }, { $set: { name: member.name } });
   await syncMember(member);

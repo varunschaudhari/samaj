@@ -37,6 +37,7 @@ import { InviteCodeModal } from './InviteCodeModal';
 import { MemberFormModal } from './MemberFormModal';
 import { MemberSheet } from './MemberSheet';
 import { MovedOutList } from './MovedOut';
+import { type ElderPair, EldersModal } from './EldersModal';
 import { ReviewPanel } from './ReviewPanel';
 
 /** /family: the signed-in user's own family. */
@@ -183,6 +184,8 @@ function FamilySkeleton() {
 
 /** Generations, top to bottom, with a heading each. */
 const GROUPS: { generation: number; label: MessageKey }[] = [
+  { generation: -3, label: 'family.gen.greatGrandparents' },
+  { generation: -2, label: 'family.gen.grandparents' },
   { generation: -1, label: 'family.gen.parents' },
   { generation: 0, label: 'family.gen.us' },
   { generation: 1, label: 'family.gen.children' },
@@ -207,6 +210,7 @@ export function FamilyPage() {
   const [inviting, setInviting] = useState<FamilyMember | null>(null);
   const [privacyFor, setPrivacyFor] = useState<FamilyMember | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
+  const [elders, setElders] = useState<ElderPair | null>(null);
 
   if (family.isPending) return <FamilySkeleton />;
 
@@ -267,6 +271,24 @@ export function FamilyPage() {
         </div>
       ))}
       <MovedOutList family={data} />
+      {canEdit && data.members.length > 1 && !data.members.some((m) => RELATION_GENERATION[m.relation] <= -3) && (
+        <Card variant="muted" className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <p className="font-semibold text-fg">{t('elders.title')}</p>
+            <p className="max-w-prose text-sm text-fg-muted">{t('elders.body')}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {!data.members.some((m) => RELATION_GENERATION[m.relation] === -2) && (
+              <Button variant="secondary" size="sm" leadingIcon={Plus} onClick={() => setElders('grandparents')}>
+                {t('elders.addGrand')}
+              </Button>
+            )}
+            <Button variant="secondary" size="sm" leadingIcon={Plus} onClick={() => setElders('greatGrandparents')}>
+              {t('elders.addGreat')}
+            </Button>
+          </div>
+        </Card>
+      )}
       {canEdit && data.members.length === 1 && (
         <Card variant="muted" className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
@@ -313,6 +335,7 @@ export function FamilyPage() {
         )}
       </div>
 
+      <EldersModal familyId={data.id} pair={elders} onClose={() => setElders(null)} />
       <MemberSheet
         member={sheetMember}
         isSelf={sheetMember?.id === me.data?.memberId}

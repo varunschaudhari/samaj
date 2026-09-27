@@ -108,8 +108,9 @@ export function FamilyChecklist({
   const language = useLanguageStore((s) => s.language);
   if (!family.permissions.canEdit) return null;
 
-  const noBirthYear = family.members.filter((m) => !m.birthYear);
-  const noPhoto = family.members.filter((m) => !m.photoUrl);
+  const living = family.members.filter((m) => !m.deceased);
+  const noBirthYear = living.filter((m) => !m.birthYear);
+  const noPhoto = living.filter((m) => !m.photoUrl);
   // Adults already listed with a number, who could sign in themselves.
   const couldSignIn = family.members.filter((m) => m.canInvite && m.phone && (ageOf(m) ?? 0) >= 18);
   const first = <T,>(list: T[]) => list[0] as T;

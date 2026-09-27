@@ -10,17 +10,23 @@ import { formatNumber, useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { useSaveMember } from './api';
 import { PhotoField } from './PhotoField';
 
-const FIELDS = ['name', 'relation', 'gender', 'birthYear', 'occupation', 'education', 'phone'] as const;
+const FIELDS = ['name', 'relation', 'gender', 'birthYear', 'occupation', 'education', 'phone', 'deceased', 'deathYear'] as const;
 
 /** The gender most relations imply, so picking "Son" fills it in. Spouse is the opposite of the head. */
 const RELATION_GENDER: Partial<Record<Relation, Gender>> = {
   son: 'male',
   father: 'male',
+  grandfather: 'male',
+  greatGrandfather: 'male',
+  uncle: 'male',
   brother: 'male',
   grandson: 'male',
   sonInLaw: 'male',
   daughter: 'female',
   mother: 'female',
+  grandmother: 'female',
+  greatGrandmother: 'female',
+  aunt: 'female',
   sister: 'female',
   granddaughter: 'female',
   daughterInLaw: 'female',
@@ -38,6 +44,8 @@ function toFormValues(member: FamilyMember | null, relation?: Relation): MemberI
     occupation: member?.occupation ?? '',
     education: member?.education ?? '',
     phone: member?.phone ?? '',
+    deceased: member?.deceased ?? false,
+    deathYear: member?.deathYear ? String(member.deathYear) : '',
   };
 }
 
@@ -90,6 +98,7 @@ export function MemberFormModal({ familyId, member, open, onClose, initialRelati
   const relation = form.watch('relation');
   const gender = form.watch('gender');
   const birthYear = form.watch('birthYear');
+  const deceased = form.watch('deceased') ?? false;
   const age = /^\d{4}$/.test(String(birthYear ?? '')) ? new Date().getFullYear() - Number(birthYear) : null;
 
   const pickRelation = (r: Relation) => {
@@ -103,12 +112,12 @@ export function MemberFormModal({ familyId, member, open, onClose, initialRelati
   };
 
   const onSubmit = form.handleSubmit((values) => {
-    if (!member && !consent) {
+    if (!member && !consent && !values.deceased) {
       setConsentMissing(true);
       return;
     }
     save.mutate(
-      { memberId: member?.id ?? null, input: member ? values : { ...values, consent: true } },
+      { memberId: member?.id ?? null, input: member || values.deceased ? values : { ...values, consent: true } },
       {
         onSuccess: ({ family }) => {
           // Added to a verified family by the family itself: they wait for the committee.
@@ -201,28 +210,48 @@ export function MemberFormModal({ familyId, member, open, onClose, initialRelati
           <Input
             label={t('member.birthYear')}
             labelSuffix={t('common.optional')}
-            hint={age !== null && age >= 0 && age < 120 ? t('member.ageIs', { age: formatNumber(age, language) }) : t('member.birthYearHint')}
+            hint={!deceased && age !== null && age >= 0 && age < 120 ? t('member.ageIs', { age: formatNumber(age, language) }) : t('member.birthYearHint')}
             inputMode="numeric"
             maxLength={4}
             error={fieldError(t, errors.birthYear?.message)}
             {...form.register('birthYear')}
           />
+          {!isHead && !phoneLocked && (
+            <Checkbox
+              label={t('member.deceased')}
+              hint={t('member.deceasedHint')}
+              error={fieldError(t, errors.deceased?.message)}
+              {...form.register('deceased')}
+            />
+          )}
+          {deceased && (
+            <Input
+              label={t('member.deathYear')}
+              labelSuffix={t('common.optional')}
+              inputMode="numeric"
+              maxLength={4}
+              error={fieldError(t, errors.deathYear?.message)}
+              {...form.register('deathYear')}
+            />
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <Input label={t('member.occupation')} labelSuffix={t('common.optional')} error={fieldError(t, errors.occupation?.message)} {...form.register('occupation')} />
             <Input label={t('member.education')} labelSuffix={t('common.optional')} error={fieldError(t, errors.education?.message)} {...form.register('education')} />
           </div>
-          <Input
-            label={t('member.phone')}
-            labelSuffix={phoneLocked ? undefined : t('common.optional')}
-            hint={phoneLocked ? t('member.phoneLocked') : t('member.phoneHint')}
-            type="tel"
-            inputMode="numeric"
-            leadingIcon={Phone}
-            readOnly={phoneLocked}
-            error={fieldError(t, errors.phone?.message)}
-            {...form.register('phone')}
-          />
-          {!member && (
+          {!deceased && (
+            <Input
+              label={t('member.phone')}
+              labelSuffix={phoneLocked ? undefined : t('common.optional')}
+              hint={phoneLocked ? t('member.phoneLocked') : t('member.phoneHint')}
+              type="tel"
+              inputMode="numeric"
+              leadingIcon={Phone}
+              readOnly={phoneLocked}
+              error={fieldError(t, errors.phone?.message)}
+              {...form.register('phone')}
+            />
+          )}
+          {!member && !deceased && (
             <Checkbox
               label={t('privacy.consentMember')}
               checked={consent}

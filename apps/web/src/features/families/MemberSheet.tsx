@@ -20,8 +20,9 @@ import {
   UserRound,
 } from '@/components/ui/icons';
 import { placeLabel } from '@/features/branches/api';
-import { formatNumber, formatYear, useLanguageStore, useT } from '@/i18n';
+import { formatYear, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
+import { useDisplayName, useLifeLabel } from './life';
 
 export interface MemberActions {
   onEdit?: () => void;
@@ -72,9 +73,10 @@ function Fact({ icon, children }: { icon: AppIcon; children: ReactNode }) {
 export function MemberSheet({ member, isSelf, actions, onClose }: { member: FamilyMember | null; isSelf: boolean; actions: MemberActions; onClose: () => void }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
+  const displayName = useDisplayName();
+  const life = useLifeLabel();
   if (!member) return <Modal open={false} onClose={onClose} title="" />;
 
-  const age = member.birthYear ? new Date().getFullYear() - member.birthYear : null;
   // Close the sheet, then open whatever the action opens.
   const run = (fn?: () => void) => () => {
     onClose();
@@ -83,12 +85,13 @@ export function MemberSheet({ member, isSelf, actions, onClose }: { member: Fami
   const removable = Boolean(actions.onRemove) && !member.isHead && !member.hasAccount;
 
   return (
-    <Modal open onClose={onClose} title={member.name} description={[t(`relation.${member.relation}`), age !== null ? t('family.age', { age: formatNumber(age, language) }) : null].filter(Boolean).join(' · ')}>
+    <Modal open onClose={onClose} title={displayName(member)} description={[t(`relation.${member.relation}`), life(member)].filter(Boolean).join(' · ')}>
       <div className="flex flex-col gap-5">
         <div className="flex items-center gap-4">
-          <Avatar name={member.name} src={member.photoUrl} size="xl" />
+          <Avatar name={member.name} src={member.photoUrl} size="xl" className={cn(member.deceased && 'grayscale')} />
           <div className="flex flex-wrap gap-1.5">
             {member.isHead && <Badge tone="primary">{t('family.headBadge')}</Badge>}
+            {member.deceased && <Badge>{t('member.deceasedBadge')}</Badge>}
             {member.hasAccount && (
               <Badge tone="success" icon={BadgeCheck}>
                 {isSelf ? t('member.sheet.you') : t('family.signsIn')}
@@ -107,6 +110,7 @@ export function MemberSheet({ member, isSelf, actions, onClose }: { member: Fami
           <Fact icon={UserRound}>
             {t(`gender.${member.gender}`)}
             {member.birthYear ? ` · ${t('member.sheet.born', { year: formatYear(member.birthYear, language) })}` : ''}
+            {member.deathYear ? ` · ${t('member.diedIn', { year: formatYear(member.deathYear, language) })}` : ''}
           </Fact>
           {member.occupation && <Fact icon={Briefcase}>{member.occupation}</Fact>}
           {member.education && <Fact icon={GraduationCap}>{member.education}</Fact>}
@@ -125,7 +129,7 @@ export function MemberSheet({ member, isSelf, actions, onClose }: { member: Fami
               </span>
             </Fact>
           )}
-          {member.privacy && (
+          {member.privacy && !member.deceased && (
             <Fact icon={ShieldCheck}>{t('member.sheet.phoneSeenBy', { who: t(`privacy.phone.${member.privacy.phoneVisibility}`) })}</Fact>
           )}
         </ul>

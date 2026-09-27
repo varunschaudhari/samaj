@@ -14,6 +14,12 @@ export const RELATIONS = [
   'daughter',
   'father',
   'mother',
+  'grandfather',
+  'grandmother',
+  'greatGrandfather',
+  'greatGrandmother',
+  'uncle',
+  'aunt',
   'brother',
   'sister',
   'daughterInLaw',
@@ -66,24 +72,21 @@ const optionalPhone = z
   .transform((v) => (typeof v === 'string' ? v.trim() : '') || null)
   .pipe(phoneSchema.nullable());
 
-export const birthYearSchema = z
-  .union([z.string(), z.number()])
-  .nullish()
-  .transform((v) => {
-    if (v === null || v === undefined) return null;
-    const text = String(v).trim();
-    return text === '' ? null : Number(text);
-  })
-  .pipe(
-    z
-      .number({ error: 'validation.birthYear' })
-      .int('validation.birthYear')
-      .min(1900, 'validation.birthYear')
-      .max(new Date().getFullYear(), 'validation.birthYear')
-      .nullable(),
-  );
+/** A four-digit year, blank for unknown. Early enough for great-grandparents. */
+const yearSchema = (message: string) =>
+  z
+    .union([z.string(), z.number()])
+    .nullish()
+    .transform((v) => {
+      if (v === null || v === undefined) return null;
+      const text = String(v).trim();
+      return text === '' ? null : Number(text);
+    })
+    .pipe(z.number({ error: message }).int(message).min(1800, message).max(new Date().getFullYear(), message).nullable());
 
-export const memberInputSchema = z.object({
+export const birthYearSchema = yearSchema('validation.birthYear');
+
+const memberFields = z.object({
   name: personNameSchema,
   relation: z.enum(RELATIONS, { error: 'validation.relation' }),
   gender: z.enum(GENDERS, { error: 'validation.gender' }),
@@ -91,15 +94,38 @@ export const memberInputSchema = z.object({
   occupation: optionalText(60),
   education: optionalText(60),
   phone: optionalPhone,
+  /** Kept in the family and its tree, out of the directory, matrimony and sign-ins. */
+  deceased: z.boolean().default(false),
+  deathYear: yearSchema('validation.deathYear'),
 });
+
+type MemberFields = z.output<typeof memberFields>;
+
+function checkYears(v: MemberFields, ctx: z.RefinementCtx) {
+  if (v.deceased && v.deathYear !== null && v.birthYear !== null && v.deathYear < v.birthYear) {
+    ctx.addIssue({ code: 'custom', path: ['deathYear'], message: 'validation.deathBeforeBirth' });
+  }
+}
+
+/** Someone who has passed away has no number and no year of passing unless they have. */
+const tidy = <T extends MemberFields>(v: T): T => (v.deceased ? { ...v, phone: null } : { ...v, deathYear: null });
+
+export const memberInputSchema = memberFields.superRefine(checkYears).transform(tidy);
 export type MemberInput = z.input<typeof memberInputSchema>;
 export type MemberInputParsed = z.output<typeof memberInputSchema>;
 
 /**
  * Adding someone: the person adding them confirms that person agrees to be
  * listed or, for anyone under 18, that they are their parent or guardian.
+ * Not asked for someone who has passed away.
  */
-export const memberCreateSchema = memberInputSchema.extend({ consent: z.literal(true, { error: 'validation.consentRequired' }) });
+export const memberCreateSchema = memberFields
+  .extend({ consent: z.boolean().optional() })
+  .superRefine((v, ctx) => {
+    checkYears(v, ctx);
+    if (!v.deceased && v.consent !== true) ctx.addIssue({ code: 'custom', path: ['consent'], message: 'validation.consentRequired' });
+  })
+  .transform(tidy);
 export type MemberCreateInput = z.input<typeof memberCreateSchema>;
 
 /** One of the fixed gotras, or blank (null) for "not listed / not sure". */
@@ -126,7 +152,7 @@ export const enrolFamilySchema = z.object({
   place: optionalText(60).pipe(z.string().min(2, 'validation.placeMin').nullable()),
   gotra: gotraSchema,
   address: optionalText(200),
-  head: memberInputSchema.omit({ relation: true }),
+  head: memberFields.omit({ relation: true, deceased: true, deathYear: true }),
   /** The committee confirms the family agreed to be registered. */
   consent: z.literal(true, { error: 'validation.consentRequired' }),
 });
@@ -167,6 +193,9 @@ export interface FamilyMember {
   canEditPrivacy: boolean;
   /** They moved in from another family (their माहेर, after a marriage). */
   movedFrom?: LinkedFamily;
+  /** Passed away: shown as "Late" (कै.) in the family and its tree only. */
+  deceased: boolean;
+  deathYear: number | null;
 }
 
 /** Someone who was in this family and moved to another, usually after marriage. */

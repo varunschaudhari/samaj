@@ -37,7 +37,8 @@ export async function listMembers(viewer: Viewer, query: ListQuery): Promise<Mem
   if (!canBrowseDirectory(viewer)) throw notVerified();
 
   // People who asked not to be listed stay out of the directory.
-  const conditions: QueryFilter<MemberDoc>[] = [{ familyStatus: 'verified' }, { listed: { $ne: false } }];
+  // So do people who have passed away: they live on in their family's page and tree.
+  const conditions: QueryFilter<MemberDoc>[] = [{ familyStatus: 'verified' }, { listed: { $ne: false } }, { deceased: { $ne: true } }];
   // A district includes every city and town under it.
   if (query.branchId) conditions.push(inBranch(query.branchId));
   if (query.gotra) conditions.push({ gotra: query.gotra });

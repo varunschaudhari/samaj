@@ -113,7 +113,7 @@ export async function getMine(viewer: Viewer): Promise<MyMatrimony> {
   const eligible: MyMatrimony['eligible'] = [];
   const ineligible: MyMatrimony['ineligible'] = [];
   for (const m of members) {
-    if (withProfile.has(String(m._id))) continue;
+    if (withProfile.has(String(m._id)) || m.deceased) continue;
     const why = ineligibility(m, hasSpouse);
     if (why === null) eligible.push({ memberId: String(m._id), name: m.name, gender: m.gender, age: ageOf(m.birthYear) ?? 0 });
     else if (why !== 'married') ineligible.push({ memberId: String(m._id), name: m.name, reason: why });
@@ -136,6 +136,7 @@ export async function createProfile(viewer: Viewer, input: CreateInput): Promise
   if (member.approval === 'pending') {
     throw new AppError(409, 'CONFLICT', 'The committee hasn’t approved this person yet.', issue('validation.memberPending', 'memberId'));
   }
+  if (member.deceased) throw new AppError(400, 'VALIDATION_FAILED', 'Pick someone from your family.', issue('validation.profileNotEligible', 'memberId'));
 
   const hasSpouse = Boolean(await MemberModel.exists({ familyId: family._id, relation: 'spouse' }));
   const why = ineligibility(member, hasSpouse);

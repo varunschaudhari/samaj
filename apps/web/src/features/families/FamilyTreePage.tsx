@@ -8,6 +8,7 @@ import { placeLabel } from '@/features/branches/api';
 import { type MessageKey, isMessageKey, useLanguageStore, useT } from '@/i18n';
 import { ApiError, api } from '@/lib/api';
 import { cn } from '@/lib/cn';
+import { lifeYears, useDisplayName } from './life';
 
 function useFamilyTree(familyId: string) {
   return useQuery({
@@ -40,19 +41,25 @@ function useHouseholdLabel() {
 
 function PersonChip({ person }: { person: TreePerson }) {
   const t = useT();
+  const language = useLanguageStore((s) => s.language);
+  const displayName = useDisplayName();
+  const years = lifeYears(person, language, (year) => t('member.diedIn', { year }));
   const body = (
     <>
-      <Avatar name={person.name} src={person.photoUrl} size="sm" />
+      <Avatar name={person.name} src={person.photoUrl} size="sm" className={cn(person.deceased && 'grayscale')} />
       <span className="flex min-w-0 flex-col leading-tight">
-        <span className={cn('truncate text-sm text-fg', person.isHead && 'font-semibold')}>{person.name}</span>
+        <span className={cn('truncate text-sm text-fg', person.isHead && 'font-semibold')}>{displayName(person)}</span>
         <span className="truncate text-xs text-fg-muted">
           {t(`relation.${person.relation}`)}
+          {years && ` · ${years}`}
           {person.movedTo && ` · ${t('tree.married')}`}
         </span>
       </span>
     </>
   );
-  if (!person.movedTo) return <li className="flex min-w-0 items-center gap-2 rounded-full border border-line bg-surface py-1 pr-3 pl-1">{body}</li>;
+  if (!person.movedTo) {
+    return <li className={cn('flex min-w-0 items-center gap-2 rounded-full border border-line py-1 pr-3 pl-1', person.deceased ? 'bg-surface-muted' : 'bg-surface')}>{body}</li>;
+  }
   // Married out: still their parents' child, one tap from the family they're in now.
   const now = t('tree.nowIn', { name: t('family.title', { name: person.movedTo.headName }) });
   return (
