@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { FamilyLinkView } from './links';
 import { type FamilyStatus, type Gender, GENDERS } from '../constants';
 import { personNameSchema } from './auth';
 import { GOTRA_IDS, type GotraId } from '../gotras';
@@ -23,8 +24,27 @@ export const RELATIONS = [
 export type Relation = (typeof RELATIONS)[number];
 
 /** 'invited': someone was given a code to their own sign-in; 'joined': they used it. */
-export const HISTORY_ACTIONS = ['created', 'updated', 'verified', 'rejected', 'resubmitted', 'invited', 'joined'] as const;
+export const HISTORY_ACTIONS = [
+  'created',
+  'updated',
+  'verified',
+  'rejected',
+  'resubmitted',
+  'invited',
+  'joined',
+  // A person the family added was approved or turned down by the committee.
+  'memberApproved',
+  'memberRejected',
+  // Links with other families, and people moving between families.
+  'linked',
+  'unlinked',
+  'movedIn',
+  'movedOut',
+] as const;
 export type HistoryAction = (typeof HISTORY_ACTIONS)[number];
+
+export const MEMBER_APPROVALS = ['approved', 'pending'] as const;
+export type MemberApproval = (typeof MEMBER_APPROVALS)[number];
 
 /*
  * These schemas are idempotent: their output is valid input. The web form
@@ -129,6 +149,8 @@ export interface FamilyMember {
   accountId?: string;
   /** The viewer may create an invite code so this person can sign in to this family. */
   canInvite: boolean;
+  /** 'pending': added to a verified family and waiting for the committee; only the family and reviewers see them. */
+  approval: MemberApproval;
 }
 
 /** A one-time code that links a new sign-in to a person already listed in a family. */
@@ -162,7 +184,13 @@ export interface FamilyDetail {
     canEdit: boolean;
     canReview: boolean;
     canResubmit: boolean;
+    /** The viewer's own family may propose a link to this one. */
+    canLink: boolean;
+    /** The viewer's own family may ask for people from this one to move in. */
+    canRequestMove: boolean;
   };
+  /** Accepted links to other families. */
+  links: FamilyLinkView[];
 }
 
 export interface PendingFamily {

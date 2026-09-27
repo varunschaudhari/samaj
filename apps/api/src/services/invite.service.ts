@@ -23,6 +23,9 @@ export async function createInvite(viewer: Viewer, familyId: string, memberId: s
   const family = await loadEditable(viewer, familyId);
   const member = await loadMemberOf(family, memberId);
   if (member.userId) throw new AppError(409, 'CONFLICT', `${member.name} already has their own sign-in.`);
+  if (member.approval === 'pending') {
+    throw new AppError(409, 'CONFLICT', `${member.name} is waiting for the committee to approve them.`, [{ path: 'memberId', message: 'validation.memberPending' }]);
+  }
   if (!member.phone) {
     throw new AppError(400, 'VALIDATION_FAILED', `Add ${member.name}'s mobile number first. They will sign in with it.`, [
       { path: 'phone', message: 'validation.phoneNeeded' },

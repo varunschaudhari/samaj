@@ -13,6 +13,8 @@ import { connectDb, disconnectDb } from '../config/db';
 import { env } from '../config/env';
 import { BranchModel } from '../models/branch.model';
 import { EventModel } from '../models/event.model';
+import { FamilyLinkModel } from '../models/family-link.model';
+import { MemberMoveModel } from '../models/member-move.model';
 import { FamilyModel } from '../models/family.model';
 import { InterestModel } from '../models/interest.model';
 import { InviteModel } from '../models/invite.model';
@@ -66,9 +68,11 @@ async function main() {
   }
   await backfill(MemberModel, { nameTokens: { $exists: false } }, ['name', 'place', 'occupation'], tokensOf(['name', 'place', 'occupation']));
   await backfill(UserModel, { nameTokens: { $exists: false } }, ['name'], tokensOf(['name']));
+  // People listed before committee approval of additions existed.
+  await backfill(MemberModel, { approval: { $exists: false } }, [], () => ({ approval: 'approved' }));
 
   const models: AnyModel[] = [
-    BranchModel, EventModel, FamilyModel, InterestModel, InviteModel, MemberModel, NoticeModel, OfficeBearerModel,
+    BranchModel, EventModel, FamilyLinkModel, FamilyModel, InterestModel, MemberMoveModel, InviteModel, MemberModel, NoticeModel, OfficeBearerModel,
     PasswordResetModel, ProfileModel, RoleChangeModel, RsvpModel, SessionModel, UserModel,
   ];
   for (const model of models) {

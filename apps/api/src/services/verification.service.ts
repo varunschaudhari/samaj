@@ -109,7 +109,8 @@ async function loadReviewable(viewer: Viewer, familyId: string) {
 }
 
 async function setStatus(familyId: Types.ObjectId, status: FamilyDoc['status']) {
-  await MemberModel.updateMany({ familyId }, { $set: { familyStatus: status } });
+  // People still waiting for the committee keep their own 'pending' until they're approved.
+  await MemberModel.updateMany({ familyId, approval: { $ne: 'pending' } }, { $set: { familyStatus: status } });
 }
 
 export async function verify(viewer: Viewer, familyId: string): Promise<FamilyDetail> {

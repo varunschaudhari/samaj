@@ -1,4 +1,4 @@
-import { FAMILY_STATUSES, GENDERS, GOTRA_IDS, RELATIONS } from '@samaj/shared';
+import { FAMILY_STATUSES, GENDERS, GOTRA_IDS, MEMBER_APPROVALS, RELATIONS } from '@samaj/shared';
 import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
 import { branchPathPlugin, searchTokensPlugin } from './plugins';
 
@@ -33,6 +33,14 @@ const memberSchema = new Schema(
     place: { type: String, required: true, trim: true },
     gotra: { type: String, enum: GOTRA_IDS, default: null },
     familyStatus: { type: String, enum: FAMILY_STATUSES, default: 'pending', required: true },
+
+    /**
+     * 'pending' when the family added this person after it was verified: they
+     * wait for the committee. Until then familyStatus is 'pending' too, which
+     * keeps them out of the directory, and family status changes pass them by.
+     */
+    approval: { type: String, enum: MEMBER_APPROVALS, default: 'approved', required: true },
+    addedByName: { type: String, default: null },
   },
   { timestamps: true },
 );
@@ -54,6 +62,8 @@ memberSchema.index({ phone: 1 });
 // Renaming a branch renames the place of families written as the old name.
 memberSchema.index({ branchId: 1, place: 1 });
 memberSchema.index({ familyId: 1, isHead: 1 });
+// The committee's queue of people added to verified families.
+memberSchema.index({ approval: 1, branchPath: 1, createdAt: 1 }, { partialFilterExpression: { approval: 'pending' } });
 
 export type MemberDoc = InferSchemaType<typeof memberSchema> & { _id: Types.ObjectId };
 export const MemberModel = model('Member', memberSchema);

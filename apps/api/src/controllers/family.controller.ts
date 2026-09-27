@@ -1,6 +1,9 @@
 import { enrolFamilySchema, familyUpdateSchema, memberInputSchema, pendingQuerySchema, rejectFamilySchema } from '@samaj/shared';
 import type { Request, Response } from 'express';
+import * as approvalsService from '../services/approvals.service';
 import * as familyService from '../services/family.service';
+import * as linksService from '../services/links.service';
+import * as movesService from '../services/moves.service';
 import * as inviteService from '../services/invite.service';
 import type { Viewer } from '../services/viewer';
 import * as matrimonyService from '../services/matrimony.service';
@@ -68,8 +71,18 @@ export async function listPending(req: Request, res: Response) {
 }
 
 export async function countPending(req: Request, res: Response) {
-  const [families, profiles] = await Promise.all([verificationService.countPending(viewer(req)), matrimonyService.countPendingProfiles(viewer(req))]);
-  res.json({ pending: families + profiles, families, profiles });
+  const v = viewer(req);
+  const [families, profiles, members, moves] = await Promise.all([
+    verificationService.countPending(v),
+    matrimonyService.countPendingProfiles(v),
+    approvalsService.countPendingMembers(v),
+    movesService.countPendingMoves(v),
+  ]);
+  res.json({ pending: families + profiles + members + moves, families, profiles, members, moves });
+}
+
+export async function requests(req: Request, res: Response) {
+  res.json({ requests: await linksService.requestsFor(viewer(req), param(req, 'familyId')) });
 }
 
 export async function verify(req: Request, res: Response) {

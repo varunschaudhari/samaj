@@ -3,6 +3,7 @@ import {
   type FamilyDetail,
   type FamilyMember,
   type HistoryAction,
+  MAX_FAMILY_LINKS,
   type MemberInputParsed,
   PHOTO_MAX_BYTES,
   type enrolFamilySchema,
@@ -18,7 +19,8 @@ import { UserModel } from '../models/user.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { storage } from '../utils/storage';
 import { closeForRemovedMember, syncFamilyGotra, syncMember } from './matrimony.service';
-import { canEditFamily, canEnrolIn, canResetPasswordFor, canReviewFamily, canSeeContact, canViewFamily, isOwnFamily } from './access';
+import { canEditFamily, canEnrolIn, canResetPasswordFor, canReviewFamily, canSeeContact, canViewFamily, hasReach, isOwnFamily } from './access';
+import { actsForOwnFamily, linksOf } from './links.service';
 import { assertPhoneFree } from './phones';
 import type { Viewer } from './viewer';
 
@@ -70,9 +72,16 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
   const family = await loadFamily(familyId);
   if (!canViewFamily(viewer, family)) throw familyGone();
 
-  const [members, branch] = await Promise.all([
-    MemberModel.find({ familyId: family._id }).sort({ isHead: -1, birthYear: 1, createdAt: 1 }).lean(),
+  const canEdit = canEditFamily(viewer, family);
+  const canReview = canReviewFamily(viewer, family);
+  // People waiting for the committee show only to the family and its reviewers.
+  const seesPending = canEdit || hasReach(viewer, 'member:verify', family);
+  const [members, branch, links] = await Promise.all([
+    MemberModel.find({ familyId: family._id, ...(!seesPending && { approval: { $ne: 'pending' } }) })
+      .sort({ isHead: -1, birthYear: 1, createdAt: 1 })
+      .lean(),
     BranchModel.findById(family.branchId).lean(),
+    linksOf(viewer, family),
   ]);
   // Roles of the members who have accounts, to decide who may get a password reset code.
   const accountIds = members.flatMap((m) => (m.userId ? [m.userId] : []));
@@ -80,8 +89,7 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
   const roleByUser = new Map(accounts.map((u) => [String(u._id), u.role]));
 
   const showContact = canSeeContact(viewer, { ...family.toObject(), familyId: family._id });
-  const canEdit = canEditFamily(viewer, family);
-  const canReview = canReviewFamily(viewer, family);
+  const fromOwnFamily = actsForOwnFamily(viewer, family);
 
   const toMember = (m: (typeof members)[number]): FamilyMember => {
     const role = m.userId ? roleByUser.get(String(m.userId)) : undefined;
@@ -100,7 +108,9 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     hasAccount: m.userId !== null,
     canResetPassword,
     ...(canResetPassword && { accountId: String(m.userId) }),
-    canInvite: canEdit && m.userId === null,
+    canInvite: canEdit && m.userId === null && m.approval !== 'pending',
+    // Records from before approvals existed have no value: they were listed already.
+    approval: m.approval ?? 'approved',
     };
   };
 
@@ -118,7 +128,10 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
       canEdit,
       canReview,
       canResubmit: isOwnFamily(viewer, family) && family.status === 'rejected',
+      canLink: fromOwnFamily && !links.some((l) => l.family.id === viewer.familyId) && links.length < MAX_FAMILY_LINKS,
+      canRequestMove: fromOwnFamily,
     },
+    links,
   };
   if (showContact) detail.address = family.address ?? null;
   if (canEdit || canReview) {
@@ -198,6 +211,8 @@ export async function addMember(viewer: Viewer, familyId: string, input: MemberI
     throw new AppError(400, 'VALIDATION_FAILED', `A family can list up to ${MAX_FAMILY_MEMBERS} people.`);
   }
 
+  // A verified family's additions wait for the committee, unless a reviewer added them.
+  const waits = family.status === 'verified' && !canReviewFamily(viewer, family);
   await MemberModel.create({
     ...input,
     familyId: family._id,
@@ -206,9 +221,11 @@ export async function addMember(viewer: Viewer, familyId: string, input: MemberI
     branchAncestors: family.branchAncestors,
     place: family.place,
     gotra: family.gotra,
-    familyStatus: family.status,
+    familyStatus: waits ? 'pending' : family.status,
+    approval: waits ? 'pending' : 'approved',
+    addedByName: viewer.name,
   });
-  recordHistory(family, viewer, 'updated', `Added ${input.name}`);
+  recordHistory(family, viewer, 'updated', waits ? `Added ${input.name}, waiting for the committee` : `Added ${input.name}`);
   await family.save();
   return getFamily(viewer, familyId);
 }

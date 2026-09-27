@@ -13,3 +13,4 @@ export * from './schemas/notices';
 export * from './schemas/events';
 export * from './schemas/committee';
 export * from './schemas/dashboard';
+export * from './schemas/links';

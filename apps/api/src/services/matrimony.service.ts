@@ -133,6 +133,9 @@ export async function createProfile(viewer: Viewer, input: CreateInput): Promise
   const family = await FamilyModel.findById(member.familyId);
   if (!family || !canEditFamily(viewer, family)) throw forbidden('Only the family can create a profile for this person.');
   if (family.status !== 'verified') throw notVerified();
+  if (member.approval === 'pending') {
+    throw new AppError(409, 'CONFLICT', 'The committee hasn’t approved this person yet.', issue('validation.memberPending', 'memberId'));
+  }
 
   const hasSpouse = Boolean(await MemberModel.exists({ familyId: family._id, relation: 'spouse' }));
   const why = ineligibility(member, hasSpouse);
@@ -383,6 +386,16 @@ export async function syncMember(member: Pick<MemberDoc, '_id' | 'gender' | 'bir
 }
 
 /** A removed family member's profile closes, and their open interests are withdrawn. */
+/** The person married and moved to another family: their profile closes as 'married' and open interests end. */
+export async function closeForMarriage(memberId: Types.ObjectId) {
+  const profile = await ProfileModel.findOne({ memberId, status: { $ne: 'closed' } });
+  if (!profile) return;
+  profile.status = 'closed';
+  profile.closeReason = 'married';
+  await profile.save();
+  await withdrawOpenInterests(profile._id);
+}
+
 export async function closeForRemovedMember(memberId: Types.ObjectId) {
   const profile = await ProfileModel.findOne({ memberId });
   if (!profile) return;

@@ -8,6 +8,8 @@ familyRouter.use(requireAuth);
 // Committee members (in their branch) and admins register a family on its behalf. The service checks who may.
 familyRouter.post('/', families.enrol);
 familyRouter.get('/:familyId', families.get);
+// Links, and people moving in or out, waiting for this family.
+familyRouter.get('/:familyId/requests', families.requests);
 familyRouter.put('/:familyId', families.update);
 familyRouter.post('/:familyId/members', families.addMember);
 familyRouter.put('/:familyId/members/:memberId', families.updateMember);
