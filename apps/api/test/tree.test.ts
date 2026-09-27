@@ -1,4 +1,4 @@
-import type { FamilyDetail, FamilyTree, LinkKind, TreePerson } from '@samaj/shared';
+import type { FamilyDetail, FamilyRequests, FamilyTree, LinkKind, TreePerson } from '@samaj/shared';
 import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { FamilyLinkModel, linkPair } from '../src/models/family-link.model';
@@ -168,9 +168,19 @@ describe('GET /api/families/:id/tree', () => {
     // Guessed: the head of the linked home.
     expect(parentOf(await tree(own.cookie, own.familyId), 'Rohit Wagh')).toBe('Sunil Wagh');
     expect((await set(rohit, home.memberIds[1])).status).toBe(200);
-    expect(parentOf(await tree(own.cookie, own.familyId), 'Rohit Wagh')).toBe('Anil Wagh');
+    // Waiting for the home to agree: the tree still guesses, and only the family sees the request.
+    expect(parentOf(await tree(own.cookie, own.familyId), 'Rohit Wagh')).toBe('Sunil Wagh');
     const page = (await api.get(`/api/families/${own.familyId}`).set('Cookie', own.cookie)).body.family as FamilyDetail;
-    expect(page.members.find((m) => m.id === rohit)?.externalParent).toMatchObject({ name: 'Anil Wagh', family: { headName: 'Sunil Wagh' } });
+    expect(page.members.find((m) => m.id === rohit)?.externalParent).toMatchObject({ name: 'Anil Wagh', family: { headName: 'Sunil Wagh' }, pending: true });
+    const seen = (await api.get(`/api/families/${own.familyId}`).set('Cookie', home.cookie)).body.family as FamilyDetail;
+    expect(seen.members.find((m) => m.id === rohit)).not.toHaveProperty('externalParent');
+    const asked = (await api.get(`/api/families/${home.familyId}/requests`).set('Cookie', home.cookie)).body.requests as FamilyRequests;
+    expect(asked.parentLinksIn).toMatchObject([{ memberId: rohit, memberName: 'Rohit Wagh', parent: { name: 'Anil Wagh' }, family: { headName: 'Rohit Wagh' } }]);
+    expect(((await api.get(`/api/families/${own.familyId}/requests`).set('Cookie', own.cookie)).body.requests as FamilyRequests).parentLinksOut).toHaveLength(1);
+    // Only the home answers.
+    expect((await api.post(`/api/links/parents/${rohit}/accept`).set('Cookie', own.cookie)).status).toBe(403);
+    expect((await api.post(`/api/links/parents/${rohit}/accept`).set('Cookie', home.cookie)).status).toBe(200);
+    expect(parentOf(await tree(own.cookie, own.familyId), 'Rohit Wagh')).toBe('Anil Wagh');
 
     // Only in a family linked to theirs, and not for the family's own children.
     const unlinked = await set(rohit, stranger.memberIds[0]);
@@ -182,6 +192,12 @@ describe('GET /api/families/:id/tree', () => {
 
     expect((await set(rohit, null)).status).toBe(200);
     expect(parentOf(await tree(own.cookie, own.familyId), 'Rohit Wagh')).toBe('Sunil Wagh');
+
+    // Asked again and turned down: dropped.
+    await set(rohit, home.memberIds[1]);
+    expect((await api.post(`/api/links/parents/${rohit}/decline`).set('Cookie', home.cookie)).status).toBe(200);
+    const after = (await api.get(`/api/families/${own.familyId}`).set('Cookie', own.cookie)).body.family as FamilyDetail;
+    expect(after.members.find((m) => m.id === rohit)).not.toHaveProperty('externalParent');
   });
 
   it('draws a wife’s माहेर from the move that brought her, and shows her once', async () => {
@@ -249,7 +265,9 @@ describe('GET /api/families/:id/tree', () => {
       ],
     });
     await link(own.familyId, maher.familyId, 'inLaws');
-    await api.put(`/api/families/${own.familyId}/members/${own.memberIds[1]}/parent`).set('Cookie', own.cookie).send({ memberId: maher.memberIds[0] });
+    // Set by the branch committee, which speaks for both families: no waiting.
+    const committee = await createFamily(branches.district, { account: 'committee' });
+    await api.put(`/api/families/${own.familyId}/members/${own.memberIds[1]}/parent`).set('Cookie', committee.cookie).send({ memberId: maher.memberIds[0] });
 
     const t = await tree(own.cookie, own.familyId);
     const who = byName(t);

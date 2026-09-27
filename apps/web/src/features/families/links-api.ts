@@ -31,6 +31,10 @@ export const useRequestLink = () => useLinkMutation((input: LinkRequestInput) =>
 export const useAcceptLink = () => useLinkMutation((id: string) => api.post<{ requests: FamilyRequests }>(`/links/${id}/accept`));
 export const useRemoveLink = () => useLinkMutation((id: string) => api.delete<void>(`/links/${id}`));
 
+/** The parent's family answers "your Anil is our Rohit's father". */
+export const useAcceptParentLink = () => useLinkMutation((memberId: string) => api.post<{ requests: FamilyRequests }>(`/links/parents/${memberId}/accept`));
+export const useDeclineParentLink = () => useLinkMutation((memberId: string) => api.post<{ requests: FamilyRequests }>(`/links/parents/${memberId}/decline`));
+
 export const useRequestMove = () => useLinkMutation((input: MoveRequestInput) => api.post<{ move: MemberMoveView }>('/moves', input));
 export const useAgreeMove = () => useLinkMutation((id: string) => api.post<{ move: MemberMoveView }>(`/moves/${id}/agree`));
 export const useApproveMove = () => useLinkMutation((id: string) => api.post<{ move: MemberMoveView }>(`/moves/${id}/approve`));

@@ -157,6 +157,7 @@ export function MemberSheet({
             <Fact icon={Users}>
               <span>
                 {t('member.sheet.childOf', { name: member.externalParent.name })} ·{' '}
+                {member.externalParent.pending && <span className="text-fg-muted">({t('parentLinks.waiting')}) </span>}
                 {member.externalParent.family.canView ? (
                   <Link to={`/families/${member.externalParent.family.id}`} onClick={onClose} className="font-semibold text-primary hover:underline">
                     {t('family.title', { name: member.externalParent.family.headName })}

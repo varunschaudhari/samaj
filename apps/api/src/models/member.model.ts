@@ -70,6 +70,9 @@ const memberSchema = new Schema(
     birthFamilyId: { type: Schema.Types.ObjectId, ref: 'Family', default: null },
     /** Their parent, listed in another family linked to this one (a head's father, a wife's father in her माहेर). */
     externalParentId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
+    /** The parent's family hasn't agreed yet, so the tree doesn't use it. */
+    externalParentPending: { type: Boolean, default: false },
+    externalParentAskedBy: { type: String, default: null },
   },
   { timestamps: true },
 );
@@ -99,6 +102,9 @@ memberSchema.index({ approval: 1, branchPath: 1, createdAt: 1 }, { partialFilter
 
 // The dashboard's count of living people subtracts these, keeping its main count on the index.
 memberSchema.index({ familyStatus: 1, branchPath: 1 }, { partialFilterExpression: { deceased: true } });
+
+// Parent links waiting for the parent's family.
+memberSchema.index({ externalParentId: 1 }, { partialFilterExpression: { externalParentPending: true } });
 
 export type MemberDoc = InferSchemaType<typeof memberSchema> & { _id: Types.ObjectId };
 export const MemberModel = model('Member', memberSchema);

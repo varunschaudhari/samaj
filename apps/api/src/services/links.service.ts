@@ -7,6 +7,7 @@ import {
   type LinkKind,
   type LinkedFamily,
   MAX_FAMILY_LINKS,
+  type ParentLinkRequest,
   type Relation,
   type linkRequestSchema,
   type samePersonSchema,
@@ -172,7 +173,7 @@ export async function requestsFor(viewer: Viewer, familyId: string): Promise<Fam
       .lean(),
   ]);
   const summaries = await familySummaries(viewer, [...incoming.map((l) => l.fromFamilyId), ...outgoing.map((l) => l.toFamilyId)]);
-  const [out, into] = await Promise.all([moveViews(viewer, movesOut), moveViews(viewer, movesIn)]);
+  const [out, into, parentLinks] = await Promise.all([moveViews(viewer, movesOut), moveViews(viewer, movesIn), parentLinksOf(viewer, family._id)]);
   const pick = (id: Types.ObjectId) => summaries.get(String(id));
   return {
     incomingLinks: incoming.flatMap((l) => {
@@ -185,6 +186,29 @@ export async function requestsFor(viewer: Viewer, familyId: string): Promise<Fam
     }),
     movesOut: out,
     movesIn: into,
+    ...parentLinks,
+  };
+}
+
+/** Parent links waiting either way: to this family's people, and from them. */
+async function parentLinksOf(viewer: Viewer, familyId: Types.ObjectId): Promise<Pick<FamilyRequests, 'parentLinksIn' | 'parentLinksOut'>> {
+  const ours = await MemberModel.find({ familyId }, { _id: 1 }).lean();
+  const [incoming, outgoing] = await Promise.all([
+    MemberModel.find({ externalParentPending: true, externalParentId: { $in: ours.map((m) => m._id) } }, { name: 1, familyId: 1, externalParentId: 1, externalParentAskedBy: 1 }).lean(),
+    MemberModel.find({ familyId, externalParentPending: true }, { name: 1, familyId: 1, externalParentId: 1, externalParentAskedBy: 1 }).lean(),
+  ]);
+  const parents = await MemberModel.find({ _id: { $in: [...incoming, ...outgoing].map((m) => m.externalParentId) } }, { name: 1, familyId: 1 }).lean();
+  const summaries = await familySummaries(viewer, [...incoming.map((m) => m.familyId), ...parents.map((p) => p.familyId)]);
+  const view = (m: (typeof incoming)[number], other: Types.ObjectId | undefined): ParentLinkRequest[] => {
+    const parent = parents.find((p) => String(p._id) === String(m.externalParentId));
+    const family = other ? summaries.get(String(other)) : undefined;
+    return parent && family
+      ? [{ memberId: String(m._id), memberName: m.name, parent: { id: String(parent._id), name: parent.name }, family, requestedByName: m.externalParentAskedBy ?? '' }]
+      : [];
+  };
+  return {
+    parentLinksIn: incoming.flatMap((m) => view(m, m.familyId)),
+    parentLinksOut: outgoing.flatMap((m) => view(m, parents.find((p) => String(p._id) === String(m.externalParentId))?.familyId)),
   };
 }
 
@@ -291,12 +315,51 @@ export async function setExternalParent(viewer: Viewer, familyId: string, member
     const linked = await FamilyLinkModel.exists({ pair: linkPair(family._id, parent.familyId), status: 'accepted' });
     if (!linked) throw new AppError(409, 'CONFLICT', 'Link the two families first.', tieIssue('validation.parentNotLinked'));
     member.externalParentId = parent._id;
-    recordHistory(family, viewer, 'updated', `${member.name}'s parent: ${parent.name}, in the family of ${await headName(parent.familyId)}`);
+    // Their family says so too, unless the viewer can already speak for it (the committee, say).
+    member.externalParentPending = !canEditFamily(viewer, theirs);
+    member.externalParentAskedBy = viewer.name;
+    const note = `${member.name}'s parent: ${parent.name}, in the family of ${await headName(parent.familyId)}`;
+    recordHistory(family, viewer, 'updated', member.externalParentPending ? `${note} (waiting for that family to agree)` : note);
   }
+  if (parentId === null) member.externalParentPending = false;
   await member.save();
   if (parentId === null) recordHistory(family, viewer, 'updated', `${member.name}'s parent in another family removed`);
   await family.save();
   return getFamily(viewer, familyId);
+}
+
+/** A waiting parent link, and the parent's family, which the viewer must be able to speak for. */
+async function loadParentLink(viewer: Viewer, memberId: string) {
+  const gone = () => notFound('That request is no longer there.');
+  const member = Types.ObjectId.isValid(memberId) ? await MemberModel.findById(memberId) : null;
+  if (!member?.externalParentPending || !member.externalParentId) throw gone();
+  const parent = await MemberModel.findById(member.externalParentId, { name: 1, familyId: 1 }).lean();
+  if (!parent) throw gone();
+  const theirs = await loadFamily(String(parent.familyId));
+  if (!canEditFamily(viewer, theirs)) throw forbidden('Only the parent’s family can answer this.');
+  return { member, parent, theirs, child: await loadFamily(String(member.familyId)) };
+}
+
+/** The parent's family agrees: the tree joins them. */
+export async function acceptParentLink(viewer: Viewer, memberId: string): Promise<FamilyRequests> {
+  const { member, parent, theirs, child } = await loadParentLink(viewer, memberId);
+  member.externalParentPending = false;
+  await member.save();
+  recordHistory(theirs, viewer, 'linked', `${parent.name} is the parent of ${member.name}, in the family of ${await headName(child._id)}`);
+  recordHistory(child, viewer, 'linked', `The family of ${await headName(theirs._id)} agreed: ${parent.name} is ${member.name}'s parent`);
+  await Promise.all([theirs.save(), child.save()]);
+  return requestsFor(viewer, String(theirs._id));
+}
+
+/** The parent's family says no: the link is dropped. */
+export async function declineParentLink(viewer: Viewer, memberId: string): Promise<FamilyRequests> {
+  const { member, parent, theirs, child } = await loadParentLink(viewer, memberId);
+  member.externalParentId = null;
+  member.externalParentPending = false;
+  await member.save();
+  recordHistory(child, viewer, 'unlinked', `The family of ${await headName(theirs._id)} said ${parent.name} is not ${member.name}'s parent`);
+  await child.save();
+  return requestsFor(viewer, String(theirs._id));
 }
 
 type SamePersonInput = z.output<typeof samePersonSchema>;

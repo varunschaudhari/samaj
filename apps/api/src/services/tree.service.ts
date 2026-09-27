@@ -216,7 +216,8 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
     ]);
     members.push(...loaded);
     const generationOf = (m: MemberLean) => (placed.get(String(m.familyId))?.generation ?? 0) + RELATION_GENERATION[m.relation];
-    const pointed = loaded.filter((m) => m.externalParentId);
+    // Only once the parent's family agreed.
+    const pointed = loaded.filter((m) => m.externalParentId && !m.externalParentPending);
     const parents = pointed.length ? await MemberModel.find({ _id: { $in: pointed.map((m) => m.externalParentId) } }, { familyId: 1, relation: 1 }).lean() : [];
     const next: string[] = [];
     for (const m of pointed) {

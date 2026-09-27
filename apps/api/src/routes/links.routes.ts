@@ -22,6 +22,13 @@ linkRouter.post('/', async (req, res) => {
 linkRouter.post('/:id/accept', async (req, res) => {
   res.json({ requests: await links.acceptLink(viewer(req), id(req)) });
 });
+// "Our Rohit's father is your Anil": the parent's family answers.
+linkRouter.post('/parents/:id/accept', async (req, res) => {
+  res.json({ requests: await links.acceptParentLink(viewer(req), id(req)) });
+});
+linkRouter.post('/parents/:id/decline', async (req, res) => {
+  res.json({ requests: await links.declineParentLink(viewer(req), id(req)) });
+});
 linkRouter.delete('/:id', async (req, res) => {
   await links.removeLink(viewer(req), id(req));
   res.status(204).end();

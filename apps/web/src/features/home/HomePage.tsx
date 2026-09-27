@@ -196,7 +196,7 @@ function FamilyRequestsCard({ user }: { user: PublicUser }) {
   const language = useLanguageStore((s) => s.language);
   const requests = useFamilyRequests(user.familyId);
   const r = requests.data;
-  const waiting = r ? r.incomingLinks.length + r.movesOut.length : 0;
+  const waiting = r ? r.incomingLinks.length + r.movesOut.length + r.parentLinksIn.length : 0;
   if (waiting === 0) return null;
   return (
     <Link

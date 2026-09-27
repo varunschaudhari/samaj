@@ -18,7 +18,18 @@ import { useMe } from '@/features/auth/api';
 import { placeLabel } from '@/features/branches/api';
 import { type MessageKey, formatDate, useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { useFamily } from './api';
-import { useAcceptLink, useAgreeMove, useCancelMove, useDeclineMove, useFamilyRequests, useRemoveLink, useRequestLink, useRequestMove } from './links-api';
+import {
+  useAcceptLink,
+  useAcceptParentLink,
+  useAgreeMove,
+  useCancelMove,
+  useDeclineMove,
+  useDeclineParentLink,
+  useFamilyRequests,
+  useRemoveLink,
+  useRequestLink,
+  useRequestMove,
+} from './links-api';
 
 /** "Family of Anil Wagh · Bhusawal", linking to the family when the viewer may open it. */
 function FamilyName({ family }: { family: LinkedFamily }) {
@@ -367,6 +378,8 @@ export function FamilyRequestsPanel({ familyId }: { familyId: string }) {
   const agree = useAgreeMove();
   const decline = useDeclineMove();
   const cancel = useCancelMove();
+  const acceptParent = useAcceptParentLink();
+  const declineParent = useDeclineParentLink();
   const [declining, setDeclining] = useState<MemberMoveView | null>(null);
   const done = (message: MessageKey, values?: Record<string, string>) => ({
     onSuccess: () => toast.success(t(message, values)),
@@ -376,7 +389,7 @@ export function FamilyRequestsPanel({ familyId }: { familyId: string }) {
   if (requests.isPending) return <Skeleton className="h-24 w-full rounded-md" />;
   if (requests.isError) return <ErrorState title={t('links.requestsError')} error={requests.error} onRetry={() => requests.refetch()} retrying={requests.isFetching} />;
   const r = requests.data;
-  const count = r.incomingLinks.length + r.outgoingLinks.length + r.movesOut.length + r.movesIn.length;
+  const count = r.incomingLinks.length + r.outgoingLinks.length + r.movesOut.length + r.movesIn.length + r.parentLinksIn.length + r.parentLinksOut.length;
   if (count === 0) return null;
 
   return (
@@ -416,6 +429,28 @@ export function FamilyRequestsPanel({ familyId }: { familyId: string }) {
                 {t('links.decline')}
               </Button>
             </div>
+          </li>
+        ))}
+        {r.parentLinksIn.map((p) => (
+          <li key={p.memberId} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="text-sm text-fg-muted">{t('parentLinks.incoming', { family: p.family.headName })}</span>
+              <span className="font-semibold text-fg">{t('parentLinks.claim', { parent: p.parent.name, child: p.memberName })}</span>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <Button size="sm" leadingIcon={Check} loading={acceptParent.isPending} onClick={() => acceptParent.mutate(p.memberId, done('parentLinks.accepted'))}>
+                {t('parentLinks.accept')}
+              </Button>
+              <Button size="sm" variant="ghost" leadingIcon={X} onClick={() => declineParent.mutate(p.memberId, done('parentLinks.declined'))}>
+                {t('parentLinks.decline')}
+              </Button>
+            </div>
+          </li>
+        ))}
+        {r.parentLinksOut.map((p) => (
+          <li key={p.memberId} className="flex flex-col gap-0.5 py-3">
+            <span className="text-sm text-fg-muted">{t('parentLinks.outgoing', { family: p.family.headName })}</span>
+            <span className="font-semibold text-fg">{t('parentLinks.claim', { parent: p.parent.name, child: p.memberName })}</span>
           </li>
         ))}
         {r.outgoingLinks.map((l) => (

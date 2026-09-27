@@ -48,7 +48,20 @@ export function ExternalParentModal({ familyId, member, links, onClose }: { fami
           <Button
             disabled={!parentId}
             loading={save.isPending && parentId !== null}
-            onClick={() => parentId && save.mutate({ memberId: member.id, parentId }, { onSuccess: done(t('parentElsewhere.saved')) })}
+            onClick={() =>
+              parentId &&
+              save.mutate(
+                { memberId: member.id, parentId },
+                {
+                  // Joined at once only when the viewer speaks for both families; otherwise the other family is asked.
+                  onSuccess: ({ family }) => {
+                    const pending = family.members.find((m) => m.id === member.id)?.externalParent?.pending;
+                    toast.success(t(pending ? 'parentElsewhere.asked' : 'parentElsewhere.saved', { family: family.members.find((m) => m.id === member.id)?.externalParent?.family.headName ?? '' }));
+                    onClose();
+                  },
+                },
+              )
+            }
           >
             {t('common.save')}
           </Button>

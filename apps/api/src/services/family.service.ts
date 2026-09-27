@@ -149,7 +149,8 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     formerPartner: m.formerPartner === true,
     maidenName: m.maidenName ?? null,
     ...(seesPending && { adopted: m.adopted === true }),
-    ...(externalOf(m.externalParentId) && { externalParent: externalOf(m.externalParentId) }),
+    // One still waiting for the parent's family is the family's own business.
+    ...((!m.externalParentPending || canEdit) && externalOf(m.externalParentId) && { externalParent: { ...externalOf(m.externalParentId)!, pending: m.externalParentPending === true } }),
     ...(seesPending && m.birthFamilyId && externalFamilies.get(String(m.birthFamilyId)) && { birthFamily: externalFamilies.get(String(m.birthFamilyId)) }),
     ...(maher(m._id) && { movedFrom: maher(m._id) }),
     };
@@ -431,7 +432,7 @@ export async function removeMember(viewer: Viewer, familyId: string, memberId: s
   await untie(family._id, member._id);
   // Nobody elsewhere has them as a parent, or a word on whether they're someone else.
   await Promise.all([
-    MemberModel.updateMany({ externalParentId: member._id }, { $set: { externalParentId: null } }),
+    MemberModel.updateMany({ externalParentId: member._id }, { $set: { externalParentId: null, externalParentPending: false } }),
     SamePersonModel.deleteMany({ $or: [{ a: member._id }, { b: member._id }] }),
   ]);
   recordHistory(family, viewer, 'updated', `Removed ${member.name}`);

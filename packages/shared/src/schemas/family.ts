@@ -297,7 +297,7 @@ export interface FamilyMember {
   /** Adopted into the family. Present for the family and its committee only. */
   adopted?: boolean;
   /** Their parent, listed in another family (a head's father in his parents' home, a wife's father in her माहेर). */
-  externalParent?: { id: string; name: string; family: LinkedFamily };
+  externalParent?: { id: string; name: string; family: LinkedFamily; /** Their family hasn't agreed yet; the tree waits. */ pending: boolean };
   /** Their other parent, when their parent has had more than one spouse. */
   otherParentId: string | null;
   /** Divorced or separated from whoever they married. */

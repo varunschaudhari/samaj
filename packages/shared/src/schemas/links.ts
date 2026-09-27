@@ -126,6 +126,16 @@ export interface MemberMoveView {
 }
 
 /** What waits for this family: links others proposed, links it proposed, and people moving in or out. */
+/** "Anil in your family is Rohit's father": one family's word about a person in another, until that family agrees. */
+export interface ParentLinkRequest {
+  memberId: string;
+  memberName: string;
+  parent: { id: string; name: string };
+  /** The other family: the child's, for a request to this family; the parent's, for one this family sent. */
+  family: LinkedFamily;
+  requestedByName: string;
+}
+
 export interface FamilyRequests {
   incomingLinks: { id: string; kind: LinkKind; family: LinkedFamily; requestedByName: string; createdAt: string }[];
   outgoingLinks: { id: string; kind: LinkKind; family: LinkedFamily; createdAt: string }[];
@@ -133,6 +143,10 @@ export interface FamilyRequests {
   movesOut: MemberMoveView[];
   /** People this family asked to move in, until the committee decides. */
   movesIn: MemberMoveView[];
+  /** Another family says one of this family's people is the parent of one of theirs. */
+  parentLinksIn: ParentLinkRequest[];
+  /** This family said so about someone in another family, which hasn't agreed yet. */
+  parentLinksOut: ParentLinkRequest[];
 }
 
 /** Someone added to a verified family, waiting for the committee. */
