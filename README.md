@@ -15,7 +15,7 @@ packages/shared  zod schemas, types, RBAC table, constants. Imported by both app
 - **Joining a family:** a mobile number belongs to one person. When the family lists someone with their number (a spouse, a grown child), that person doesn't sign up. The family, or its branch committee, creates an invite code from the family page, and the person enters it with their number on **Join your family** (`/join`). Their new sign-in is linked to the person already listed, in the same family, and the family keeps its verification status. Sign-up refuses a number that is already listed in a family and points to Join instead, so households aren't registered twice. Invite codes are 8 characters, work once, expire after 7 days, allow 5 tries, and are stored hashed; a new code replaces the old one.
 - **Committee enrolment:** for households without a smartphone, or at an enrolment camp, committee members (in their own branch and the towns inside it) and admins use **Enrol a family** on the Review screen. They enter the head and the family details, and the family starts verified, because its reviewer created it. They then add the rest of the household and give invite codes to anyone who wants their own sign-in.
 - **Verification:** new families wait for their branch committee to review them. The committee reviews a whole household at once and either verifies it or sends it back with a note, and the family can fix its details and resubmit. The directory shows only verified families, and members of a family that isn't verified yet can open only their own family page. Committee members can't review their own family; an admin can.
-- **Branches:** districts, with cities and towns inside them (two levels). The seed creates Jalgaon District with Amalner and Dharangaon. Admins add, rename and remove branches on the Branches screen; a branch can only be removed while it has no families and nothing inside it, and names must be unique within a district in both English and Marathi.
+- **Branches:** districts, with cities and towns inside them (two levels). The seed creates 11 districts across Maharashtra (Jalgaon, Dhule, Nandurbar, Nashik, Chhatrapati Sambhajinagar, Buldhana, Akola, Pune, Mumbai & Thane, Nagpur, Ahilyanagar) with 43 towns. Admins add, rename and remove branches on the Branches screen; a branch can only be removed while it has no families and nothing inside it, and names must be unique within a district in both English and Marathi.
 - **Gotra:** chosen from a fixed list in [packages/shared/src/gotras.ts](packages/shared/src/gotras.ts), with English and Marathi names. The database stores the id, so spellings can't drift, and "Not listed / not sure" is always available. The six gotras there now are placeholders: replace them with the samaj's real list, and keep the ids stable once families use them.
 - **Roles:** `member` can read the directory and edit their own family. `committee` can also see contact details, edit families and review new ones, but only inside their own branch and the branches below it. `admin` works in every branch: review, branches, and making people members or committee. `superadmin` (the samaj's trustees) can do everything an admin can and is the only role that can appoint or remove admins and super admins. Nobody can change their own role, and the app won't demote the last super admin. The table is in [packages/shared/src/rbac.ts](packages/shared/src/rbac.ts), and the per-record rules (own family, branch scope) are in [apps/api/src/services/access.ts](apps/api/src/services/access.ts).
 - **People and roles:** admins find any account on Admin → People (by name or mobile number) and set its role and branch. For a committee member, the branch is the one they manage, including every town inside it. Changes take effect on that person's next request, and each one is recorded with who made it. An admin can't change their own role.
@@ -48,7 +48,7 @@ packages/shared  zod schemas, types, RBAC table, constants. Imported by both app
 npm install                 # first run also downloads a MongoDB binary for the API tests
 cp .env.example .env        # every variable is documented in the file
 npm run db:up               # starts MongoDB in Docker
-npm run seed                # sample branches, members and three sign-in accounts
+npm run seed                # wipes the dev database, then ~200 families, 1,100+ people and 12 sign-ins
 npm run dev                 # API on :4000, web on :5173, both with hot reload
 ```
 
@@ -59,8 +59,11 @@ Open http://localhost:5173. The seed script prints the demo accounts. All of the
 | superadmin | 9800000005 | everything, including appointing admins                 |
 | admin     | 9800000001 | Review, People and Branches in every branch; can't appoint admins |
 | committee | 9800000002 | Review tab: families waiting in Jalgaon District, Amalner and Dharangaon |
-| member    | 9800000003 | verified family in Amalner: directory, own family, photo upload, and matrimony for their son Rohit Demo |
+| member    | 9800000003 | verified family in Amalner with the whole family tree to try: late father, brother's family, married sons, a daughter-in-law from Admin Demo's family, an adopted granddaughter, and a son with his own linked household. Directory, photos, matrimony for Rohit Demo, and *How are two people related?* |
 | member    | 9800000004 | pending family in Dharangaon: directory is closed until the committee verifies it |
+| committee | 9800000007 / 9800000008 / 9800000009 | Dhule, Nashik and Pune district committees, each with its own review queue |
+| committee | 9800000013 | Amalner town committee: only Amalner's families |
+| member    | 9800000010 / 9800000011 / 9800000012 | members in Bhusawal, Nashik City and Pune City |
 | (no sign-in yet) | 9800000006 | Member Demo's spouse. Sign in as 9800000003, open My family and give her a sign-in (phone icon), then sign out and use **Have an invite code?** |
 
 **Port 27017 already in use?** If you have MongoDB installed as a service, set `MONGO_PORT=27018` in `.env` and change `MONGODB_URI` to `mongodb://localhost:27018/samaj`.
