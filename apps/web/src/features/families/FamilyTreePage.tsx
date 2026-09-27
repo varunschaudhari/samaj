@@ -40,13 +40,32 @@ function useHouseholdLabel() {
 
 function PersonChip({ person }: { person: TreePerson }) {
   const t = useT();
-  return (
-    <li className="flex min-w-0 items-center gap-2 rounded-full border border-line bg-surface py-1 pr-3 pl-1">
+  const body = (
+    <>
       <Avatar name={person.name} src={person.photoUrl} size="sm" />
       <span className="flex min-w-0 flex-col leading-tight">
         <span className={cn('truncate text-sm text-fg', person.isHead && 'font-semibold')}>{person.name}</span>
-        <span className="truncate text-xs text-fg-muted">{t(`relation.${person.relation}`)}</span>
+        <span className="truncate text-xs text-fg-muted">
+          {t(`relation.${person.relation}`)}
+          {person.movedTo && ` · ${t('tree.married')}`}
+        </span>
       </span>
+    </>
+  );
+  if (!person.movedTo) return <li className="flex min-w-0 items-center gap-2 rounded-full border border-line bg-surface py-1 pr-3 pl-1">{body}</li>;
+  // Married out: still their parents' child, one tap from the family they're in now.
+  const now = t('tree.nowIn', { name: t('family.title', { name: person.movedTo.headName }) });
+  return (
+    <li className="min-w-0">
+      {person.movedTo.canView ? (
+        <Link to={`/families/${person.movedTo.id}/tree`} title={now} aria-label={`${person.name}, ${now}`} className="flex min-w-0 items-center gap-2 rounded-full border border-dashed border-line bg-surface py-1 pr-3 pl-1 hover:border-primary">
+          {body}
+        </Link>
+      ) : (
+        <span title={now} className="flex min-w-0 items-center gap-2 rounded-full border border-dashed border-line bg-surface py-1 pr-3 pl-1">
+          {body}
+        </span>
+      )}
     </li>
   );
 }

@@ -20,7 +20,7 @@ import { AppError, forbidden, notFound } from '../utils/app-error';
 import { storage } from '../utils/storage';
 import { closeForRemovedMember, syncFamilyGotra, syncMember } from './matrimony.service';
 import { canEditFamily, canEnrolIn, canResetPasswordFor, canReviewFamily, canSeeContact, canSeePhone, canViewFamily, hasReach, isOwnFamily } from './access';
-import { actsForOwnFamily, linksOf } from './links.service';
+import { actsForOwnFamily, linksOf, movedInFrom, movesOutOf } from './links.service';
 import { assertPhoneFree } from './phones';
 import type { Viewer } from './viewer';
 
@@ -85,6 +85,10 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     linksOf(viewer, family),
   ]);
   // Roles of the members who have accounts, to decide who may get a password reset code.
+  const [movedOut, cameFrom] = await Promise.all([
+    movesOutOf(viewer, [String(family._id)]),
+    movedInFrom(viewer, family._id, members.map((m) => m._id)),
+  ]);
   const accountIds = members.flatMap((m) => (m.userId ? [m.userId] : []));
   const accounts = accountIds.length ? await UserModel.find({ _id: { $in: accountIds } }, { role: 1 }).lean() : [];
   const roleByUser = new Map(accounts.map((u) => [String(u._id), u.role]));
@@ -92,6 +96,11 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
   const showContact = canSeeContact(viewer, { ...family.toObject(), familyId: family._id });
   const fromOwnFamily = actsForOwnFamily(viewer, family);
 
+  // Other families show only if the viewer may open them, as with links; the family itself sees all.
+  const maher = (id: Types.ObjectId) => {
+    const from = cameFrom.get(String(id));
+    return from && (from.canView || canEdit) ? from : undefined;
+  };
   const toMember = (m: (typeof members)[number]): FamilyMember => {
     const role = m.userId ? roleByUser.get(String(m.userId)) : undefined;
     const canResetPassword = role !== undefined && canResetPasswordFor(viewer, { id: String(m.userId), role }, family);
@@ -115,6 +124,7 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     ...(seesPending && { privacy: { phoneVisibility: m.phoneVisibility ?? 'committee', listed: m.listed !== false } }),
     // An account holder decides for themselves; the family decides for those without one.
     canEditPrivacy: m.userId ? String(m.userId) === viewer.id : canEdit,
+    ...(maher(m._id) && { movedFrom: maher(m._id) }),
     };
   };
 
@@ -136,6 +146,9 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
       canRequestMove: fromOwnFamily,
     },
     links,
+    movedOut: movedOut
+      .filter((o) => (o.family.canView || canEdit) && (seesPending || o.member.listed !== false))
+      .map((o) => ({ memberId: String(o.member._id), name: o.member.name, relation: o.relation, gender: o.member.gender, family: o.family, at: o.at.toISOString() })),
   };
   if (showContact) detail.address = family.address ?? null;
   if (canEdit || canReview) {

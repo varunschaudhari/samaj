@@ -16,6 +16,8 @@ const memberMoveSchema = new Schema(
     toFamilyId: { type: Schema.Types.ObjectId, ref: 'Family', required: true },
     /** Their relation in the new family. */
     relation: { type: String, enum: RELATIONS, required: true },
+    /** Their relation in the family they left, to keep them in that family's tree. */
+    fromRelation: { type: String, enum: RELATIONS, default: null },
     note: { type: String, default: null },
     status: { type: String, enum: MOVE_STATUSES, default: 'awaitingFamily', required: true },
     requestedByUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -36,6 +38,8 @@ memberMoveSchema.plugin(branchPathPlugin);
 memberMoveSchema.index({ memberId: 1 }, { unique: true, partialFilterExpression: { status: { $in: ['awaitingFamily', 'awaitingCommittee'] } } });
 memberMoveSchema.index({ fromFamilyId: 1, status: 1 });
 memberMoveSchema.index({ toFamilyId: 1, status: 1 });
+// Where a person came from.
+memberMoveSchema.index({ memberId: 1, status: 1, decidedAt: -1 });
 // The committee's queue.
 memberMoveSchema.index({ status: 1, branchPath: 1, createdAt: 1 });
 

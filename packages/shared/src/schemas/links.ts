@@ -159,6 +159,8 @@ export interface TreePerson {
   isHead: boolean;
   /** Relative to the head of the family the tree is drawn for: -1 parents, 0 their own, 1 children. */
   generation: number;
+  /** They moved out, usually by marriage, and are in this family now. */
+  movedTo?: LinkedFamily;
 }
 
 export interface TreeHousehold {

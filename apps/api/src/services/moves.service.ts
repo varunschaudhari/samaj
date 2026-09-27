@@ -1,6 +1,8 @@
-import { BRANCH_SCOPED_ROLES, type MemberMoveView, can, type moveRequestSchema } from '@samaj/shared';
-import { Types } from 'mongoose';
+import { BRANCH_SCOPED_ROLES, MAX_FAMILY_LINKS, type MemberMoveView, can, type moveRequestSchema } from '@samaj/shared';
+import { type HydratedDocument, Types } from 'mongoose';
 import type { z } from 'zod';
+import { FamilyLinkModel, linkPair } from '../models/family-link.model';
+import type { FamilyDoc } from '../models/family.model';
 import { InviteModel } from '../models/invite.model';
 import { MemberModel } from '../models/member.model';
 import { type MemberMoveDoc, MemberMoveModel } from '../models/member-move.model';
@@ -10,11 +12,12 @@ import { invalidate } from '../utils/cache';
 import { canEditFamily, canReviewFamily, canViewFamily } from './access';
 import { inBranch } from './audience';
 import { MAX_FAMILY_MEMBERS, loadFamily, recordHistory } from './family.service';
-import { familySummaries } from './links.service';
+import { familySummaries, headName } from './links.service';
 import { closeForMarriage } from './matrimony.service';
 import type { Viewer } from './viewer';
 
 type MoveInput = z.output<typeof moveRequestSchema>;
+type FamilyDocument = HydratedDocument<FamilyDoc>;
 
 const OPEN = ['awaitingFamily', 'awaitingCommittee'] as const;
 const moveGone = () => notFound('That request is no longer there.');
@@ -68,6 +71,7 @@ export async function requestMove(viewer: Viewer, input: MoveInput): Promise<Mem
     const move = await MemberMoveModel.create({
       memberId: member._id,
       memberName: member.name,
+      fromRelation: member.relation,
       fromFamilyId: from._id,
       toFamilyId: to._id,
       relation: input.relation,
@@ -156,12 +160,54 @@ export async function approveMove(viewer: Viewer, id: string): Promise<MemberMov
 
   recordHistory(from, viewer, 'movedOut', member.name);
   recordHistory(to, viewer, 'movedIn', member.name);
+  await linkAsInLaws(viewer, from, to);
   move.status = 'done';
   move.decidedByName = viewer.name;
   move.decidedAt = new Date();
   await Promise.all([from.save(), to.save(), move.save()]);
   invalidate('dashboard');
   return view(viewer, move.toObject());
+}
+
+/**
+ * After a marriage the two families are सासर and माहेर to each other: link
+ * them as in-laws unless they are linked already. A waiting request between
+ * them is accepted, whatever relation it named. Skipped when either family
+ * is at its link limit.
+ */
+async function linkAsInLaws(viewer: Viewer, from: FamilyDocument, to: FamilyDocument): Promise<void> {
+  const pair = linkPair(from._id, to._id);
+  const existing = await FamilyLinkModel.findOne({ pair });
+  if (existing?.status === 'accepted') return;
+  if (existing) {
+    existing.status = 'accepted';
+    existing.acceptedByName = viewer.name;
+    existing.acceptedAt = new Date();
+    await existing.save();
+  } else {
+    const counts = await Promise.all([from._id, to._id].map((id) => FamilyLinkModel.countDocuments({ $or: [{ fromFamilyId: id }, { toFamilyId: id }] })));
+    if (counts.some((n) => n >= MAX_FAMILY_LINKS)) return;
+    try {
+      await FamilyLinkModel.create({
+        fromFamilyId: from._id,
+        toFamilyId: to._id,
+        kind: 'inLaws',
+        pair,
+        status: 'accepted',
+        requestedByUserId: new Types.ObjectId(viewer.id),
+        requestedByName: viewer.name,
+        acceptedByName: viewer.name,
+        acceptedAt: new Date(),
+      });
+    } catch (err) {
+      // Linked a moment ago by someone else: nothing more to do.
+      if ((err as { code?: number }).code === 11000) return;
+      throw err;
+    }
+  }
+  const [fromHead, toHead] = await Promise.all([headName(from._id), headName(to._id)]);
+  recordHistory(from, viewer, 'linked', `Family of ${toHead}`);
+  recordHistory(to, viewer, 'linked', `Family of ${fromHead}`);
 }
 
 /** The old family refuses, or the committee does. */

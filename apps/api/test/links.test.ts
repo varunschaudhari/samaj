@@ -1,4 +1,4 @@
-import type { FamilyDetail, FamilyRequests, MemberMoveView, MemberPage, PendingMember } from '@samaj/shared';
+import type { FamilyDetail, FamilyRequests, FamilyTree, MemberMoveView, MemberPage, PendingMember } from '@samaj/shared';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { MemberModel } from '../src/models/member.model';
 import { ProfileModel } from '../src/models/profile.model';
@@ -194,7 +194,50 @@ describe('moving a person to another family', () => {
 
     expect((await family(groom.cookie, groom.familyId)).members.map((m) => m.name)).toContain('Priya Patil');
     expect((await family(bride.cookie, bride.familyId)).members.map((m) => m.name)).toEqual(['Suresh Patil']);
-    expect((await family(bride.cookie, bride.familyId)).history?.[0]).toMatchObject({ action: 'movedOut', note: 'Priya Patil' });
+    expect((await family(bride.cookie, bride.familyId)).history?.slice(0, 2)).toMatchObject([
+      { action: 'linked', note: 'Family of Rohit Wagh' },
+      { action: 'movedOut', note: 'Priya Patil' },
+    ]);
+  });
+
+  it('keeps her माहेर: the families become in-laws, and each page and the tree show where she went and came from', async () => {
+    const { bride, groom, committee, priyaId } = await setup();
+    const visitor = await createFamily(branches.pune, { account: 'member' });
+    const move = (await api.post('/api/moves').set('Cookie', groom.cookie).send({ memberId: priyaId, relation: 'daughterInLaw' })).body.move as MemberMoveView;
+    await api.post(`/api/moves/${move.id}/agree`).set('Cookie', bride.cookie);
+    await api.post(`/api/moves/${move.id}/approve`).set('Cookie', committee.cookie);
+
+    // Linked as in-laws, both ways.
+    expect((await family(bride.cookie, bride.familyId)).links).toMatchObject([{ kind: 'inLaws', family: { headName: 'Rohit Wagh' } }]);
+    expect((await family(groom.cookie, groom.familyId)).links).toMatchObject([{ kind: 'inLaws', family: { headName: 'Suresh Patil' } }]);
+
+    // Her parents' page: married and moved, to which family.
+    const parents = await family(visitor.cookie, bride.familyId);
+    expect(parents.movedOut).toMatchObject([{ memberId: priyaId, name: 'Priya Patil', relation: 'daughter', family: { id: groom.familyId, headName: 'Rohit Wagh', canView: true } }]);
+    // Her card in the new family: where she came from.
+    const inLaws = await family(visitor.cookie, groom.familyId);
+    expect(inLaws.members.find((m) => m.id === priyaId)?.movedFrom).toMatchObject({ id: bride.familyId, headName: 'Suresh Patil' });
+    expect(inLaws.members.find((m) => m.name === 'Rohit Wagh')?.movedFrom).toBeUndefined();
+
+    // Her parents' tree keeps her among their children, pointing to her new household.
+    const tree = (await api.get(`/api/families/${bride.familyId}/tree`).set('Cookie', bride.cookie)).body.tree as FamilyTree;
+    const home = tree.households.find((h) => h.family.id === bride.familyId);
+    expect(home?.members.find((m) => m.id === priyaId)).toMatchObject({ relation: 'daughter', generation: 1, movedTo: { id: groom.familyId } });
+
+    // Someone who asked not to be listed drops off for other families, but not for her parents.
+    await MemberModel.updateOne({ _id: priyaId }, { $set: { listed: false } });
+    expect((await family(visitor.cookie, bride.familyId)).movedOut).toEqual([]);
+    expect((await family(bride.cookie, bride.familyId)).movedOut).toHaveLength(1);
+  });
+
+  it('accepts a link request already waiting between the two families instead of adding another', async () => {
+    const { bride, groom, committee, priyaId } = await setup();
+    await api.post('/api/links').set('Cookie', groom.cookie).send({ toFamilyId: bride.familyId, kind: 'relatives' });
+    const move = (await api.post('/api/moves').set('Cookie', groom.cookie).send({ memberId: priyaId, relation: 'daughterInLaw' })).body.move as MemberMoveView;
+    await api.post(`/api/moves/${move.id}/agree`).set('Cookie', bride.cookie);
+    await api.post(`/api/moves/${move.id}/approve`).set('Cookie', committee.cookie);
+    expect((await family(groom.cookie, groom.familyId)).links).toMatchObject([{ kind: 'relatives' }]);
+    expect((await requests(groom.cookie, groom.familyId)).outgoingLinks).toEqual([]);
   });
 
   it('can be declined by the old family, and withdrawn by the new one', async () => {

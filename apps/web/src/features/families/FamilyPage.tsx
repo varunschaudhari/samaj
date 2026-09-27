@@ -36,6 +36,7 @@ import { FamilyChecklist, FamilySummary } from './FamilyOverview';
 import { InviteCodeModal } from './InviteCodeModal';
 import { MemberFormModal } from './MemberFormModal';
 import { MemberSheet } from './MemberSheet';
+import { MovedOutList } from './MovedOut';
 import { ReviewPanel } from './ReviewPanel';
 
 /** /family: the signed-in user's own family. */
@@ -265,6 +266,7 @@ export function FamilyPage() {
           </ul>
         </div>
       ))}
+      <MovedOutList family={data} />
       {canEdit && data.members.length === 1 && (
         <Card variant="muted" className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">

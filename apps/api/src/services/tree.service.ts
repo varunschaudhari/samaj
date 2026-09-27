@@ -1,4 +1,4 @@
-import { type FamilyTree, INVERSE_LINK, type LinkKind, RELATION_GENERATION, TREE_DEPTH, TREE_MAX_HOUSEHOLDS, type TreeHousehold } from '@samaj/shared';
+import { type FamilyTree, INVERSE_LINK, type LinkKind, RELATION_GENERATION, type Relation, TREE_DEPTH, TREE_MAX_HOUSEHOLDS, type TreeHousehold } from '@samaj/shared';
 import { Types } from 'mongoose';
 import { FamilyLinkModel } from '../models/family-link.model';
 import { FamilyModel } from '../models/family.model';
@@ -6,7 +6,7 @@ import { MemberModel } from '../models/member.model';
 import { notFound } from '../utils/app-error';
 import { canEditFamily, canViewFamily, hasReach } from './access';
 import { photoUrl } from './family.service';
-import { familySummaries } from './links.service';
+import { familySummaries, movesOutOf } from './links.service';
 import type { Viewer } from './viewer';
 
 /** Links that place a household in the tree, and the generation step each one takes. */
@@ -61,12 +61,13 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
   }
 
   const allIds = [...placed.keys(), ...side.map((s) => s.id)];
-  const [families, members, summaries] = await Promise.all([
+  const [families, members, summaries, movedOut] = await Promise.all([
     FamilyModel.find({ _id: { $in: allIds.map((id) => new Types.ObjectId(id)) } }, { history: 0 }).lean(),
     MemberModel.find({ familyId: { $in: [...placed.keys()].map((id) => new Types.ObjectId(id)) } })
       .sort({ isHead: -1, birthYear: 1, createdAt: 1 })
       .lean(),
     familySummaries(viewer, allIds),
+    movesOutOf(viewer, [...placed.keys()]),
   ]);
   const familyBy = new Map(families.map((f) => [String(f._id), f]));
 
@@ -75,7 +76,8 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
     const summary = summaries.get(id);
     // Only families the viewer could open anyway.
     if (!family || !summary?.canView) return [];
-    const seesPending = canEditFamily(viewer, family) || hasReach(viewer, 'member:verify', family);
+    const canEdit = canEditFamily(viewer, family);
+    const seesPending = canEdit || hasReach(viewer, 'member:verify', family);
     return [
       {
         family: summary,
@@ -92,7 +94,26 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
             photoUrl: photoUrl(m),
             isHead: m.isHead,
             generation: at.generation + RELATION_GENERATION[m.relation],
-          })),
+          }))
+          .concat(
+            movedOut
+              .filter((o) => o.fromFamilyId === id && (o.family.canView || canEdit) && (seesPending || o.member.listed !== false))
+              .map((o) => {
+                // Moves recorded before the old relation was kept: most who marry out are a son or daughter.
+                const relation: Relation = o.relation ?? (o.member.gender === 'female' ? 'daughter' : 'son');
+                return {
+                  id: String(o.member._id),
+                  name: o.member.name,
+                  relation,
+                  gender: o.member.gender,
+                  birthYear: o.member.birthYear ?? null,
+                  photoUrl: photoUrl(o.member),
+                  isHead: false,
+                  generation: at.generation + RELATION_GENERATION[relation],
+                  movedTo: o.family,
+                };
+              }),
+          ),
       },
     ];
   });

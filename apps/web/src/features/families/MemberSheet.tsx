@@ -1,5 +1,6 @@
 import { type FamilyMember, formatPhone } from '@samaj/shared';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 import { Avatar, Badge, Icon, Modal, buttonVariants } from '@/components/ui';
 import {
   type AppIcon,
@@ -9,6 +10,7 @@ import {
   EyeOff,
   GraduationCap,
   HourglassMedium,
+  House,
   KeyRound,
   Pencil,
   Phone,
@@ -17,6 +19,7 @@ import {
   Trash2,
   UserRound,
 } from '@/components/ui/icons';
+import { placeLabel } from '@/features/branches/api';
 import { formatNumber, formatYear, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 
@@ -107,6 +110,21 @@ export function MemberSheet({ member, isSelf, actions, onClose }: { member: Fami
           </Fact>
           {member.occupation && <Fact icon={Briefcase}>{member.occupation}</Fact>}
           {member.education && <Fact icon={GraduationCap}>{member.education}</Fact>}
+          {member.movedFrom && (
+            <Fact icon={House}>
+              <span>
+                {t(member.gender === 'female' ? 'member.sheet.maher' : 'member.sheet.from')}{' '}
+                {member.movedFrom.canView ? (
+                  <Link to={`/families/${member.movedFrom.id}`} onClick={onClose} className="font-semibold text-primary hover:underline">
+                    {t('family.title', { name: member.movedFrom.headName })}
+                  </Link>
+                ) : (
+                  <span className="font-semibold">{t('family.title', { name: member.movedFrom.headName })}</span>
+                )}
+                , {placeLabel(member.movedFrom.place, member.movedFrom.branch, language)}
+              </span>
+            </Fact>
+          )}
           {member.privacy && (
             <Fact icon={ShieldCheck}>{t('member.sheet.phoneSeenBy', { who: t(`privacy.phone.${member.privacy.phoneVisibility}`) })}</Fact>
           )}

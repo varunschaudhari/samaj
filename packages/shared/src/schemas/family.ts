@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { FamilyLinkView } from './links';
+import type { FamilyLinkView, LinkedFamily } from './links';
 import type { PhoneVisibility } from './privacy';
 import { type FamilyStatus, type Gender, GENDERS } from '../constants';
 import { personNameSchema } from './auth';
@@ -165,6 +165,20 @@ export interface FamilyMember {
   privacy?: { phoneVisibility: PhoneVisibility; listed: boolean };
   /** The viewer may change those: the person themselves, or the family for people without an account. */
   canEditPrivacy: boolean;
+  /** They moved in from another family (their माहेर, after a marriage). */
+  movedFrom?: LinkedFamily;
+}
+
+/** Someone who was in this family and moved to another, usually after marriage. */
+export interface MovedOutMember {
+  memberId: string;
+  name: string;
+  /** Their relation here, before they moved. */
+  relation: Relation | null;
+  gender: Gender;
+  /** The family they are in now. */
+  family: LinkedFamily;
+  at: string;
 }
 
 /** A one-time code that links a new sign-in to a person already listed in a family. */
@@ -205,6 +219,8 @@ export interface FamilyDetail {
   };
   /** Accepted links to other families. */
   links: FamilyLinkView[];
+  /** People who moved from this family to another, newest first. */
+  movedOut: MovedOutMember[];
 }
 
 export interface PendingFamily {

@@ -1,10 +1,10 @@
-import { type FamilyLinkView, type FamilyRequests, INVERSE_LINK, type LinkKind, type LinkedFamily, MAX_FAMILY_LINKS, type linkRequestSchema } from '@samaj/shared';
+import { type FamilyLinkView, type FamilyRequests, INVERSE_LINK, type LinkKind, type LinkedFamily, MAX_FAMILY_LINKS, type Relation, type linkRequestSchema } from '@samaj/shared';
 import { type HydratedDocument, Types } from 'mongoose';
 import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
 import { type FamilyLinkDoc, FamilyLinkModel, linkPair } from '../models/family-link.model';
 import { type FamilyDoc, FamilyModel } from '../models/family.model';
-import { MemberModel } from '../models/member.model';
+import { type MemberDoc, MemberModel } from '../models/member.model';
 import { MemberMoveModel } from '../models/member-move.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { canEditFamily, canViewFamily } from './access';
@@ -43,6 +43,66 @@ export async function familySummaries(viewer: Viewer, ids: (Types.ObjectId | str
       ];
     }),
   );
+}
+
+/** Moves read per family page; older ones drop off. */
+const MOVES_SHOWN = 20;
+
+export interface MovedOut {
+  fromFamilyId: string;
+  /** Their relation in the family they left; null for moves recorded before it was kept. */
+  relation: Relation | null;
+  at: Date;
+  member: MemberDoc & { _id: Types.ObjectId };
+  /** The family they are in now. */
+  family: LinkedFamily;
+}
+
+/**
+ * People who moved out of these families, and the family each is in now.
+ * The latest move per person; people who have since come back are left out.
+ * Callers decide who may see them (listed, and the family they moved to).
+ */
+export async function movesOutOf(viewer: Viewer, familyIds: string[]): Promise<MovedOut[]> {
+  if (familyIds.length === 0) return [];
+  const moves = await MemberMoveModel.find({ fromFamilyId: { $in: familyIds.map((id) => new Types.ObjectId(id)) }, status: 'done' })
+    .sort({ decidedAt: -1 })
+    .limit(MOVES_SHOWN * familyIds.length)
+    .lean();
+  const seen = new Set<string>();
+  const latest = moves.filter((m) => {
+    const key = `${String(m.fromFamilyId)}:${String(m.memberId)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (latest.length === 0) return [];
+  const members = await MemberModel.find({ _id: { $in: latest.map((m) => m.memberId) } }).lean();
+  const memberBy = new Map(members.map((m) => [String(m._id), m]));
+  const summaries = await familySummaries(viewer, members.map((m) => m.familyId));
+  return latest.flatMap((move) => {
+    const member = memberBy.get(String(move.memberId));
+    if (!member || String(member.familyId) === String(move.fromFamilyId)) return [];
+    const family = summaries.get(String(member.familyId));
+    if (!family) return [];
+    return [{ fromFamilyId: String(move.fromFamilyId), relation: move.fromRelation ?? null, at: move.decidedAt ?? move.updatedAt, member, family }];
+  });
+}
+
+/** For people in this family who moved in: the family each came from (their माहेर). */
+export async function movedInFrom(viewer: Viewer, familyId: Types.ObjectId, memberIds: Types.ObjectId[]): Promise<Map<string, LinkedFamily>> {
+  if (memberIds.length === 0) return new Map();
+  const moves = await MemberMoveModel.find({ memberId: { $in: memberIds }, toFamilyId: familyId, status: 'done' }, { memberId: 1, fromFamilyId: 1 })
+    .sort({ decidedAt: -1 })
+    .lean();
+  if (moves.length === 0) return new Map();
+  const summaries = await familySummaries(viewer, moves.map((m) => m.fromFamilyId));
+  const from = new Map<string, LinkedFamily>();
+  for (const move of moves) {
+    const family = summaries.get(String(move.fromFamilyId));
+    if (family && !from.has(String(move.memberId))) from.set(String(move.memberId), family);
+  }
+  return from;
 }
 
 const isFrom = (link: Pick<FamilyLinkDoc, 'fromFamilyId'>, familyId: string) => String(link.fromFamilyId) === familyId;
@@ -150,7 +210,7 @@ async function loadLink(id: string) {
   return link;
 }
 
-async function headName(familyId: Types.ObjectId) {
+export async function headName(familyId: Types.ObjectId) {
   return (await MemberModel.findOne({ familyId, isHead: true }, { name: 1 }).lean())?.name ?? '';
 }
 
