@@ -1,5 +1,4 @@
 import type { FamilyTree, TreeHousehold } from '@samaj/shared';
-import { useQuery } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -7,23 +6,16 @@ import { Avatar, Badge, Card, Chip, EmptyState, ErrorState, Icon, IconButton, Sk
 import { ArrowLeft, Network, Printer, Rows, SearchX, Share, X } from '@/components/ui/icons';
 import { placeLabel } from '@/features/branches/api';
 import { type MessageKey, isMessageKey, useLanguageStore, useT } from '@/i18n';
-import { ApiError, api } from '@/lib/api';
+import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useDisplayName } from './life';
 import { useMe } from '@/features/auth/api';
+import { useFamilyTree } from './tree-api';
 import { kinshipFrom } from './kinship';
 import { type Kin, TreeChart, useGenerationLabel, usePersonLine } from './TreeChart';
 import { TreePersonModal } from './TreePersonModal';
 import { TreeSearch } from './TreeSearch';
 import { type ChartPerson, findPeople } from './tree-layout';
-
-function useFamilyTree(familyId: string) {
-  return useQuery({
-    queryKey: ['family', familyId, 'tree'],
-    queryFn: async ({ signal }) => (await api.get<{ tree: FamilyTree }>(`/families/${familyId}/tree`, undefined, signal)).tree,
-    enabled: Boolean(familyId),
-  });
-}
 
 /** What a household is to the family the tree is drawn for. */
 function useHouseholdLabel() {

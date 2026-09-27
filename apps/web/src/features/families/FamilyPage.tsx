@@ -39,6 +39,7 @@ import { MemberSheet } from './MemberSheet';
 import { MovedOutList } from './MovedOut';
 import { type ElderPair, EldersModal } from './EldersModal';
 import { ExternalParentModal } from './ExternalParentModal';
+import { NotJoinedCard } from './NotJoinedCard';
 import { ReviewPanel } from './ReviewPanel';
 
 /** /family: the signed-in user's own family. */
@@ -333,6 +334,7 @@ export function FamilyPage() {
               onEditMember={(m) => setEditing({ member: m })}
               onInvite={(m) => setInviting(m)}
             />
+            <NotJoinedCard family={data} onParentElsewhere={(m) => setParentElsewhere(m)} onEditMember={(m) => setEditing({ member: m })} />
             <RelatedFamilies family={data} />
             {data.history && <History family={data} />}
           </aside>
