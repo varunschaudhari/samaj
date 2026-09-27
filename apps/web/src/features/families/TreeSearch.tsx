@@ -1,4 +1,5 @@
 import { type KeyboardEvent, useId, useState } from 'react';
+import { Link } from 'react-router';
 import { Avatar, Input } from '@/components/ui';
 import { Search } from '@/components/ui/icons';
 import { formatNumber, useLanguageStore, useT } from '@/i18n';
@@ -76,7 +77,12 @@ export function TreeSearch({
       {open && query.trim() !== '' && (
         <div id={listId} role="listbox" aria-label={t('tree.search')} className="absolute z-20 mt-1 max-h-80 w-full overflow-auto rounded-md border border-line bg-surface py-1 shadow-overlay">
           {shown.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-fg-muted">{t('tree.noMatch')}</p>
+            <div className="flex flex-col gap-1 px-3 py-2 text-sm">
+              <p className="text-fg-muted">{t('tree.noMatch')}</p>
+              <Link to={`/directory?q=${encodeURIComponent(query.trim())}`} onMouseDown={(e) => e.preventDefault()} className="font-semibold text-primary hover:underline">
+                {t('tree.searchDirectory')}
+              </Link>
+            </div>
           ) : (
             shown.map((p, i) => (
               <button
@@ -95,6 +101,7 @@ export function TreeSearch({
                   <span className="truncate text-sm font-semibold text-fg">{displayName(p)}</span>
                   <span className="truncate text-xs text-fg-muted">
                     {t(`relation.${p.relation}`)} · {t('family.title', { name: p.household.headName })}
+                    {p.maidenName && ` · ${t('member.maidenNameShort', { name: p.maidenName })}`}
                   </span>
                 </span>
               </button>

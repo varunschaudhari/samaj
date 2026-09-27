@@ -138,6 +138,7 @@ export function MemberSheet({
           {member.occupation && <Fact icon={Briefcase}>{member.occupation}</Fact>}
           {member.education && <Fact icon={GraduationCap}>{member.education}</Fact>}
           {parent && <Fact icon={Users}>{t('member.sheet.childOf', { name: parent.name })}</Fact>}
+          {member.maidenName && member.maidenName !== member.name && <Fact icon={UserRound}>{t('member.maidenNameShort', { name: member.maidenName })}</Fact>}
           {member.birthFamily && <Fact icon={House}>{t('member.sheet.bornInto', { name: member.birthFamily.headName })}</Fact>}
           {member.externalParent && (
             <Fact icon={Users}>

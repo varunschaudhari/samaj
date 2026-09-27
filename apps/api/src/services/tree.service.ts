@@ -290,6 +290,7 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
             partnerId: null,
             otherParentId: null,
             formerPartner: m.formerPartner === true,
+            ...(m.maidenName && m.maidenName !== m.name && { maidenName: m.maidenName }),
             // Adoption is the family's own business: others see a son as a son.
             ...(seesPending && { adopted: m.adopted === true }),
           },

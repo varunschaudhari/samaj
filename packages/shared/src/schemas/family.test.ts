@@ -21,6 +21,7 @@ describe('memberInputSchema', () => {
       otherParentId: null,
       formerPartner: false,
       birthFamilyId: null,
+      maidenName: null,
     });
   });
 

@@ -19,10 +19,11 @@ import { FamilyModel } from '../models/family.model';
 import { InterestModel } from '../models/interest.model';
 import { InviteModel } from '../models/invite.model';
 import { MemberModel } from '../models/member.model';
+import { SamePersonModel } from '../models/same-person.model';
 import { NoticeModel } from '../models/notice.model';
 import { OfficeBearerModel } from '../models/office-bearer.model';
 import { PasswordResetModel } from '../models/password-reset.model';
-import { prefixTokens } from '../models/plugins';
+import { keyTokens, prefixTokens } from '../models/plugins';
 import { ProfileModel } from '../models/profile.model';
 import { RoleChangeModel } from '../models/role-change.model';
 import { RsvpModel } from '../models/rsvp.model';
@@ -68,6 +69,8 @@ async function main() {
   }
   await backfill(MemberModel, { nameTokens: { $exists: false } }, ['name', 'place', 'occupation'], tokensOf(['name', 'place', 'occupation']));
   await backfill(UserModel, { nameTokens: { $exists: false } }, ['name'], tokensOf(['name']));
+  // Spelling-tolerant name keys arrived later.
+  await backfill(MemberModel, { keyTokens: { $exists: false } }, ['name', 'maidenName'], (doc) => ({ keyTokens: keyTokens(doc.name as string, doc.maidenName as string | null) }));
   // People listed before committee approval of additions existed.
   await backfill(MemberModel, { approval: { $exists: false } }, [], () => ({ approval: 'approved' }));
   // Privacy settings arrived later: keep numbers with the family and committee, and keep people listed.
@@ -75,7 +78,7 @@ async function main() {
 
   const models: AnyModel[] = [
     BranchModel, EventModel, FamilyLinkModel, FamilyModel, InterestModel, MemberMoveModel, InviteModel, MemberModel, NoticeModel, OfficeBearerModel,
-    PasswordResetModel, ProfileModel, RoleChangeModel, RsvpModel, SessionModel, UserModel,
+    PasswordResetModel, ProfileModel, RoleChangeModel, RsvpModel, SamePersonModel, SessionModel, UserModel,
   ];
   for (const model of models) {
     const dropped = await model.syncIndexes();

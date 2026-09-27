@@ -147,6 +147,7 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     partnerId: m.partnerId ? String(m.partnerId) : null,
     otherParentId: m.otherParentId ? String(m.otherParentId) : null,
     formerPartner: m.formerPartner === true,
+    maidenName: m.maidenName ?? null,
     ...(seesPending && { adopted: m.adopted === true }),
     ...(externalOf(m.externalParentId) && { externalParent: externalOf(m.externalParentId) }),
     ...(seesPending && m.birthFamilyId && externalFamilies.get(String(m.birthFamilyId)) && { birthFamily: externalFamilies.get(String(m.birthFamilyId)) }),
@@ -344,6 +345,7 @@ export async function updateMember(viewer: Viewer, familyId: string, memberId: s
   member.otherParentId = input.otherParentId ? new Types.ObjectId(input.otherParentId) : null;
   member.formerPartner = input.formerPartner;
   member.birthFamilyId = input.birthFamilyId ? new Types.ObjectId(input.birthFamilyId) : null;
+  member.maidenName = input.maidenName;
   await member.save();
   // A son who is now a nephew is no longer anyone's father here.
   if (relationChanged) await untie(family._id, member._id);

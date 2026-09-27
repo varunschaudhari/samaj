@@ -118,4 +118,11 @@ describe('findPeople', () => {
     expect(findPeople(people, 'WAGH').length).toBe(2);
     expect(findPeople(people, '  ')).toEqual([]);
   });
+
+  it('finds Marathi typing, other spellings and names before marriage', () => {
+    const family = [{ name: 'Rohit Chaudhari' }, { name: 'Priya Chaudhari', maidenName: 'Priya Patil' }];
+    expect(findPeople(family, 'रोहित').map((p) => p.name)).toEqual(['Rohit Chaudhari']);
+    expect(findPeople(family, 'choudhary').length).toBe(2);
+    expect(findPeople(family, 'patil').map((p) => p.name)).toEqual(['Priya Chaudhari']);
+  });
 });

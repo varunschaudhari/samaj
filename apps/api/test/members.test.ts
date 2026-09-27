@@ -117,3 +117,24 @@ describe('GET /api/members', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('searching names typed in Marathi, spelt another way, or from before marriage', () => {
+  it('finds them', async () => {
+    const viewer = await createFamily(branches.bhusawal, { account: 'member' });
+    const own = await createFamily(branches.amalner, {
+      account: 'member',
+      people: [{ name: 'Rohit Chaudhari' }, { name: 'Priya Chaudhari', relation: 'spouse', gender: 'female' }],
+    });
+    const priya = own.memberIds[1];
+    await api
+      .put(`/api/families/${own.familyId}/members/${priya}`)
+      .set('Cookie', own.cookie)
+      .send({ name: 'Priya Chaudhari', relation: 'spouse', gender: 'female', maidenName: 'Priya Patil' });
+    const names = async (q: string) => ((await api.get(`/api/members?q=${encodeURIComponent(q)}`).set('Cookie', viewer.cookie)).body as { items: Member[] }).items.map((m) => m.name);
+    // Both Rohits: this family's and the Wagh family's.
+    expect(await names('रोहित')).toEqual(['Rohit Chaudhari', 'Rohit Wagh']);
+    expect(await names('Choudhary')).toEqual(['Priya Chaudhari', 'Rohit Chaudhari']);
+    expect(await names('priya patil')).toEqual(['Priya Chaudhari']);
+    expect(await names('पाटील')).toEqual(['Priya Chaudhari']);
+  });
+});

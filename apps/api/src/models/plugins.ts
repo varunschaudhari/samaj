@@ -1,3 +1,4 @@
+import { nameKeys } from '@samaj/shared';
 import type { Schema, Types } from 'mongoose';
 
 /*
@@ -83,5 +84,33 @@ export function searchTokensPlugin(schema: Schema, fields: string[]) {
   });
   onUpdate(schema, fields, (field, value, set) => {
     set[`${field}Tokens`] = prefixTokens(value as string | null);
+  });
+}
+
+/** Every prefix of the spelling-tolerant key of every word (see nameKey), for all the given texts. */
+export function keyTokens(...texts: (string | null | undefined)[]): string[] {
+  const tokens = new Set<string>();
+  for (const key of texts.flatMap(nameKeys)) {
+    const chars = [...key];
+    for (let i = 1; i <= Math.min(chars.length, MAX_PREFIX); i++) tokens.add(chars.slice(0, i).join(''));
+  }
+  return [...tokens];
+}
+
+/**
+ * `keyTokens` from several name fields together (a name and the name before
+ * marriage), so a search finds a name typed in Marathi or spelt another way.
+ */
+export function nameKeysPlugin(schema: Schema, fields: string[]) {
+  schema.add({ keyTokens: { type: [String], default: [], select: false } });
+  schema.pre('validate', function () {
+    if (this.isNew || fields.some((f) => this.isModified(f))) this.set('keyTokens', keyTokens(...fields.map((f) => this.get(f) as string | null)));
+  });
+  schema.pre('insertMany', function (docs: unknown) {
+    for (const doc of [docs].flat() as Record<string, unknown>[]) doc.keyTokens = keyTokens(...fields.map((f) => doc[f] as string | null));
+  });
+  // An update carries only the fields it changes: keys come from those.
+  onUpdate(schema, fields, (_field, _value, set) => {
+    set.keyTokens = keyTokens(...fields.map((f) => set[f] as string | null));
   });
 }

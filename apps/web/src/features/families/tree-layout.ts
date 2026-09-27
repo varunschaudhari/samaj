@@ -1,4 +1,4 @@
-import { type FamilyTree, type LinkedFamily, PARENT_CHOICES, type TreePerson } from '@samaj/shared';
+import { type FamilyTree, type LinkedFamily, PARENT_CHOICES, type TreePerson, nameKey } from '@samaj/shared';
 
 /** Sizes in CSS pixels at 100% zoom. Cards are all one size so generations line up across the whole chart. */
 export const CARD_W = 184;
@@ -213,12 +213,20 @@ const fold = (s: string) =>
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '');
 
-/** Everyone whose name has a word starting with each word typed: "roh wa" finds "Rohit Anil Wagh". */
-export function findPeople<T extends { name: string }>(people: T[], query: string): T[] {
+/**
+ * Everyone whose name (or name before marriage) has a word starting with each
+ * word typed: "roh wa" finds "Rohit Anil Wagh". Also by the spelling-tolerant
+ * key, so रोहित and "Rohit", or "Choudhary" and "Chaudhari", find each other.
+ */
+export function findPeople<T extends { name: string; maidenName?: string }>(people: T[], query: string): T[] {
   const typed = fold(query).split(/\s+/).filter(Boolean);
   if (typed.length === 0) return [];
   return people.filter((p) => {
-    const name = fold(p.name).split(/\s+/);
-    return typed.every((w) => name.some((n) => n.startsWith(w)));
+    const words = fold(`${p.name} ${p.maidenName ?? ''}`).split(/\s+/).filter(Boolean);
+    const keys = words.map(nameKey);
+    return typed.every((w) => {
+      const key = nameKey(w);
+      return words.some((n) => n.startsWith(w)) || (key !== '' && keys.some((k) => k.startsWith(key)));
+    });
   });
 }

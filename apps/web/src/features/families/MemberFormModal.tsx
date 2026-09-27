@@ -24,7 +24,7 @@ import { useSaveMember } from './api';
 import { BirthFamilyField } from './BirthFamilyField';
 import { PhotoField } from './PhotoField';
 
-const FIELDS = ['name', 'relation', 'gender', 'birthYear', 'occupation', 'education', 'phone', 'deceased', 'deathYear', 'parentId', 'partnerId', 'adopted', 'otherParentId', 'formerPartner', 'birthFamilyId'] as const;
+const FIELDS = ['name', 'relation', 'gender', 'birthYear', 'occupation', 'education', 'phone', 'deceased', 'deathYear', 'parentId', 'partnerId', 'adopted', 'otherParentId', 'formerPartner', 'birthFamilyId', 'maidenName'] as const;
 
 /** The gender most relations imply, so picking "Son" fills it in. Spouse is the opposite of the head. */
 const RELATION_GENDER: Partial<Record<Relation, Gender>> = {
@@ -77,6 +77,7 @@ function toFormValues(member: FamilyMember | null, relation?: Relation): MemberI
     otherParentId: member?.otherParentId ?? '',
     formerPartner: member?.formerPartner ?? false,
     birthFamilyId: member?.birthFamily?.id ?? '',
+    maidenName: member?.maidenName ?? '',
   };
 }
 
@@ -342,6 +343,16 @@ export function MemberFormModal({ familyId, member, open, onClose, initialRelati
               exclude={familyId}
               onChange={(id) => form.setValue('birthFamilyId', id)}
               error={fieldError(t, errors.birthFamilyId?.message)}
+            />
+          )}
+          {SPOUSE_RELATIONS.includes(relation) && (
+            <Input
+              label={t('member.maidenName')}
+              labelSuffix={t('common.optional')}
+              hint={t('member.maidenNameHint')}
+              autoComplete="off"
+              error={fieldError(t, errors.maidenName?.message)}
+              {...form.register('maidenName')}
             />
           )}
           {SPOUSE_RELATIONS.includes(relation) && <Checkbox label={t('member.formerPartner')} hint={t('member.formerPartnerHint')} {...form.register('formerPartner')} />}

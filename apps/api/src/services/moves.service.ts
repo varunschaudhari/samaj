@@ -173,6 +173,8 @@ export async function approveMove(viewer: Viewer, id: string): Promise<MemberMov
   member.otherParentId = null;
   member.formerPartner = false;
   member.adopted = false;
+  // Her name as her parents' family knew it, so she can still be found by it.
+  if (!member.maidenName) member.maidenName = member.name;
   await member.save();
   await Promise.all([
     MemberModel.updateMany({ familyId: from._id, parentId: member._id }, { $set: { parentId: null } }),

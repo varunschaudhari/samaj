@@ -215,6 +215,8 @@ export interface TreePerson {
   otherParentId: string | null;
   /** Divorced or separated from their partner. */
   formerPartner: boolean;
+  /** Their name before they married in, to find them by. */
+  maidenName?: string;
   /** The same person, listed in other households here: shown once, as this entry. */
   alsoListed?: { memberId: string; familyId: string; headName: string }[];
 }

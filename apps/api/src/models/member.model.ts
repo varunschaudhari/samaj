@@ -1,6 +1,6 @@
 import { FAMILY_STATUSES, GENDERS, GOTRA_IDS, MEMBER_APPROVALS, PHONE_VISIBILITIES, RELATIONS } from '@samaj/shared';
 import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
-import { branchPathPlugin, searchTokensPlugin } from './plugins';
+import { branchPathPlugin, nameKeysPlugin, searchTokensPlugin } from './plugins';
 
 /**
  * A person in a family. Separate from User because most people in a family
@@ -64,6 +64,8 @@ const memberSchema = new Schema(
     otherParentId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
     /** Divorced or separated from whoever they married. */
     formerPartner: { type: Boolean, default: false },
+    /** Someone who married in: their name before, so they can be found by it. */
+    maidenName: { type: String, default: null, trim: true },
     /** Adopted: the family they were born into. Its gotra counts in matrimony too. */
     birthFamilyId: { type: Schema.Types.ObjectId, ref: 'Family', default: null },
     /** Their parent, listed in another family linked to this one (a head's father, a wife's father in her माहेर). */
@@ -74,6 +76,7 @@ const memberSchema = new Schema(
 
 memberSchema.plugin(branchPathPlugin);
 memberSchema.plugin(searchTokensPlugin, ['name', 'place', 'occupation']);
+memberSchema.plugin(nameKeysPlugin, ['name', 'maidenName']);
 
 // The directory: browse everyone, a branch, or a gotra, in name order.
 memberSchema.index({ familyStatus: 1, name: 1, _id: 1 });
@@ -84,6 +87,8 @@ memberSchema.index({ familyStatus: 1, gotra: 1, name: 1, _id: 1 });
 memberSchema.index({ familyStatus: 1, nameTokens: 1, name: 1, _id: 1 });
 memberSchema.index({ familyStatus: 1, placeTokens: 1, name: 1, _id: 1 });
 memberSchema.index({ familyStatus: 1, occupationTokens: 1, name: 1, _id: 1 });
+// A name typed in Marathi, spelt another way, or someone's name before marriage.
+memberSchema.index({ familyStatus: 1, keyTokens: 1, name: 1, _id: 1 });
 // Signup and enrolment look for an unclaimed person with this number.
 memberSchema.index({ phone: 1 });
 // Renaming a branch renames the place of families written as the old name.

@@ -1,4 +1,4 @@
-import { type Member, type MemberPage, type memberListQuerySchema } from '@samaj/shared';
+import { nameKey, type Member, type MemberPage, type memberListQuerySchema } from '@samaj/shared';
 import { type QueryFilter, Types } from 'mongoose';
 import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
@@ -46,7 +46,9 @@ export async function listMembers(viewer: Viewer, query: ListQuery): Promise<Mem
     // Every word typed must start a word of the name, place or occupation, so
     // "sun cha" finds "Sunita Chaudhari". Indexed prefix tokens, not a regex.
     for (const word of searchWords(query.q)) {
-      conditions.push({ $or: [{ nameTokens: word }, { placeTokens: word }, { occupationTokens: word }] });
+      // Also by the name's key: रोहित finds Rohit, Chaudhary finds Choudhari, and a maiden name finds her.
+      const key = nameKey(word);
+      conditions.push({ $or: [{ nameTokens: word }, { placeTokens: word }, { occupationTokens: word }, ...(key ? [{ keyTokens: key }] : [])] });
     }
   }
 
