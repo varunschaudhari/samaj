@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { X } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useId, useRef } from 'react';
 import { useT } from '@/i18n';
 import { cn } from '@/lib/cn';

@@ -1,5 +1,5 @@
 import { NOTICE_KINDS, type Notice, type NoticeKind, can } from '@samaj/shared';
-import { Megaphone, Plus, Trash2 } from 'lucide-react';
+import { Megaphone, Plus, Trash2 } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Button, Chip, ChipRow, EmptyState, ErrorState, Modal, toast } from '@/components/ui';
 import { useMe } from '@/features/auth/api';

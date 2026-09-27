@@ -1,13 +1,16 @@
 import { type AdminUser, ROLES, type Role, formatPhone } from '@samaj/shared';
-import { ChevronRight, Search, SearchX, Users } from 'lucide-react';
+import { ChevronRight, SearchX, Users } from '@/components/ui/icons';
 import { useState } from 'react';
-import { Avatar, Badge, Button, Card, EmptyState, ErrorState, Icon, Input, Select, Skeleton } from '@/components/ui';
+import { type ActiveFilter, Avatar, Badge, Button, EmptyState, ErrorState, Icon, ListToolbar, LoadMore, Select, Skeleton } from '@/components/ui';
 import { branchName } from '@/features/branches/api';
+import { BranchSelect, useBranchLabel } from '@/features/branches/BranchSelect';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatTotal, useLanguageStore, useT } from '@/i18n';
 import { type UserFilters, useUsers } from './api';
 import { ResetCodeModal } from './ResetCodeModal';
 import { UserRoleModal } from './UserRoleModal';
+
+const LIST = 'divide-y divide-line overflow-hidden rounded-md border border-line bg-surface shadow-card';
 
 const ROLE_TONE: Record<Role, 'neutral' | 'primary' | 'kumkum' | 'zari'> = { member: 'neutral', committee: 'primary', admin: 'kumkum', superadmin: 'zari' };
 
@@ -15,8 +18,12 @@ function UserRow({ user, onOpen }: { user: AdminUser; onOpen: () => void }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
   return (
-    <Card as="li" padding="none">
-      <button type="button" onClick={onOpen} className="flex w-full items-center gap-3 rounded-md p-3 text-left transition-colors duration-150 hover:bg-surface-muted">
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-surface-muted"
+      >
         <Avatar name={user.name} size="md" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -28,13 +35,13 @@ function UserRow({ user, onOpen }: { user: AdminUser; onOpen: () => void }) {
         </span>
         <Icon icon={ChevronRight} className="text-fg-muted" />
       </button>
-    </Card>
+    </li>
   );
 }
 
 function UserRowSkeleton() {
   return (
-    <li className="flex items-center gap-3 rounded-md border border-line bg-surface p-3" aria-hidden="true">
+    <li className="flex items-center gap-3 px-4 py-3" aria-hidden="true">
       <Skeleton className="size-10 rounded-full" />
       <div className="flex flex-1 flex-col gap-2">
         <Skeleton className="h-4 w-1/2" />
@@ -49,20 +56,31 @@ export function PeoplePage() {
   const t = useT();
   const [search, setSearch] = useState('');
   const [role, setRole] = useState<UserFilters['role']>('');
+  const [branchId, setBranchId] = useState('');
   const q = useDebouncedValue(search.trim());
-  const users = useUsers({ q, role });
+  const users = useUsers({ q, role, branchId });
+  const branchLabel = useBranchLabel(branchId);
   const [openId, setOpenId] = useState<string | null>(null);
   const [resetTarget, setResetTarget] = useState<{ userId: string; name: string } | null>(null);
 
   const items = users.data?.pages.flatMap((p) => p.items) ?? [];
   const total = users.data?.pages[0]?.total;
   const language = useLanguageStore((s) => s.language);
-  const filtered = Boolean(q || role);
+  const filtered = Boolean(q || role || branchId);
+  const clearAll = () => {
+    setSearch('');
+    setRole('');
+    setBranchId('');
+  };
+  const active: ActiveFilter[] = [
+    ...(role ? [{ key: 'role', label: `${t('people.role')}: ${t(`role.${role}`)}`, onRemove: () => setRole('') }] : []),
+    ...(branchLabel ? [{ key: 'branch', label: `${t('directory.filterBranch')}: ${branchLabel}`, onRemove: () => setBranchId('') }] : []),
+  ];
 
   let body;
   if (users.isPending) {
     body = (
-      <ul className="flex flex-col gap-2" aria-busy="true" aria-label={t('common.loading')}>
+      <ul className={LIST} aria-busy="true" aria-label={t('common.loading')}>
         {[0, 1, 2, 3].map((i) => (
           <UserRowSkeleton key={i} />
         ))}
@@ -77,13 +95,7 @@ export function PeoplePage() {
         title={t('people.noResults.title')}
         body={t('people.noResults.body')}
         action={
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setSearch('');
-              setRole('');
-            }}
-          >
+          <Button variant="secondary" onClick={clearAll}>
             {t('directory.clearFilters')}
           </Button>
         }
@@ -94,43 +106,37 @@ export function PeoplePage() {
   } else {
     body = (
       <div className="flex flex-col gap-3">
-        <ul className="flex flex-col gap-2">
+        <ul className={LIST} aria-busy={users.isPlaceholderData || undefined}>
           {items.map((u) => (
             <UserRow key={u.id} user={u} onOpen={() => setOpenId(u.id)} />
           ))}
         </ul>
-        {users.hasNextPage && (
-          <Button variant="secondary" className="self-center" loading={users.isFetchingNextPage} onClick={() => users.fetchNextPage()}>
-            {t('people.loadMore')}
-          </Button>
-        )}
+        <LoadMore {...users} label={t('people.loadMore')} />
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-fg-muted tabular-nums">{total === undefined ? <Skeleton className="h-4 w-24" /> : t('people.count', { count: formatTotal(total, language) })}</p>
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <Input
-          label={t('people.search')}
-          hideLabel
-          type="search"
-          placeholder={t('people.searchPlaceholder')}
-          leadingIcon={Search}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          fieldClassName="sm:flex-1"
-        />
-        <Select label={t('people.role')} hideLabel value={role} onChange={(e) => setRole(e.target.value as UserFilters['role'])} fieldClassName="sm:w-44">
-          <option value="">{t('people.allRoles')}</option>
-          {ROLES.map((r) => (
-            <option key={r} value={r}>
-              {t(`role.${r}`)}
-            </option>
-          ))}
-        </Select>
-      </div>
+      <ListToolbar
+        search={{ value: search, onChange: setSearch, label: t('people.search'), placeholder: t('people.searchPlaceholder') }}
+        active={active}
+        onClearAll={clearAll}
+        summary={total === undefined ? <Skeleton className="h-4 w-24" /> : t('people.count', { count: formatTotal(total, language) })}
+        filters={
+          <>
+            <Select label={t('people.role')} hideLabel value={role} onChange={(e) => setRole(e.target.value as UserFilters['role'])} fieldClassName="md:w-40">
+              <option value="">{t('people.allRoles')}</option>
+              {ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {t(`role.${r}`)}
+                </option>
+              ))}
+            </Select>
+            <BranchSelect label={t('directory.filterBranch')} allLabel={t('directory.allBranches')} value={branchId} onChange={setBranchId} />
+          </>
+        }
+      />
       {body}
       <UserRoleModal userId={openId} onClose={() => setOpenId(null)} onResetPassword={(target) => {
         setOpenId(null);

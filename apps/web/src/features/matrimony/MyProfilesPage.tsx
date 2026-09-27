@@ -1,4 +1,4 @@
-import { HeartHandshake, Info, Plus } from 'lucide-react';
+import { HeartHandshake, Info, Plus } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Button, Card, EmptyState, ErrorState, Icon, buttonVariants } from '@/components/ui';

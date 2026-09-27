@@ -2,7 +2,25 @@ import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
+
+/**
+ * Each Phosphor icon ships six weights; the app draws three (see
+ * src/components/ui/Icon.tsx). Dropping the others from the build takes
+ * about a third off the icons' size.
+ */
+function phosphorWeights(keep = ['regular', 'fill', 'duotone']): Plugin {
+  const entry = /\n {2}\[\n {4}"(\w+)",[\s\S]*?\n {2}\],?/g;
+  return {
+    name: 'samaj:phosphor-weights',
+    apply: 'build',
+    transform(code, id) {
+      if (!/@phosphor-icons[\\/]react[\\/]dist[\\/]defs[\\/]/.test(id)) return null;
+      return { code: code.replace(entry, (match, weight: string) => (keep.includes(weight) ? match : '')), map: null };
+    },
+  };
+}
 
 const apiProxy = { '/api': { target: 'http://localhost:4000', changeOrigin: false } };
 
@@ -10,6 +28,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    phosphorWeights(),
     VitePWA({
       registerType: 'autoUpdate',
       // Registered from main.tsx.
@@ -20,12 +39,12 @@ export default defineConfig({
         short_name: 'Samaj',
         description: 'The Teli Samaj directory, notices, events and matrimony for member families.',
         lang: 'en',
-        start_url: '/community',
+        start_url: '/home',
         scope: '/',
         display: 'standalone',
         orientation: 'portrait',
         theme_color: '#0B5D57',
-        background_color: '#F6F8F7',
+        background_color: '#F8F5EE',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },

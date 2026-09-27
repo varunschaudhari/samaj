@@ -1,5 +1,5 @@
 import { type InterestItem, formatPhone } from '@samaj/shared';
-import { Check, Inbox, Phone, Undo2, X } from 'lucide-react';
+import { Check, Inbox, Phone, Undo2, X } from '@/components/ui/icons';
 import { Link } from 'react-router';
 import { Avatar, Badge, Button, Card, EmptyState, ErrorState, Icon, Skeleton, buttonVariants, toast } from '@/components/ui';
 import { formatDate, useErrorMessage, useLanguageStore, useT } from '@/i18n';

@@ -1,5 +1,5 @@
 import { type VariantProps, cva } from 'class-variance-authority';
-import { LoaderCircle, type LucideIcon } from 'lucide-react';
+import { LoaderCircle, type AppIcon } from '@/components/ui/icons';
 import type { ComponentProps } from 'react';
 import { cn } from '@/lib/cn';
 import { Icon } from './Icon';
@@ -31,8 +31,8 @@ export const buttonVariants = cva(
 );
 
 export interface ButtonProps extends ComponentProps<'button'>, VariantProps<typeof buttonVariants> {
-  leadingIcon?: LucideIcon;
-  trailingIcon?: LucideIcon;
+  leadingIcon?: AppIcon;
+  trailingIcon?: AppIcon;
   /** Shows a spinner, keeps the label (so the width doesn't jump) and blocks clicks. */
   loading?: boolean;
 }

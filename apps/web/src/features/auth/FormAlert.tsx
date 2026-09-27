@@ -1,4 +1,4 @@
-import { CircleAlert } from 'lucide-react';
+import { CircleAlert } from '@/components/ui/icons';
 import { Icon } from '@/components/ui';
 
 /** A form-level error, announced when it appears. */

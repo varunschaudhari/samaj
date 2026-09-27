@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, Info, type LucideIcon, TriangleAlert, X } from 'lucide-react';
+import { CircleAlert, CircleCheck, Info, type AppIcon, TriangleAlert, X } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { create } from 'zustand';
 import { useT } from '@/i18n';
@@ -37,7 +37,7 @@ export const toast = {
   error: (title: string, description?: string) => useToastStore.getState().push({ tone: 'danger', title, description }),
 };
 
-const TONE: Record<Tone, { icon: LucideIcon; className: string }> = {
+const TONE: Record<Tone, { icon: AppIcon; className: string }> = {
   success: { icon: CircleCheck, className: 'text-success' },
   info: { icon: Info, className: 'text-info' },
   warning: { icon: TriangleAlert, className: 'text-warning' },

@@ -1,5 +1,5 @@
 import { type VariantProps, cva } from 'class-variance-authority';
-import type { LucideIcon } from 'lucide-react';
+import type { AppIcon } from '@/components/ui/icons';
 import type { ComponentProps } from 'react';
 import { cn } from '@/lib/cn';
 import { Icon } from './Icon';
@@ -21,7 +21,7 @@ const badgeVariants = cva('inline-flex items-center gap-1 rounded-xs px-2 py-0.5
 });
 
 interface BadgeProps extends ComponentProps<'span'>, VariantProps<typeof badgeVariants> {
-  icon?: LucideIcon;
+  icon?: AppIcon;
 }
 
 export function Badge({ tone, icon, className, children, ...rest }: BadgeProps) {

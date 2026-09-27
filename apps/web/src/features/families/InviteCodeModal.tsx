@@ -1,5 +1,5 @@
 import { type FamilyMember, formatPhone } from '@samaj/shared';
-import { Phone } from 'lucide-react';
+import { Phone } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { Button, ErrorState, Modal } from '@/components/ui';
 import { formatDate, useLanguageStore, useT } from '@/i18n';

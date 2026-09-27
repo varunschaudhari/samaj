@@ -1,4 +1,4 @@
-import { Camera, Trash2 } from 'lucide-react';
+import { Camera, Trash2 } from '@/components/ui/icons';
 import { useId, useRef } from 'react';
 import { Avatar, Button, toast } from '@/components/ui';
 import { useErrorMessage, useT } from '@/i18n';

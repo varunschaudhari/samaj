@@ -1,5 +1,5 @@
 import type { FamilyStatus } from '@samaj/shared';
-import { BadgeCheck, Clock, TriangleAlert } from 'lucide-react';
+import { BadgeCheck, Clock, TriangleAlert } from '@/components/ui/icons';
 import { Badge } from '@/components/ui';
 import { useT } from '@/i18n';
 

@@ -1,5 +1,5 @@
 import type { EventSummary } from '@samaj/shared';
-import { CircleCheck, MapPin, Users } from 'lucide-react';
+import { CircleCheck, MapPin, Users } from '@/components/ui/icons';
 import { Link } from 'react-router';
 import { Card, Icon, Skeleton } from '@/components/ui';
 import { branchName } from '@/features/branches/api';

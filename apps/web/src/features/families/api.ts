@@ -1,5 +1,5 @@
-import type { EnrolFamilyInput, FamilyDetail, FamilyUpdateInput, InviteCode, MemberInput, PendingFamilyPage } from '@samaj/shared';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { EnrolFamilyInput, FamilyDetail, FamilyUpdateInput, InviteCode, MemberInput, PendingFamilyPage, ReviewSort } from '@samaj/shared';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { meKey } from '@/features/auth/api';
 import { api } from '@/lib/api';
 import { resizeImage } from '@/lib/image';
@@ -88,10 +88,16 @@ export function useReview(familyId: string) {
   return { verify, reject, resubmit };
 }
 
-export function usePendingFamilies() {
+export interface ReviewFilters {
+  branchId: string;
+  sort: ReviewSort;
+}
+
+export function usePendingFamilies(filters: ReviewFilters = { branchId: '', sort: 'oldest' }) {
   return useInfiniteQuery({
-    queryKey: ['verifications', 'list'],
-    queryFn: ({ pageParam, signal }) => api.get<PendingFamilyPage>('/verifications', { cursor: pageParam }, signal),
+    queryKey: ['verifications', 'list', filters],
+    queryFn: ({ pageParam, signal }) => api.get<PendingFamilyPage>('/verifications', { ...filters, cursor: pageParam }, signal),
+    placeholderData: keepPreviousData,
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });

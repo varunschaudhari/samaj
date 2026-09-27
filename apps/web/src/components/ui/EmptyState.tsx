@@ -1,4 +1,4 @@
-import { CircleAlert, type LucideIcon, RotateCw } from 'lucide-react';
+import { CircleAlert, type AppIcon, RotateCw } from '@/components/ui/icons';
 import type { ReactNode } from 'react';
 import { useErrorMessage, useT } from '@/i18n';
 import { ApiError } from '@/lib/api';
@@ -7,7 +7,7 @@ import { Button } from './Button';
 import { Icon } from './Icon';
 
 interface EmptyStateProps {
-  icon: LucideIcon;
+  icon: AppIcon;
   title: string;
   /** Say what to do next, not just that there's nothing here. */
   body: ReactNode;

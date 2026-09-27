@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { PROTECTED_ROLES, type RoleUpdateInput, assignableRoles, formatPhone, roleUpdateSchema } from '@samaj/shared';
-import { KeyRound } from 'lucide-react';
+import { KeyRound } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button, ErrorState, Modal, Select, Skeleton, toast } from '@/components/ui';

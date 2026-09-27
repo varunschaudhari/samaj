@@ -1,11 +1,11 @@
-import { BookUser, CalendarDays, HeartHandshake, type LucideIcon } from 'lucide-react';
+import { BookUser, CalendarDays, HeartHandshake, type AppIcon } from '@/components/ui/icons';
 import type { ReactNode } from 'react';
 import { BrandMark } from '@/components/layout/BrandMark';
 import { LanguageSwitch } from '@/components/layout/LanguageSwitch';
 import { Icon } from '@/components/ui';
 import { type MessageKey, useT } from '@/i18n';
 
-const POINTS: { icon: LucideIcon; label: MessageKey }[] = [
+const POINTS: { icon: AppIcon; label: MessageKey }[] = [
   { icon: BookUser, label: 'auth.hero.directory' },
   { icon: CalendarDays, label: 'auth.hero.events' },
   { icon: HeartHandshake, label: 'auth.hero.matrimony' },

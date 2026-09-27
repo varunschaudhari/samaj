@@ -1,5 +1,5 @@
 import { can } from '@samaj/shared';
-import { LogOut, UserRound, WifiOff } from 'lucide-react';
+import { LogOut, UserRound, WifiOff } from '@/components/ui/icons';
 import { NavLink, Outlet, useNavigation } from 'react-router';
 import { Avatar, Button, Icon, Tooltip, toast } from '@/components/ui';
 import { useLogout, useMe } from '@/features/auth/api';
@@ -78,9 +78,13 @@ export function AppShell() {
                 )
               }
             >
-              <Icon icon={item.icon} size="lg" />
-              <span className="flex-1">{t(item.label)}</span>
-              <PendingBadge count={badgeFor(item)} />
+              {({ isActive }) => (
+                <>
+                  <Icon icon={item.icon} size="lg" weight={isActive ? 'fill' : 'regular'} />
+                  <span className="flex-1">{t(item.label)}</span>
+                  <PendingBadge count={badgeFor(item)} />
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -135,7 +139,7 @@ export function AppShell() {
               {({ isActive }) => (
                 <>
                   <span className={cn('relative flex h-7 w-14 items-center justify-center rounded-full', isActive && 'bg-primary-soft')}>
-                    <Icon icon={item.icon} size="lg" />
+                    <Icon icon={item.icon} size="lg" weight={isActive ? 'fill' : 'regular'} />
                     <PendingBadge count={badgeFor(item)} className="absolute -top-1 right-1" />
                   </span>
                   <span className="max-w-full truncate">{t(item.tabLabel ?? item.label)}</span>

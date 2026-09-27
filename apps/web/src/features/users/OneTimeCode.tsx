@@ -1,5 +1,5 @@
 import { formatResetCode } from '@samaj/shared';
-import { Check, Copy, KeyRound } from 'lucide-react';
+import { Check, Copy, KeyRound } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
 import { Button, Icon, Skeleton } from '@/components/ui';
 import { useT } from '@/i18n';

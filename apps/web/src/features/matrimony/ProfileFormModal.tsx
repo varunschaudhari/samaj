@@ -8,7 +8,7 @@ import {
   profileCreateSchema,
   profileFieldsSchema,
 } from '@samaj/shared';
-import { Phone } from 'lucide-react';
+import { Phone } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { type Resolver, useForm } from 'react-hook-form';
 import { Button, Input, Modal, Select, Textarea, toast } from '@/components/ui';

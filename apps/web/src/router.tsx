@@ -77,6 +77,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/home" replace /> },
           { path: '/home', element: <HomePage /> },
+          { path: '/dashboard', lazy: guarded('member:verify', async () => (await import('@/features/dashboard/DashboardPage')).DashboardPage) },
           {
             path: '/community',
             element: <CommunityLayout />,

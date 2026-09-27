@@ -1,5 +1,5 @@
 import { formatPhone } from '@samaj/shared';
-import { Download, House, KeyRound, LogOut, Pencil } from 'lucide-react';
+import { Download, House, KeyRound, LogOut, Pencil } from '@/components/ui/icons';
 import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
 import { LanguageSwitch } from '@/components/layout/LanguageSwitch';

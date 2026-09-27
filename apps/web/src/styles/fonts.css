@@ -1,11 +1,12 @@
 /*
- * Self-hosted fonts from @fontsource-variable. Only the Latin and Devanagari
+ * Google Fonts, self-hosted from @fontsource (so the app works offline and
+ * nothing is fetched from Google). Only the Latin and Devanagari
  * subsets are declared, and unicode-range means an English-only page never
- * downloads the Devanagari file. One variable file per family and script
- * covers every weight.
+ * downloads the Devanagari file.
  *
  * Noto Sans Devanagari  UI and body. Latin and Devanagari drawn to share metrics.
- * Eczar                 Display: headings, names, figures.
+ * Poppins               Display: headings, names, figures. Weights 500-700,
+ *                       one static file per weight and script.
  * Both include Marathi letterforms, which appear when lang="mr" is set on <html>.
  */
 
@@ -28,20 +29,56 @@
 }
 
 @font-face {
-  font-family: 'Eczar Variable';
+  font-family: 'Poppins';
   font-style: normal;
   font-display: swap;
-  font-weight: 400 800;
-  src: url('@fontsource-variable/eczar/files/eczar-latin-wght-normal.woff2') format('woff2-variations');
+  font-weight: 500;
+  src: url('@fontsource/poppins/files/poppins-latin-500-normal.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
-  font-family: 'Eczar Variable';
+  font-family: 'Poppins';
   font-style: normal;
   font-display: swap;
-  font-weight: 400 800;
-  src: url('@fontsource-variable/eczar/files/eczar-devanagari-wght-normal.woff2') format('woff2-variations');
+  font-weight: 500;
+  src: url('@fontsource/poppins/files/poppins-devanagari-500-normal.woff2') format('woff2');
+  unicode-range: U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B09;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fontsource/poppins/files/poppins-latin-600-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fontsource/poppins/files/poppins-devanagari-600-normal.woff2') format('woff2');
+  unicode-range: U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B09;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('@fontsource/poppins/files/poppins-latin-700-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('@fontsource/poppins/files/poppins-devanagari-700-normal.woff2') format('woff2');
   unicode-range: U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B09;
 }
 
@@ -75,20 +112,22 @@
 
 @font-face {
   font-family: 'Samaj Display Fallback';
-  src: local('Georgia');
-  size-adjust: 98.77%;
-  ascent-override: 115.73%;
-  descent-override: 64.19%;
-  line-gap-override: 0%;
+  src: local('Arial'), local('ArialMT'), local('Roboto');
+  /* Poppins' published metrics against Arial. */
+  size-adjust: 112.16%;
+  ascent-override: 93.62%;
+  descent-override: 31.21%;
+  line-gap-override: 8.92%;
   unicode-range: U+0000-00FF, U+2000-206F;
 }
 
 @font-face {
   font-family: 'Samaj Display Fallback';
   src: local('Nirmala UI'), local('NirmalaUI'), local('Kohinoor Devanagari');
-  size-adjust: 92.15%;
-  ascent-override: 124.04%;
-  descent-override: 68.8%;
+  /* Approximate: Poppins Devanagari's line box, at Nirmala's width. */
+  size-adjust: 100%;
+  ascent-override: 105%;
+  descent-override: 35%;
   line-gap-override: 0%;
   unicode-range: U+0900-097F, U+200C-200D, U+20B9, U+25CC, U+A8E0-A8FF;
 }

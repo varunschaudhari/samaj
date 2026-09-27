@@ -1,4 +1,4 @@
-import { RotateCw, TriangleAlert } from 'lucide-react';
+import { RotateCw, TriangleAlert } from '@/components/ui/icons';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { isRouteErrorResponse, useRouteError } from 'react-router';
 import { Button, EmptyState } from '@/components/ui';

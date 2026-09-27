@@ -1,4 +1,4 @@
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from '@/components/ui/icons';
 import { type ComponentProps, useState } from 'react';
 import { IconButton, Input } from '@/components/ui';
 import { useT } from '@/i18n';

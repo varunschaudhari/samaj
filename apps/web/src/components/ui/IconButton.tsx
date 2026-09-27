@@ -1,5 +1,5 @@
 import { type VariantProps, cva } from 'class-variance-authority';
-import type { LucideIcon } from 'lucide-react';
+import type { AppIcon } from '@/components/ui/icons';
 import type { ComponentProps } from 'react';
 import { cn } from '@/lib/cn';
 import { Icon } from './Icon';
@@ -20,7 +20,7 @@ const iconButtonVariants = cva(
 );
 
 interface IconButtonProps extends Omit<ComponentProps<'button'>, 'children'>, VariantProps<typeof iconButtonVariants> {
-  icon: LucideIcon;
+  icon: AppIcon;
   /** Required: it is both the accessible name and the tooltip text. */
   label: string;
   tooltipSide?: 'top' | 'bottom';

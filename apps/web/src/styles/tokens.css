@@ -12,7 +12,7 @@
 
 :root {
   --font-body-stack: 'Noto Sans Devanagari Variable', 'Samaj Sans Fallback', 'Noto Sans Devanagari', system-ui, sans-serif;
-  --font-display-stack: 'Eczar Variable', 'Samaj Display Fallback', 'Noto Serif Devanagari', Georgia, serif;
+  --font-display-stack: 'Poppins', 'Samaj Display Fallback', 'Noto Sans Devanagari', system-ui, sans-serif;
 
   /* Surfaces */
   --canvas: #f8f5ee;

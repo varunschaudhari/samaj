@@ -5,12 +5,14 @@ import { api } from '@/lib/api';
 export interface UserFilters {
   q: string;
   role: Role | '';
+  branchId: string;
 }
 
 export function useUsers(filters: UserFilters) {
   return useInfiniteQuery({
     queryKey: ['users', 'list', filters],
-    queryFn: ({ pageParam, signal }) => api.get<AdminUserPage>('/users', { q: filters.q, role: filters.role, cursor: pageParam }, signal),
+    queryFn: ({ pageParam, signal }) =>
+      api.get<AdminUserPage>('/users', { q: filters.q, role: filters.role, branchId: filters.branchId, cursor: pageParam }, signal),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     placeholderData: keepPreviousData,

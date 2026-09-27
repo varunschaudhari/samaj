@@ -1,7 +1,7 @@
 import type { BranchSummary } from '@samaj/shared';
-import { Network, Pencil, Plus, Trash2, UsersRound } from 'lucide-react';
+import { Network, Pencil, Plus, SearchX, Trash2, UsersRound } from '@/components/ui/icons';
 import { useState } from 'react';
-import { Badge, Button, Card, EmptyState, ErrorState, IconButton, Modal, Skeleton, toast } from '@/components/ui';
+import { type ActiveFilter, Badge, Button, Card, EmptyState, ErrorState, IconButton, ListToolbar, Modal, Select, Skeleton, toast } from '@/components/ui';
 import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { branchName } from './api';
 import { useBranchSummaries, useDeleteBranch } from './admin-api';
@@ -69,6 +69,9 @@ function BranchesSkeleton() {
   );
 }
 
+const BRANCH_SHOWS = ['all', 'noCommittee', 'noFamilies'] as const;
+type BranchShow = (typeof BRANCH_SHOWS)[number];
+
 export function BranchesPage() {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
@@ -79,10 +82,28 @@ export function BranchesPage() {
   const [removing, setRemoving] = useState<BranchSummary | null>(null);
   const [committeeFor, setCommitteeFor] = useState<string | null>(null);
 
+  const [search, setSearch] = useState('');
+  const [show, setShow] = useState<BranchShow>('all');
+
   const all = summaries.data ?? [];
-  const districts = all.filter((b) => b.parentId === null);
-  const placesIn = (id: string) =>
+  const allDistricts = all.filter((b) => b.parentId === null);
+  const allPlacesIn = (id: string) =>
     all.filter((b) => b.parentId === id).sort((a, b) => branchName(a, language).localeCompare(branchName(b, language), language));
+
+  // Every branch is already loaded (a few hundred at most), so search and filters run here.
+  const q = search.trim().toLocaleLowerCase();
+  const filtering = Boolean(q) || show !== 'all';
+  const keep = (b: BranchSummary) =>
+    (!q || b.name.toLocaleLowerCase().includes(q) || b.nameMr.includes(search.trim())) &&
+    (show === 'all' || (show === 'noCommittee' && b.committee.length === 0) || (show === 'noFamilies' && b.familyCount === 0));
+  const placesIn = (id: string) => (filtering ? allPlacesIn(id).filter(keep) : allPlacesIn(id));
+  const districts = filtering ? allDistricts.filter((d) => keep(d) || placesIn(d.id).length > 0) : allDistricts;
+  const shown = districts.length + districts.reduce((n, d) => n + placesIn(d.id).length, 0);
+  const clearAll = () => {
+    setSearch('');
+    setShow('all');
+  };
+  const active: ActiveFilter[] = show === 'all' ? [] : [{ key: 'show', label: t(`branches.show.${show}`), onRemove: () => setShow('all') }];
 
   const addDistrict = (
     <Button leadingIcon={Plus} onClick={() => setFormTarget({ mode: 'addDistrict' })}>
@@ -95,8 +116,21 @@ export function BranchesPage() {
     body = <BranchesSkeleton />;
   } else if (summaries.isError) {
     body = <ErrorState title={t('branches.error.title')} error={summaries.error} onRetry={() => summaries.refetch()} retrying={summaries.isFetching} />;
-  } else if (districts.length === 0) {
+  } else if (allDistricts.length === 0) {
     body = <EmptyState icon={Network} title={t('branches.empty.title')} body={t('branches.empty.body')} action={addDistrict} />;
+  } else if (districts.length === 0) {
+    body = (
+      <EmptyState
+        icon={SearchX}
+        title={t('branches.noMatch.title')}
+        body={t('branches.noMatch.body')}
+        action={
+          <Button variant="secondary" onClick={clearAll}>
+            {t('directory.clearFilters')}
+          </Button>
+        }
+      />
+    );
   } else {
     body = (
       <ul className="flex flex-col gap-4">
@@ -141,14 +175,30 @@ export function BranchesPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {summaries.data ? (
-          <p className="text-sm text-fg-muted tabular-nums">{t('branches.subtitle', { districts: districts.length, places: all.length - districts.length })}</p>
-        ) : (
-          <Skeleton className="h-4 w-40" />
-        )}
-        {districts.length > 0 && addDistrict}
-      </div>
+      {allDistricts.length > 0 && <div className="flex justify-end">{addDistrict}</div>}
+      <ListToolbar
+        search={{ value: search, onChange: setSearch, label: t('branches.search'), placeholder: t('branches.searchPlaceholder') }}
+        active={active}
+        onClearAll={clearAll}
+        summary={
+          !summaries.data ? (
+            <Skeleton className="h-4 w-40" />
+          ) : filtering ? (
+            t('branches.showing', { count: shown })
+          ) : (
+            t('branches.subtitle', { districts: allDistricts.length, places: all.length - allDistricts.length })
+          )
+        }
+        filters={
+          <Select label={t('branches.show.label')} hideLabel value={show} onChange={(e) => setShow(e.target.value as BranchShow)} fieldClassName="md:w-56">
+            {BRANCH_SHOWS.map((s) => (
+              <option key={s} value={s}>
+                {t(`branches.show.${s}`)}
+              </option>
+            ))}
+          </Select>
+        }
+      />
       {body}
 
       <BranchFormModal target={formTarget} onClose={() => setFormTarget(null)} />

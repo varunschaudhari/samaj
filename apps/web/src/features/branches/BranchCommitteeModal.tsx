@@ -1,5 +1,5 @@
 import { type AdminUser, OFFICE_POSTS, type OfficePost, type BranchSummary, PROTECTED_ROLES, formatPhone } from '@samaj/shared';
-import { Search, UserMinus, UserPlus } from 'lucide-react';
+import { Search, UserMinus, UserPlus } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, Icon, IconButton, Input, Modal, Select, Skeleton, toast } from '@/components/ui';
 import { useUsers } from '@/features/users/api';
@@ -25,7 +25,7 @@ export function BranchCommitteeModal({ branch, onClose }: { branch: BranchSummar
   const [picked, setPicked] = useState<AdminUser | null>(null);
   const [listAs, setListAs] = useState<OfficePost | ''>('member');
   const [confirming, setConfirming] = useState<string | null>(null);
-  const results = useUsers({ q, role: '' });
+  const results = useUsers({ q, role: '', branchId: '' });
 
   useEffect(() => {
     setSearch('');

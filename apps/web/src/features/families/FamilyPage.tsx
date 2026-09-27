@@ -1,5 +1,5 @@
 import { type FamilyDetail, type FamilyMember, gotraName } from '@samaj/shared';
-import { Clock, MapPin, Pencil, SearchX, Send, TriangleAlert, UserPlus } from 'lucide-react';
+import { Clock, MapPin, Pencil, SearchX, Send, TriangleAlert, UserPlus } from '@/components/ui/icons';
 import { type ReactNode, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';

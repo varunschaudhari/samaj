@@ -1,9 +1,9 @@
 import { gotraName } from '@samaj/shared';
-import { Clock, HeartHandshake, SearchX, X } from 'lucide-react';
+import { Clock, HeartHandshake, SearchX, X } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Button, EmptyState, ErrorState, Input, Select, Skeleton, buttonVariants } from '@/components/ui';
-import { branchName, groupBranches, useBranches } from '@/features/branches/api';
+import { type ActiveFilter, Button, EmptyState, ErrorState, ListToolbar, LoadMore, Select, Skeleton, buttonVariants } from '@/components/ui';
+import { BranchSelect, useBranchLabel } from '@/features/branches/BranchSelect';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatTotal, useLanguageStore, useT } from '@/i18n';
 import { type SearchFilters, useMyMatrimony, useProfileSearch } from './api';
@@ -16,7 +16,6 @@ export function SearchPage() {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
   const mine = useMyMatrimony();
-  const branches = useBranches();
   const [params, setParams] = useSearchParams();
   const live = (mine.data?.profiles ?? []).filter((p) => p.status === 'active');
 
@@ -52,6 +51,36 @@ export function SearchPage() {
     setEducation('');
     setParams(forProfile ? { for: forProfile } : {}, { replace: true });
   };
+  const branchLabel = useBranchLabel(filters.branchId);
+  const ageLabel =
+    filters.ageMin && filters.ageMax
+      ? t('matrimony.search.ageRange', { min: filters.ageMin, max: filters.ageMax })
+      : filters.ageMin
+        ? t('matrimony.search.fromAge', { age: filters.ageMin })
+        : filters.ageMax
+          ? t('matrimony.search.toAge', { age: filters.ageMax })
+          : null;
+  const active: ActiveFilter[] = [
+    ...(ageLabel
+      ? [
+          {
+            key: 'age',
+            label: `${t('matrimony.search.age')}: ${ageLabel}`,
+            onRemove: () =>
+              setParams(
+                (prev) => {
+                  const next = new URLSearchParams(prev);
+                  next.delete('ageMin');
+                  next.delete('ageMax');
+                  return next;
+                },
+                { replace: true },
+              ),
+          },
+        ]
+      : []),
+    ...(branchLabel ? [{ key: 'branch', label: `${t('directory.filterBranch')}: ${branchLabel}`, onRemove: () => set('branch', '') }] : []),
+  ];
 
   if (mine.isPending) return <Skeleton className="h-40 w-full rounded-md" />;
   if (mine.isError) return <ErrorState title={t('matrimony.error.title')} error={mine.error} onRetry={() => mine.refetch()} />;
@@ -106,11 +135,7 @@ export function SearchPage() {
             <ProfileCardView key={p.id} profile={p} href={`/matrimony/profiles/${p.id}?from=${forProfile}`} />
           ))}
         </ul>
-        {results.hasNextPage && (
-          <Button variant="secondary" className="self-center" loading={results.isFetchingNextPage} onClick={() => results.fetchNextPage()}>
-            {t('matrimony.search.more')}
-          </Button>
-        )}
+        <LoadMore {...results} label={t('matrimony.search.more')} />
       </div>
     );
   }
@@ -130,54 +155,50 @@ export function SearchPage() {
       )}
       {own.gotra && <p className="text-sm text-fg-muted">{t('matrimony.search.gotraRule', { gotra: gotraName(own.gotra, language) ?? '' })}</p>}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Select label={t('matrimony.search.ageMin')} value={filters.ageMin} onChange={(e) => set('ageMin', e.target.value)}>
-          <option value="">{t('matrimony.search.any')}</option>
-          {AGES.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </Select>
-        <Select label={t('matrimony.search.ageMax')} value={filters.ageMax} onChange={(e) => set('ageMax', e.target.value)}>
-          <option value="">{t('matrimony.search.any')}</option>
-          {AGES.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </Select>
-        <Select label={t('directory.filterBranch')} value={filters.branchId} onChange={(e) => set('branch', e.target.value)} fieldClassName="col-span-2 md:col-span-1">
-          <option value="">{t('directory.allBranches')}</option>
-          {groupBranches(branches.data ?? [], language).map(({ district, children }) => (
-            <optgroup key={district.id} label={branchName(district, language)}>
-              <option value={district.id}>
-                {branchName(district, language)} ({t('branchKind.district')})
-              </option>
-              {children.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {branchName(b, language)}
+      <ListToolbar
+        search={{ value: education, onChange: setEducation, label: t('matrimony.search.education'), placeholder: t('matrimony.search.educationPlaceholder') }}
+        active={active}
+        onClearAll={clear}
+        summary={total === undefined ? <Skeleton className="h-4 w-24" /> : t('matrimony.search.count', { count: formatTotal(total, language) })}
+        filters={
+          <>
+            <Select
+              label={t('matrimony.search.ageMin')}
+              hideLabel
+              value={filters.ageMin}
+              onChange={(e) => set('ageMin', e.target.value)}
+              fieldClassName="md:w-32"
+            >
+              <option value="">{t('matrimony.search.ageMinAny')}</option>
+              {AGES.map((a) => (
+                <option key={a} value={a}>
+                  {t('matrimony.search.fromAge', { age: a })}
                 </option>
               ))}
-            </optgroup>
-          ))}
-        </Select>
-        <Input
-          label={t('member.education')}
-          placeholder="B.E., M.Com…"
-          value={education}
-          onChange={(e) => setEducation(e.target.value)}
-          fieldClassName="col-span-2 md:col-span-1"
-        />
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-fg-muted tabular-nums">{total === undefined ? '' : t('matrimony.search.count', { count: formatTotal(total, language) })}</p>
-        {filtered && (
-          <Button variant="ghost" size="sm" leadingIcon={X} onClick={clear}>
-            {t('directory.clearFilters')}
-          </Button>
-        )}
-      </div>
+            </Select>
+            <Select
+              label={t('matrimony.search.ageMax')}
+              hideLabel
+              value={filters.ageMax}
+              onChange={(e) => set('ageMax', e.target.value)}
+              fieldClassName="md:w-32"
+            >
+              <option value="">{t('matrimony.search.ageMaxAny')}</option>
+              {AGES.map((a) => (
+                <option key={a} value={a}>
+                  {t('matrimony.search.toAge', { age: a })}
+                </option>
+              ))}
+            </Select>
+            <BranchSelect
+              label={t('directory.filterBranch')}
+              allLabel={t('directory.allBranches')}
+              value={filters.branchId}
+              onChange={(v) => set('branch', v)}
+            />
+          </>
+        }
+      />
       {body}
     </div>
   );

@@ -1,4 +1,4 @@
-import { HeartHandshake, Inbox, Search, UserRound } from 'lucide-react';
+import { HeartHandshake, Inbox, Search, UserRound } from '@/components/ui/icons';
 import { Navigate, NavLink, Outlet } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EmptyState, Icon, Skeleton } from '@/components/ui';

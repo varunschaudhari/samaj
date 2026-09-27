@@ -1,4 +1,4 @@
-import { MapPin } from 'lucide-react';
+import { MapPin } from '@/components/ui/icons';
 import { Link } from 'react-router';
 import { EmptyState, buttonVariants } from '@/components/ui';
 import { useT } from '@/i18n';

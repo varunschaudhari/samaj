@@ -1,5 +1,17 @@
 import { type Permission, type Role, can } from '@samaj/shared';
-import { BookUser, ClipboardCheck, HeartHandshake, House, type LucideIcon, Megaphone, Palette, ShieldCheck, UserRound, UsersRound } from 'lucide-react';
+import {
+  type AppIcon,
+  BookUser,
+  ClipboardCheck,
+  Dashboard,
+  HeartHandshake,
+  House,
+  Megaphone,
+  Palette,
+  ShieldCheck,
+  UserRound,
+  UsersRound,
+} from '@/components/ui/icons';
 import type { MessageKey } from '@/i18n';
 
 export interface NavItem {
@@ -7,7 +19,7 @@ export interface NavItem {
   label: MessageKey;
   /** A shorter label for the phone tab bar, where five share 360px. */
   tabLabel?: MessageKey;
-  icon: LucideIcon;
+  icon: AppIcon;
   /** Shown only to roles with this permission. */
   permission?: Permission;
   /** Shows the count of families waiting for review. */
@@ -24,6 +36,8 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { to: '/home', label: 'nav.home', icon: House },
+  // On phones the dashboard is a Home tile, keeping the tab bar at five.
+  { to: '/dashboard', label: 'nav.dashboard', icon: Dashboard, permission: 'member:verify', sidebarOnly: true },
   { to: '/directory', label: 'nav.directory', icon: BookUser },
   { to: '/community', label: 'nav.community', tabLabel: 'nav.community.short', icon: Megaphone },
   { to: '/family', label: 'nav.family', tabLabel: 'nav.family.short', icon: UsersRound },

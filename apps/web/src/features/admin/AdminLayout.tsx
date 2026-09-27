@@ -1,5 +1,5 @@
 import { can } from '@samaj/shared';
-import { ClipboardCheck, Network, Users } from 'lucide-react';
+import { ClipboardCheck, Network, Users } from '@/components/ui/icons';
 import { Navigate, NavLink, Outlet } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Icon } from '@/components/ui';

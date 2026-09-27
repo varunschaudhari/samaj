@@ -1,5 +1,5 @@
 import type { PublicUser } from '@samaj/shared';
-import { Clock, TriangleAlert, UserPlus } from 'lucide-react';
+import { Clock, TriangleAlert, UserPlus } from '@/components/ui/icons';
 import { Link } from 'react-router';
 import { EmptyState, Icon, buttonVariants } from '@/components/ui';
 import { branchName, useBranches } from '@/features/branches/api';

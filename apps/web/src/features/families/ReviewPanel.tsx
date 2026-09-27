@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type FamilyDetail, rejectFamilySchema } from '@samaj/shared';
-import { BadgeCheck, MessageSquareWarning, Send } from 'lucide-react';
+import { BadgeCheck, MessageSquareWarning, Send } from '@/components/ui/icons';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button, Card, CardTitle, Modal, Textarea, toast } from '@/components/ui';

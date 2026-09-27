@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { GENDERS, type SignupInput, signupSchema } from '@samaj/shared';
-import { Phone, RotateCw, UsersRound } from 'lucide-react';
+import { Phone, RotateCw, UsersRound } from '@/components/ui/icons';
 import { type UseFormRegisterReturn, useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router';
 import { Button, Card, Icon, Input, Select, Skeleton } from '@/components/ui';

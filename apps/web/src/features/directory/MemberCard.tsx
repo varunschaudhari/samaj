@@ -1,5 +1,5 @@
 import { type Member, formatPhone, gotraName } from '@samaj/shared';
-import { Phone } from 'lucide-react';
+import { Phone } from '@/components/ui/icons';
 import { Link } from 'react-router';
 import { Avatar, Badge, Icon, Skeleton } from '@/components/ui';
 import { placeLabel } from '@/features/branches/api';

@@ -1,26 +1,41 @@
-import type { PendingFamily } from '@samaj/shared';
-import { ChevronRight, ClipboardCheck, HeartHandshake, MapPin, UserPlus } from 'lucide-react';
+import { type PendingFamily, type ReviewSort, isGlobalRole } from '@samaj/shared';
+import { ChevronRight, ClipboardCheck, HeartHandshake, HourglassMedium, MapPin, UserPlus } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Avatar, Button, Card, EmptyState, ErrorState, Icon, Skeleton, Tabs } from '@/components/ui';
+import { type ActiveFilter, Avatar, Badge, Button, EmptyState, ErrorState, Icon, ListToolbar, LoadMore, Skeleton, SortSelect, Tabs } from '@/components/ui';
+import { useMe } from '@/features/auth/api';
 import { placeLabel } from '@/features/branches/api';
-import { usePendingFamilies } from '@/features/families/api';
+import { BranchSelect, useBranchLabel } from '@/features/branches/BranchSelect';
+import { type ReviewFilters, usePendingFamilies } from '@/features/families/api';
 import { EnrolFamilyModal } from '@/features/families/EnrolFamilyModal';
 import { usePendingProfiles } from '@/features/matrimony/api';
 import { ProfileCardSkeleton, ProfileCardView } from '@/features/matrimony/ProfileCardView';
-import { formatDate, formatNumber, formatTotal, useLanguageStore, useT } from '@/i18n';
+import { formatDate, formatTotal, useLanguageStore, useT } from '@/i18n';
+
+/** Past a week, a waiting family is flagged red. */
+const LONG_WAIT_DAYS = 7;
+const DAY = 24 * 60 * 60 * 1000;
+const LIST = 'divide-y divide-line overflow-hidden rounded-md border border-line bg-surface shadow-card';
 
 function PendingCard({ family }: { family: PendingFamily }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
+  const days = Math.floor((Date.now() - new Date(family.submittedAt).getTime()) / DAY);
   return (
-    <Card as="li" padding="none">
-      {/* The whole card is the link: a big target on phones. */}
-      <Link to={`/families/${family.id}`} className="flex items-center gap-3 rounded-md p-4 transition-colors duration-150 hover:bg-surface-muted">
+    <li>
+      {/* The whole row is the link: a big target on phones. */}
+      <Link to={`/families/${family.id}`} className="flex items-center gap-3 px-4 py-3 transition-colors duration-150 hover:bg-surface-muted">
         <Avatar name={family.headName} size="lg" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <p className="font-display text-lg font-semibold break-words text-fg">{t('family.title', { name: family.headName })}</p>
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-semibold break-words text-fg">{t('family.title', { name: family.headName })}</span>
+            {days >= 1 && (
+              <Badge tone={days > LONG_WAIT_DAYS ? 'danger' : 'warning'} icon={HourglassMedium}>
+                {t('review.waitingDays', { count: days })}
+              </Badge>
+            )}
+          </p>
           <p className="flex items-center gap-1 text-sm text-fg-muted">
             <Icon icon={MapPin} size="sm" />
             <span className="truncate">{placeLabel(family.place, family.branch, language)}</span>
@@ -34,13 +49,13 @@ function PendingCard({ family }: { family: PendingFamily }) {
           <Icon icon={ChevronRight} />
         </span>
       </Link>
-    </Card>
+    </li>
   );
 }
 
 function PendingCardSkeleton() {
   return (
-    <li className="flex items-center gap-3 rounded-md border border-line bg-surface p-4" aria-hidden="true">
+    <li className="flex items-center gap-3 px-4 py-3" aria-hidden="true">
       <Skeleton className="size-12 rounded-full" />
       <div className="flex flex-1 flex-col gap-2">
         <Skeleton className="h-5 w-2/3" />
@@ -54,7 +69,13 @@ function PendingCardSkeleton() {
 export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
-  const pending = usePendingFamilies();
+  const me = useMe();
+  const [filters, setFilters] = useState<ReviewFilters>({ branchId: '', sort: 'oldest' });
+  const pending = usePendingFamilies(filters);
+  const branchLabel = useBranchLabel(filters.branchId);
+  const active: ActiveFilter[] = branchLabel
+    ? [{ key: 'branch', label: `${t('directory.filterBranch')}: ${branchLabel}`, onRemove: () => setFilters((f) => ({ ...f, branchId: '' })) }]
+    : [];
   const [enrolling, setEnrolling] = useState(false);
   const items = pending.data?.pages.flatMap((p) => p.items) ?? [];
   const total = pending.data?.pages[0]?.total;
@@ -62,7 +83,7 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
   let body;
   if (pending.isPending) {
     body = (
-      <ul className="flex flex-col gap-3" aria-busy="true" aria-label={t('common.loading')}>
+      <ul className={LIST} aria-busy="true" aria-label={t('common.loading')}>
         {[0, 1, 2].map((i) => (
           <PendingCardSkeleton key={i} />
         ))}
@@ -71,20 +92,20 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
   } else if (pending.isError && items.length === 0) {
     body = <ErrorState title={t('review.error.title')} error={pending.error} onRetry={() => pending.refetch()} retrying={pending.isFetching} />;
   } else if (items.length === 0) {
-    body = <EmptyState icon={ClipboardCheck} title={t('review.empty.title')} body={t('review.empty.body')} />;
+    body = filters.branchId ? (
+      <EmptyState icon={ClipboardCheck} title={t('review.emptyBranch.title')} body={t('review.emptyBranch.body')} />
+    ) : (
+      <EmptyState icon={ClipboardCheck} title={t('review.empty.title')} body={t('review.empty.body')} />
+    );
   } else {
     body = (
       <div className="flex flex-col gap-4">
-        <ul className="flex flex-col gap-3">
+        <ul className={LIST} aria-busy={pending.isPlaceholderData || undefined}>
           {items.map((f) => (
             <PendingCard key={f.id} family={f} />
           ))}
         </ul>
-        {pending.hasNextPage && (
-          <Button variant="secondary" className="self-center" loading={pending.isFetchingNextPage} onClick={() => pending.fetchNextPage()}>
-            {t('directory.loadMore')}
-          </Button>
-        )}
+        <LoadMore {...pending} label={t('review.loadMore')} />
       </div>
     );
   }
@@ -126,7 +147,7 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
       {!embedded && (
         <PageHeader
           title={t('review.page.title')}
-          description={total === undefined ? <Skeleton className="h-4 w-32" /> : <span className="tabular-nums">{t('review.page.count', { count: formatTotal(total, language) })}</span>}
+          description={total === undefined ? <Skeleton className="h-4 w-32" /> : <span className="tabular-nums">{t('review.page.countShort', { count: formatTotal(total, language) })}</span>}
           actions={enrolButton}
         />
       )}
@@ -134,7 +155,40 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
       <Tabs
         label={t('review.page.title')}
         items={[
-          { id: 'families', label: `${t('review.tab.families')}${count(total)}`, content: body },
+          {
+            id: 'families',
+            label: `${t('review.tab.families')}${count(total)}`,
+            content: (
+              <div className="flex flex-col gap-3">
+                <ListToolbar
+                  active={active}
+                  summary={total === undefined ? <Skeleton className="h-4 w-24" /> : t('review.page.countShort', { count: formatTotal(total, language) })}
+                  filters={
+                    <BranchSelect
+                      label={t('directory.filterBranch')}
+                      allLabel={t('review.allMyBranches')}
+                      value={filters.branchId}
+                      onChange={(branchId) => setFilters((f) => ({ ...f, branchId }))}
+                      within={me.data && !isGlobalRole(me.data.role) ? me.data.branchId : undefined}
+                      fieldClassName="sm:w-56"
+                    />
+                  }
+                  sort={
+                    <SortSelect<ReviewSort>
+                      label={t('list.sortBy')}
+                      value={filters.sort}
+                      onChange={(sort) => setFilters((f) => ({ ...f, sort }))}
+                      options={[
+                        { value: 'oldest', label: t('review.sort.oldest') },
+                        { value: 'newest', label: t('review.sort.newest') },
+                      ]}
+                    />
+                  }
+                />
+                {body}
+              </div>
+            ),
+          },
           { id: 'profiles', label: `${t('review.tab.profiles')}${count(profiles.data?.length)}`, content: profileBody },
         ]}
       />

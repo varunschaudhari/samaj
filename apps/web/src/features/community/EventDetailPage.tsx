@@ -1,5 +1,5 @@
 import { MAX_RSVP_PEOPLE } from '@samaj/shared';
-import { ArrowLeft, CalendarDays, CircleCheck, Clock, ExternalLink, MapPin, Minus, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, CalendarDays, CircleCheck, Clock, ExternalLink, MapPin, Minus, Pencil, Plus, Trash2, Users } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Button, Card, CardTitle, EmptyState, ErrorState, Icon, IconButton, Modal, Skeleton, buttonVariants, toast } from '@/components/ui';

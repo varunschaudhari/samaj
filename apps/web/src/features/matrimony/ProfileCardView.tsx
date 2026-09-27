@@ -1,5 +1,5 @@
 import { type ProfileCard, type ProfileStatus, gotraName } from '@samaj/shared';
-import { MapPin } from 'lucide-react';
+import { MapPin } from '@/components/ui/icons';
 import { Link } from 'react-router';
 import { Avatar, Badge, Card, Icon, Skeleton } from '@/components/ui';
 import { placeLabel } from '@/features/branches/api';

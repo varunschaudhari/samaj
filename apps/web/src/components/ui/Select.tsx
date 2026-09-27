@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown } from '@/components/ui/icons';
 import type { ComponentProps } from 'react';
 import { cn } from '@/lib/cn';
 import { Field, type FieldProps, controlClasses } from './Field';

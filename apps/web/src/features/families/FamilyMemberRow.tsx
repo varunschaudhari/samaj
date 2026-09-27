@@ -1,5 +1,5 @@
 import { type FamilyMember, formatPhone } from '@samaj/shared';
-import { GraduationCap, KeyRound, Pencil, Phone, Smartphone, Trash2 } from 'lucide-react';
+import { GraduationCap, KeyRound, Pencil, Phone, Smartphone, Trash2 } from '@/components/ui/icons';
 import { Avatar, Badge, Icon, IconButton, Skeleton, buttonVariants } from '@/components/ui';
 import { useT } from '@/i18n';
 import { cn } from '@/lib/cn';

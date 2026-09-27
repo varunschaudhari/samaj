@@ -1,11 +1,11 @@
-import type { LucideIcon } from 'lucide-react';
+import type { AppIcon } from '@/components/ui/icons';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { Icon } from './Icon';
 
 interface ChipProps extends Omit<ComponentProps<'button'>, 'children'> {
   selected: boolean;
-  icon?: LucideIcon;
+  icon?: AppIcon;
   children: ReactNode;
 }
 

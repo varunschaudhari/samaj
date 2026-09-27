@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type Branch, type EnrolFamilyInput, GENDERS, type Language, enrolFamilySchema, isGlobalRole } from '@samaj/shared';
-import { Phone } from 'lucide-react';
+import { Phone } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';

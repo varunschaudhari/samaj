@@ -1,5 +1,5 @@
 import { type ProfileDetail, formatPhone, gotraName } from '@samaj/shared';
-import { BadgeCheck, Check, Clock, EyeOff, HeartHandshake, MapPin, Pause, Pencil, Phone, Play, Send, Trash2, TriangleAlert, X } from 'lucide-react';
+import { BadgeCheck, Check, Clock, EyeOff, HeartHandshake, MapPin, Pause, Pencil, Phone, Play, Send, Trash2, TriangleAlert, X } from '@/components/ui/icons';
 import { type ReactNode, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { Avatar, Button, Card, CardTitle, EmptyState, ErrorState, Icon, Modal, Select, Skeleton, Textarea, buttonVariants, toast } from '@/components/ui';

@@ -1,5 +1,5 @@
 import { type EventDetail, isGlobalRole } from '@samaj/shared';
-import { MapPin } from 'lucide-react';
+import { MapPin } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button, Input, Modal, Select, Textarea, toast } from '@/components/ui';

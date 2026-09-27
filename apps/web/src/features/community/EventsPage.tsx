@@ -1,10 +1,11 @@
 import { can } from '@samaj/shared';
-import { CalendarDays, Plus } from 'lucide-react';
+import { CalendarDays, Plus, SearchX } from '@/components/ui/icons';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Button, EmptyState, ErrorState } from '@/components/ui';
+import { type ActiveFilter, Button, EmptyState, ErrorState, ListToolbar, Select, Skeleton } from '@/components/ui';
 import { useMe } from '@/features/auth/api';
-import { useT } from '@/i18n';
+import { branchName } from '@/features/branches/api';
+import { useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { EventCard, EventCardSkeleton } from './EventCard';
 import { EventFormModal } from './EventFormModal';
@@ -18,6 +19,29 @@ export function EventsPage() {
   const events = useEvents(when);
   const [creating, setCreating] = useState(false);
   const canCreate = me.data ? can(me.data.role, 'notice:publish') : false;
+  const language = useLanguageStore((s) => s.language);
+  const [search, setSearch] = useState('');
+  const [branchId, setBranchId] = useState('');
+
+  // A branch sees at most a hundred events at a time, so search and the branch filter run here.
+  const all = events.data ?? [];
+  const branchOptions = [...new Map(all.map((e) => [e.branch.id, e.branch])).values()].sort((a, b) =>
+    branchName(a, language).localeCompare(branchName(b, language), language),
+  );
+  const q = search.trim().toLocaleLowerCase();
+  const shown = all.filter(
+    (e) =>
+      (!branchId || e.branch.id === branchId) &&
+      (!q || [e.title, e.venue, e.branch.name, e.branch.nameMr].some((field) => field.toLocaleLowerCase().includes(q))),
+  );
+  const branch = branchOptions.find((b) => b.id === branchId);
+  const active: ActiveFilter[] = branch
+    ? [{ key: 'branch', label: `${t('directory.filterBranch')}: ${branchName(branch, language)}`, onRemove: () => setBranchId('') }]
+    : [];
+  const clearAll = () => {
+    setSearch('');
+    setBranchId('');
+  };
 
   let body;
   if (events.isPending) {
@@ -30,7 +54,20 @@ export function EventsPage() {
     );
   } else if (events.isError) {
     body = <ErrorState title={t('events.error')} error={events.error} onRetry={() => events.refetch()} retrying={events.isFetching} />;
-  } else if (events.data.length === 0) {
+  } else if (all.length > 0 && shown.length === 0) {
+    body = (
+      <EmptyState
+        icon={SearchX}
+        title={t('events.noMatch.title')}
+        body={t('events.noMatch.body')}
+        action={
+          <Button variant="secondary" onClick={clearAll}>
+            {t('directory.clearFilters')}
+          </Button>
+        }
+      />
+    );
+  } else if (all.length === 0) {
     body =
       when === 'upcoming' ? (
         <EmptyState
@@ -45,7 +82,7 @@ export function EventsPage() {
   } else {
     body = (
       <ul className="flex flex-col gap-3" aria-busy={events.isPlaceholderData || undefined}>
-        {events.data.map((e) => (
+        {shown.map((e) => (
           <EventCard key={e.id} event={e} />
         ))}
       </ul>
@@ -55,7 +92,7 @@ export function EventsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="group" aria-label={t('events.when')} className="inline-flex rounded-full border border-line-strong p-0.5">
+        <div role="group" aria-label={t('events.when')} className="inline-flex rounded-full border border-line-strong bg-surface p-0.5">
           {(['upcoming', 'past'] as const).map((w) => (
             <button
               key={w}
@@ -77,6 +114,22 @@ export function EventsPage() {
           </Button>
         )}
       </div>
+      <ListToolbar
+        search={{ value: search, onChange: setSearch, label: t('events.search'), placeholder: t('events.searchPlaceholder') }}
+        active={active}
+        onClearAll={clearAll}
+        summary={events.data ? t('events.showing', { count: shown.length }) : <Skeleton className="h-4 w-24" />}
+        filters={
+          <Select label={t('directory.filterBranch')} hideLabel value={branchId} onChange={(e) => setBranchId(e.target.value)} fieldClassName="md:w-48">
+            <option value="">{t('directory.allBranches')}</option>
+            {branchOptions.map((b) => (
+              <option key={b.id} value={b.id}>
+                {branchName(b, language)}
+              </option>
+            ))}
+          </Select>
+        }
+      />
       {body}
       <EventFormModal target={creating ? 'new' : null} onClose={() => setCreating(false)} onSaved={(id) => navigate(`/community/events/${id}`)} />
     </div>

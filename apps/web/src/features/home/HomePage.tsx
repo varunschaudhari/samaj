@@ -4,14 +4,15 @@ import {
   CalendarDays,
   ChevronRight,
   ClipboardCheck,
+  Dashboard,
   HeartHandshake,
-  type LucideIcon,
+  type AppIcon,
   Megaphone,
   PhoneCall,
   RotateCw,
   Search,
   UsersRound,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { type FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Button, Icon, Skeleton, buttonVariants } from '@/components/ui';
@@ -21,7 +22,7 @@ import { EventCard, EventCardSkeleton } from '@/features/community/EventCard';
 import { useEvents } from '@/features/community/events-api';
 import { KIND_STYLE } from '@/features/community/NoticeCard';
 import { useNotices } from '@/features/community/notices-api';
-import { usePendingCount } from '@/features/families/api';
+import { useDashboard } from '@/features/dashboard/api';
 import { VerificationNotice } from '@/features/families/VerificationNotice';
 import { type MessageKey, formatDate, formatNumber, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
@@ -94,7 +95,7 @@ function Hero({ user, canBrowse }: { user: PublicUser; canBrowse: boolean }) {
 interface Tile {
   to: string;
   label: MessageKey;
-  icon: LucideIcon;
+  icon: AppIcon;
   tone: string;
 }
 
@@ -106,7 +107,10 @@ function QuickTiles({ user, canBrowse }: { user: PublicUser; canBrowse: boolean 
     { to: '/community/events', label: 'community.events', icon: CalendarDays, tone: 'bg-info-soft text-info' },
     { to: '/community/notices', label: 'community.notices', icon: Megaphone, tone: 'bg-primary-soft text-primary' },
     ...(canBrowse ? [{ to: '/matrimony', label: 'nav.matrimony', icon: HeartHandshake, tone: 'bg-kumkum-soft text-kumkum' } as const] : []),
-    { to: '/community/committee', label: 'home.whoToCall', icon: PhoneCall, tone: 'bg-success-soft text-success' },
+    // The committee are the people others call; they get their dashboard here instead.
+    can(user.role, 'member:verify')
+      ? { to: '/dashboard', label: 'nav.dashboard', icon: Dashboard, tone: 'bg-success-soft text-success' }
+      : { to: '/community/committee', label: 'home.whoToCall', icon: PhoneCall, tone: 'bg-success-soft text-success' },
   ];
   return (
     <nav aria-label={t('home.quickLinks')}>
@@ -118,7 +122,7 @@ function QuickTiles({ user, canBrowse }: { user: PublicUser; canBrowse: boolean 
               className="flex h-full min-h-24 flex-col items-center justify-center gap-2 rounded-md border border-line bg-surface px-1 py-3 text-center shadow-card transition-colors duration-150 hover:border-line-strong active:bg-surface-muted"
             >
               <span className={cn('flex size-11 items-center justify-center rounded-full', tile.tone)}>
-                <Icon icon={tile.icon} size="lg" />
+                <Icon icon={tile.icon} size="lg" weight="duotone" />
               </span>
               <span className="text-sm leading-tight font-semibold text-fg">{t(tile.label)}</span>
             </Link>
@@ -129,35 +133,57 @@ function QuickTiles({ user, canBrowse }: { user: PublicUser; canBrowse: boolean 
   );
 }
 
-/** Committee and admins: what's waiting for them. */
-function ReviewCard({ user }: { user: PublicUser }) {
+/** Committee and admins: the figures that need them, with the way to the full dashboard. */
+function WorkCard({ user }: { user: PublicUser }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
-  const pending = usePendingCount(true);
-  const href = isGlobalRole(user.role) ? '/admin/review' : '/review';
-  const count = pending.data ?? 0;
+  const dashboard = useDashboard();
+  const d = dashboard.data;
+  const reviewHref = isGlobalRole(user.role) ? '/admin/review' : '/review';
+  const pending = d?.families.pending ?? 0;
+  const figures = d
+    ? [
+        { label: t('dashboard.waitingReview'), value: d.families.pending, strong: d.families.pending > 0 },
+        { label: t('dashboard.families'), value: d.families.verified + d.families.pending + d.families.rejected, strong: false },
+        { label: t('dashboard.members'), value: d.members, strong: false },
+      ]
+    : [];
 
   return (
-    <section className="flex items-center gap-4 rounded-md border border-line bg-surface p-4 shadow-card">
-      <span className={cn('flex size-12 shrink-0 items-center justify-center rounded-full', count > 0 ? 'bg-kumkum-soft text-kumkum' : 'bg-success-soft text-success')}>
-        <Icon icon={ClipboardCheck} size="lg" />
-      </span>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <h2 className="font-semibold text-fg">{t('home.review.title')}</h2>
-        <p className="text-sm text-fg-muted tabular-nums">
-          {pending.isPending ? (
-            <Skeleton className="mt-1 h-4 w-32" />
-          ) : pending.isError ? (
-            t('home.review.unknown')
-          ) : count > 0 ? (
-            t('home.review.waiting', { count: count > 999 ? '999+' : formatNumber(count, language) })
-          ) : (
-            t('home.review.none')
-          )}
-        </p>
+    <section aria-labelledby="home-work" className="flex flex-col gap-4 rounded-md border border-line bg-surface p-4 shadow-card">
+      <div className="flex items-center justify-between gap-2">
+        <h2 id="home-work" className="flex items-center gap-2 font-display text-lg font-semibold text-fg">
+          <Icon icon={Dashboard} weight="duotone" className="text-primary" />
+          {d?.scope ? branchName(d.scope, language) : t('dashboard.allBranches')}
+        </h2>
+        <Link to="/dashboard" className="flex min-h-touch items-center gap-0.5 px-1 text-sm font-semibold text-primary hover:underline">
+          {t('nav.dashboard')}
+          <Icon icon={ChevronRight} size="sm" />
+        </Link>
       </div>
-      <Link to={href} className={cn(buttonVariants({ variant: count > 0 ? 'primary' : 'secondary', size: 'sm' }), 'shrink-0')}>
-        {t('home.review.open')}
+      {dashboard.isPending ? (
+        <div className="grid grid-cols-3 gap-3" aria-busy="true">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-14 rounded-sm" />
+          ))}
+        </div>
+      ) : dashboard.isError ? (
+        <InlineError onRetry={() => dashboard.refetch()} retrying={dashboard.isFetching} />
+      ) : (
+        <dl className="grid grid-cols-3 gap-3">
+          {figures.map((f) => (
+            <div key={f.label} className="flex flex-col-reverse gap-0.5 rounded-sm bg-surface-muted px-3 py-2">
+              <dt className="text-xs leading-tight text-fg-muted">{f.label}</dt>
+              <dd className={cn('font-display text-2xl leading-none font-semibold tabular-nums', f.strong ? 'text-kumkum' : 'text-fg')}>
+                {formatNumber(f.value, language)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      <Link to={reviewHref} className={cn(buttonVariants({ variant: pending > 0 ? 'primary' : 'secondary' }), 'self-start')}>
+        <Icon icon={ClipboardCheck} />
+        {pending > 0 ? t('home.review.waiting', { count: pending > 999 ? '999+' : formatNumber(pending, language) }) : t('home.review.open')}
       </Link>
     </section>
   );
@@ -298,7 +324,7 @@ export function HomePage() {
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <Hero user={user} canBrowse={canBrowse} />
       {!canBrowse && <VerificationNotice user={user} />}
-      {can(user.role, 'member:verify') && <ReviewCard user={user} />}
+      {can(user.role, 'member:verify') && <WorkCard user={user} />}
       <QuickTiles user={user} canBrowse={canBrowse} />
       <div className="grid gap-6 lg:grid-cols-2">
         <UpcomingEvents />

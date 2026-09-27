@@ -1,11 +1,11 @@
 import type { Notice, NoticeKind } from '@samaj/shared';
-import { CalendarClock, Flower2, type LucideIcon, Megaphone, PartyPopper, Pencil, Pin, Trash2 } from 'lucide-react';
+import { CalendarClock, Flower2, type AppIcon, Megaphone, PartyPopper, Pencil, Pin, Trash2 } from '@/components/ui/icons';
 import { Badge, Card, IconButton, Skeleton } from '@/components/ui';
 import { branchName } from '@/features/branches/api';
 import { formatDate, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 
-export const KIND_STYLE: Record<NoticeKind, { icon: LucideIcon; tone: 'primary' | 'info' | 'zari' | 'neutral' }> = {
+export const KIND_STYLE: Record<NoticeKind, { icon: AppIcon; tone: 'primary' | 'info' | 'zari' | 'neutral' }> = {
   announcement: { icon: Megaphone, tone: 'primary' },
   meeting: { icon: CalendarClock, tone: 'info' },
   celebration: { icon: PartyPopper, tone: 'zari' },

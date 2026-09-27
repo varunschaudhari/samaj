@@ -1,4 +1,4 @@
-import { CalendarDays, type LucideIcon, Megaphone, UsersRound } from 'lucide-react';
+import { CalendarDays, type AppIcon, Megaphone, UsersRound } from '@/components/ui/icons';
 import { NavLink, Outlet } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Icon } from '@/components/ui';
@@ -6,7 +6,7 @@ import { type MessageKey, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 
 /** Sections of the Community tab. */
-export const COMMUNITY_SECTIONS: { to: string; label: MessageKey; icon: LucideIcon }[] = [
+export const COMMUNITY_SECTIONS: { to: string; label: MessageKey; icon: AppIcon }[] = [
   { to: '/community/notices', label: 'community.notices', icon: Megaphone },
   { to: '/community/events', label: 'community.events', icon: CalendarDays },
   { to: '/community/committee', label: 'community.committee', icon: UsersRound },

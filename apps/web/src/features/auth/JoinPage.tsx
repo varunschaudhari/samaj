@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type JoinInput, joinSchema } from '@samaj/shared';
-import { Phone, UsersRound } from 'lucide-react';
+import { Phone, UsersRound } from '@/components/ui/icons';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router';
 import { Button, Card, Icon, Input } from '@/components/ui';

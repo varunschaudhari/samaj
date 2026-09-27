@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type LoginInput, loginSchema } from '@samaj/shared';
-import { Phone } from 'lucide-react';
+import { Phone } from '@/components/ui/icons';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Button, Input } from '@/components/ui';

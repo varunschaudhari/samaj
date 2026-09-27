@@ -1,14 +1,15 @@
-import { can, isGotraId } from '@samaj/shared';
-import { Globe, Info, MapPin, RotateCw, Search, SearchX, Users, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { type GotraId, can, gotraName, isGotraId } from '@samaj/shared';
+import { Globe, Info, MapPin, SearchX, Users, X } from '@/components/ui/icons';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Button, Chip, ChipRow, EmptyState, ErrorState, Icon, Input, Select, Skeleton } from '@/components/ui';
+import { type ActiveFilter, Button, Chip, ChipRow, EmptyState, ErrorState, Icon, ListToolbar, LoadMore, Select, Skeleton } from '@/components/ui';
 import { useMe } from '@/features/auth/api';
 import { VerificationNotice } from '@/features/families/VerificationNotice';
-import { branchName, groupBranches, useBranches } from '@/features/branches/api';
+import { branchName, useBranches } from '@/features/branches/api';
+import { BranchSelect } from '@/features/branches/BranchSelect';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { formatTotal, useErrorMessage, useLanguageStore, useT } from '@/i18n';
+import { formatTotal, useLanguageStore, useT } from '@/i18n';
 import { gotraOptions } from '@/features/families/gotra-options';
 import { type DirectoryFilters, useMembers } from './api';
 import { MemberCard, MemberCardSkeleton } from './MemberCard';
@@ -72,9 +73,10 @@ function ScopeChips({ branchId, onPick }: { branchId: string; onPick: (branchId:
 
 interface FiltersProps extends ReturnType<typeof useFilterParams> {
   onClear: () => void;
+  summary: ReactNode;
 }
 
-function Filters({ filters, update, onClear }: FiltersProps) {
+function Filters({ filters, update, onClear, summary }: FiltersProps) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
   const branches = useBranches();
@@ -86,75 +88,51 @@ function Filters({ filters, update, onClear }: FiltersProps) {
     if (debounced !== filters.q) update({ q: debounced });
   }, [debounced]);
 
-  const hasFilters = Boolean(filters.q || filters.branchId || filters.gotra);
+  const branch = branches.data?.find((b) => b.id === filters.branchId);
+  const active: ActiveFilter[] = [
+    ...(branch ? [{ key: 'branch', label: `${t('directory.filterBranch')}: ${branchName(branch, language)}`, onRemove: () => update({ branchId: '' }) }] : []),
+    ...(filters.gotra
+      ? [{ key: 'gotra', label: `${t('directory.filterGotra')}: ${gotraName(filters.gotra as GotraId, language)}`, onRemove: () => update({ gotra: '' }) }]
+      : []),
+  ];
 
   return (
-    <div className="flex flex-col gap-3 md:flex-row md:items-end">
-      <Input
-        label={t('directory.searchLabel')}
-        hideLabel
-        type="search"
-        enterKeyHint="search"
-        placeholder={t('directory.searchPlaceholder')}
-        leadingIcon={Search}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        fieldClassName="md:flex-1"
-      />
-      <div className="grid grid-cols-2 gap-3 md:flex md:w-auto">
-        {branches.isPending ? (
-          <Skeleton className="h-touch rounded-sm md:w-48" />
-        ) : (
-          <Select
+    <ListToolbar
+      search={{ value: search, onChange: setSearch, label: t('directory.searchLabel'), placeholder: t('directory.searchPlaceholder') }}
+      active={active}
+      onClearAll={onClear}
+      quick={<ScopeChips branchId={filters.branchId} onPick={(branchId) => update({ branchId })} />}
+      summary={summary}
+      filters={
+        <>
+          <BranchSelect
             label={t('directory.filterBranch')}
-            hideLabel
+            allLabel={t('directory.allBranches')}
             value={filters.branchId}
-            onChange={(e) => update({ branchId: e.target.value })}
-            disabled={branches.isError}
-            fieldClassName="md:w-48"
+            onChange={(branchId) => update({ branchId })}
+          />
+          <Select
+            label={t('directory.filterGotra')}
+            hideLabel
+            value={filters.gotra}
+            onChange={(e) => update({ gotra: e.target.value })}
+            fieldClassName="md:w-40"
           >
-            <option value="">{t('directory.allBranches')}</option>
-            {groupBranches(branches.data ?? [], language).map(({ district, children }) => (
-              <optgroup key={district.id} label={branchName(district, language)}>
-                <option value={district.id}>
-                  {branchName(district, language)} ({t('branchKind.district')})
-                </option>
-                {children.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {branchName(b, language)}
-                  </option>
-                ))}
-              </optgroup>
+            <option value="">{t('directory.allGotras')}</option>
+            {gotraOptions(language).map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
             ))}
           </Select>
-        )}
-        <Select
-          label={t('directory.filterGotra')}
-          hideLabel
-          value={filters.gotra}
-          onChange={(e) => update({ gotra: e.target.value })}
-          fieldClassName="md:w-40"
-        >
-          <option value="">{t('directory.allGotras')}</option>
-          {gotraOptions(language).map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </Select>
-      </div>
-      {hasFilters && (
-        <Button variant="ghost" leadingIcon={X} onClick={onClear} className="self-start md:self-auto">
-          {t('directory.clearFilters')}
-        </Button>
-      )}
-    </div>
+        </>
+      }
+    />
   );
 }
 
 function Directory() {
   const t = useT();
-  const errorMessage = useErrorMessage();
   const me = useMe();
   const filterParams = useFilterParams();
   const { filters, update } = filterParams;
@@ -213,33 +191,20 @@ function Directory() {
           ))}
           {members.isFetchingNextPage && Array.from({ length: 2 }, (_, i) => <MemberCardSkeleton key={`next-${i}`} />)}
         </ul>
-        {members.isFetchNextPageError && (
-          <div role="alert" className="flex flex-wrap items-center justify-center gap-3 text-sm text-danger">
-            {errorMessage(members.error)}
-            <Button variant="secondary" size="sm" leadingIcon={RotateCw} onClick={() => members.fetchNextPage()}>
-              {t('common.retry')}
-            </Button>
-          </div>
-        )}
-        {members.hasNextPage ? (
-          <Button variant="secondary" className="self-center" onClick={() => members.fetchNextPage()} loading={members.isFetchingNextPage}>
-            {t('directory.loadMore')}
-          </Button>
-        ) : (
-          <p className="text-center text-sm text-fg-muted">{t('directory.endOfList')}</p>
-        )}
+        <LoadMore {...members} label={t('directory.loadMore')} endLabel={t('directory.endOfList')} />
       </div>
     );
   }
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <PageHeader
-        title={t('directory.title')}
-        description={total === undefined ? <Skeleton className="h-4 w-24" /> : <span className="tabular-nums">{t('directory.count', { count: formatTotal(total, language) })}</span>}
+      <PageHeader title={t('directory.title')} description={t('directory.subtitle')} />
+      <Filters
+        key={filtersKey}
+        {...filterParams}
+        onClear={clearFilters}
+        summary={total === undefined ? <Skeleton className="h-4 w-24" /> : t('directory.count', { count: formatTotal(total, language) })}
       />
-      <Filters key={filtersKey} {...filterParams} onClear={clearFilters} />
-      <ScopeChips branchId={filters.branchId} onPick={(branchId) => update({ branchId })} />
       {!canSeeContacts && me.data && (
         <p className="flex items-center gap-2 text-sm text-fg-muted">
           <Icon icon={Info} size="sm" />

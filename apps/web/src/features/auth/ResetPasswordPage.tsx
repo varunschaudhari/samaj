@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type ResetPasswordInput, resetPasswordSchema } from '@samaj/shared';
-import { KeyRound, Phone } from 'lucide-react';
+import { KeyRound, Phone } from '@/components/ui/icons';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router';
 import { Button, Card, Icon, Input, toast } from '@/components/ui';

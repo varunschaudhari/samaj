@@ -1,11 +1,11 @@
-import type { LucideIcon } from 'lucide-react';
+import type { AppIcon } from '@/components/ui/icons';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { Field, type FieldProps, controlClasses } from './Field';
 import { Icon } from './Icon';
 
 interface InputProps extends Omit<ComponentProps<'input'>, 'id'>, FieldProps {
-  leadingIcon?: LucideIcon;
+  leadingIcon?: AppIcon;
   /** Content at the end of the input, such as a show-password IconButton. */
   trailing?: ReactNode;
   fieldClassName?: string;

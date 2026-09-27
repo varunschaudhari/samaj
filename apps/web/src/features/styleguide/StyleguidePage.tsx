@@ -12,7 +12,7 @@ import {
   Trash2,
   UserPlus,
   Users,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import type { Member } from '@samaj/shared';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Link } from 'react-router';
@@ -186,7 +186,7 @@ export function StyleguidePage() {
 
         <Section id="type" title="Type">
           <p className="max-w-prose text-sm text-fg-muted">
-            Eczar for display, Noto Sans Devanagari for everything else. Ratio 1.2 from 16px, all in rem.
+            Poppins for display, Noto Sans Devanagari for everything else, both Google Fonts, self-hosted. Ratio 1.2 from 16px, all in rem.
           </p>
           <dl className="flex flex-col divide-y divide-line border-y border-line">
             {TYPE_SCALE.map((row) => (
@@ -218,7 +218,10 @@ export function StyleguidePage() {
         </Section>
 
         <Section id="icons" title="Icons">
-          <p className="max-w-prose text-sm text-fg-muted">lucide-react only. Stroke 1.75 everywhere. Colour follows the text.</p>
+          <p className="max-w-prose text-sm text-fg-muted">
+            Phosphor, through the icon list in components/ui/icons.ts. Regular for UI, fill for the current tab, duotone for tiles and figures. Colour follows
+            the text.
+          </p>
           <Row label="sm 16px · inline">
             <span className="flex items-center gap-1 text-sm">
               <Icon icon={Phone} size="sm" /> +91 98220 12345
