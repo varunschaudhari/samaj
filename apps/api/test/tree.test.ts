@@ -298,6 +298,10 @@ describe('GET /api/families/:id/tree', () => {
     // The same again: nothing changed, nothing recorded.
     await edit({ birthYear: '2020', parentId: sagar });
     expect(await history()).toHaveLength(entries);
+    // A record from before a field existed: blank and false are the same.
+    await MemberModel.updateOne({ _id: aarav }, { $unset: { formerPartner: 1, adopted: 1, maidenName: 1 } });
+    await edit({ birthYear: '2020', parentId: sagar });
+    expect(await history()).toHaveLength(entries);
   });
 
   it('lets a family choose who sees its tree', async () => {

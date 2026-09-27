@@ -338,29 +338,30 @@ const CHANGE_LABELS: Record<string, string> = {
   maidenName: 'name before marriage',
 };
 
-/** "birth year, parent (Rohit Wagh), passed away": what an edit changed, for the family's history. */
-async function describeChanges(member: HydratedDocument<MemberDoc>, oldName: string): Promise<string[]> {
+/**
+ * "birth year, parent (Rohit Wagh), passed away": what an edit changed, for
+ * the family's history. Compared by value, so a record from before a field
+ * existed (blank) and the same field saved as empty or false aren't a change.
+ */
+async function describeChanges(member: HydratedDocument<MemberDoc>, before: Record<string, unknown>): Promise<string[]> {
   const nameOf = async (id: unknown) => (id ? ((await MemberModel.findById(id, { name: 1 }).lean())?.name ?? null) : null);
-  return Promise.all(
-    member.directModifiedPaths().flatMap((path): (string | Promise<string>)[] => {
-      switch (path) {
-        case 'deceased':
-          return [member.deceased ? 'passed away' : 'no longer marked as passed away'];
-        case 'adopted':
-          return [member.adopted ? 'adopted' : 'no longer marked adopted'];
-        case 'formerPartner':
-          return [member.formerPartner ? 'no longer married' : 'married'];
-        case 'name':
-          return [`name (was ${oldName})`];
-        case 'parentId':
-        case 'partnerId':
-        case 'otherParentId':
-          return [nameOf(member.get(path)).then((name) => (name ? `${CHANGE_LABELS[path]} (${name})` : `${CHANGE_LABELS[path]} removed`))];
-        default:
-          return CHANGE_LABELS[path] ? [CHANGE_LABELS[path]] : [];
-      }
-    }),
-  );
+  const plain = (v: unknown) => (v === undefined || v === null || v === '' || v === false ? null : String(v));
+  const changed = (path: string) => plain(before[path]) !== plain(member.get(path));
+  const flags: [string, string, string][] = [
+    ['deceased', 'passed away', 'no longer marked as passed away'],
+    ['adopted', 'adopted', 'no longer marked adopted'],
+    ['formerPartner', 'no longer married', 'married'],
+  ];
+  const parts: Promise<string>[] = [];
+  for (const path of Object.keys(CHANGE_LABELS)) {
+    if (!changed(path)) continue;
+    const label = CHANGE_LABELS[path] ?? path;
+    if (path === 'name') parts.push(Promise.resolve(`name (was ${String(before.name)})`));
+    else if (path === 'parentId' || path === 'partnerId' || path === 'otherParentId') parts.push(nameOf(member.get(path)).then((name) => (name ? `${label} (${name})` : `${label} removed`)));
+    else parts.push(Promise.resolve(label));
+  }
+  for (const [path, on, off] of flags) if (changed(path)) parts.push(Promise.resolve(member.get(path) ? on : off));
+  return Promise.all(parts);
 }
 
 export async function updateMember(viewer: Viewer, familyId: string, memberId: string, input: MemberInputParsed): Promise<FamilyDetail> {
@@ -376,7 +377,7 @@ export async function updateMember(viewer: Viewer, familyId: string, memberId: s
   const passedAway = input.deceased && !member.deceased;
   await checkTies(family._id, input, member._id, viewer);
   const relationChanged = !member.isHead && member.relation !== input.relation;
-  const oldName = member.name;
+  const before = member.toObject() as Record<string, unknown>;
 
   member.name = input.name;
   member.relation = member.isHead ? 'head' : input.relation;
@@ -395,7 +396,7 @@ export async function updateMember(viewer: Viewer, familyId: string, memberId: s
   member.formerPartner = input.formerPartner;
   member.birthFamilyId = input.birthFamilyId ? new Types.ObjectId(input.birthFamilyId) : null;
   member.maidenName = input.maidenName;
-  const changes = await describeChanges(member, oldName);
+  const changes = await describeChanges(member, before);
   await member.save();
   // A son who is now a nephew is no longer anyone's father here.
   if (relationChanged) await untie(family._id, member._id);
