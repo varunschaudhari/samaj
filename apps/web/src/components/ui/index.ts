@@ -2,6 +2,7 @@ export { Avatar, initials } from './Avatar';
 export { Badge } from './Badge';
 export { Button, buttonVariants } from './Button';
 export { Card, CardTitle } from './Card';
+export { Checkbox } from './Checkbox';
 export { Chip, ChipRow } from './Chip';
 export { type ActiveFilter, ListToolbar, SortSelect } from './ListToolbar';
 export { LoadMore } from './LoadMore';

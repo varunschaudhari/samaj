@@ -76,6 +76,16 @@ The API validates `.env` at startup. If anything is missing or malformed, it pri
 | `npm run db:migrate` | Builds indexes and fills derived fields on existing records. Run once per release, before starting it (`node apps/api/dist/migrate.js` in a built deployment). |
 | `npm run db:up` / `db:down` | Start or stop MongoDB in Docker          |
 
+## Privacy and consent
+
+Built for India's Digital Personal Data Protection Act, 2023. **Have a lawyer review the notice text and these choices before launch**, and set the contact below.
+
+- **The notice** is at `/privacy`, in English and Marathi ([PrivacyNoticePage.tsx](apps/web/src/features/privacy/PrivacyNoticePage.tsx)). It names what is collected, why, who sees it, children, retention, rights (including nomination and complaints to the Data Protection Board) and a contact. Set `PRIVACY_CONTACT_NAME`, `PRIVACY_CONTACT_EMAIL` and `PRIVACY_CONTACT_PHONE` on the API; until then it points people to their branch committee.
+- **Consent:** signing up and joining with an invite need a ticked box. Whoever adds a person confirms that person agrees, or that they are the parent or guardian of anyone under 18; committee enrolment confirms the family agreed. Everyone else sees a one-time screen after sign-in and can agree, sign out, or delete their data. Until they agree, the API answers only the privacy and sign-out routes (`CONSENT_REQUIRED`). Changing `PRIVACY_NOTICE_VERSION` in [privacy.ts](packages/shared/src/schemas/privacy.ts) asks everyone again.
+- **Who sees a phone number:** the family and its branch committee by default. Each person can widen it to members of their branch, or all verified members. Anyone can also stop being listed in the directory; their family and committee still see them. People with their own sign-in choose for themselves; the family chooses for the others.
+- **Download:** Profile → Privacy and your data gives a JSON file of the account, family and history, matrimony profiles and interests, event replies, role changes and sign-ins.
+- **Deletion:** anyone can delete their own data; a family head who is the family's only account holder can delete the whole family (a head with others listed must delete the family or have the committee make someone else head). It is carried out 7 days later unless cancelled, by an hourly job in the API (or `npm run privacy:purge`). It erases the account, sessions, the person's record, photo, profile and invites; in other people's records the name becomes "Former member". **Keep database backups for no more than 30 days**, as the notice promises.
+
 ## Running at scale
 
 The app is built for lakhs of members. On a generated database of 75,000 families and 3 lakh members, every list (directory, search, People, review queues, notices) returns its page in 4–10 ms, because each one reads a single index in page order. Two-word searches take about 100 ms.

@@ -1,5 +1,5 @@
 import { type FamilyMember, formatPhone } from '@samaj/shared';
-import { GraduationCap, HourglassMedium, KeyRound, Pencil, Phone, Smartphone, Trash2 } from '@/components/ui/icons';
+import { EyeOff, GraduationCap, HourglassMedium, KeyRound, Pencil, Phone, ShieldCheck, Smartphone, Trash2 } from '@/components/ui/icons';
 import { Avatar, Badge, Icon, IconButton, Skeleton, buttonVariants } from '@/components/ui';
 import { useT } from '@/i18n';
 import { cn } from '@/lib/cn';
@@ -11,9 +11,10 @@ interface FamilyMemberRowProps {
   onRemove: () => void;
   onResetPassword: () => void;
   onInvite: () => void;
+  onPrivacy: () => void;
 }
 
-export function FamilyMemberRow({ member, canEdit, onEdit, onRemove, onResetPassword, onInvite }: FamilyMemberRowProps) {
+export function FamilyMemberRow({ member, canEdit, onEdit, onRemove, onResetPassword, onInvite, onPrivacy }: FamilyMemberRowProps) {
   const t = useT();
   const age = member.birthYear ? new Date().getFullYear() - member.birthYear : null;
   const removable = canEdit && !member.isHead && !member.hasAccount;
@@ -27,6 +28,9 @@ export function FamilyMemberRow({ member, canEdit, onEdit, onRemove, onResetPass
           <p className="font-display text-lg font-semibold break-words text-fg">{member.name}</p>
           {member.isHead && <Badge tone="primary">{t('family.headBadge')}</Badge>}
           {canEdit && member.hasAccount && <Badge>{t('family.signsIn')}</Badge>}
+          {member.privacy && !member.privacy.listed && (
+            <Badge icon={EyeOff}>{t('privacy.notListedBadge')}</Badge>
+          )}
           {member.approval === 'pending' && (
             <Badge tone="warning" icon={HourglassMedium}>
               {t('family.awaitingApproval')}
@@ -51,8 +55,9 @@ export function FamilyMemberRow({ member, canEdit, onEdit, onRemove, onResetPass
           </a>
         )}
       </div>
-      {(canEdit || member.canResetPassword) && (
+      {(canEdit || member.canResetPassword || member.canEditPrivacy) && (
         <div className="flex shrink-0">
+          {member.canEditPrivacy && <IconButton icon={ShieldCheck} label={t('privacy.settingsFor', { name: member.name })} onClick={onPrivacy} />}
           {member.canInvite && <IconButton icon={Smartphone} label={t('invite.createFor', { name: member.name })} onClick={onInvite} />}
           {member.canResetPassword && <IconButton icon={KeyRound} label={t('reset.createFor', { name: member.name })} onClick={onResetPassword} />}
           {canEdit && <IconButton icon={Pencil} label={t('family.editMember', { name: member.name })} onClick={onEdit} />}

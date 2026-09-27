@@ -1,10 +1,10 @@
 import { can } from '@samaj/shared';
-import { LogOut, UserRound, WifiOff } from '@/components/ui/icons';
+import { TriangleAlert, LogOut, UserRound, WifiOff } from '@/components/ui/icons';
 import { NavLink, Outlet, useNavigation } from 'react-router';
 import { Avatar, Button, Icon, Tooltip, toast } from '@/components/ui';
 import { useLogout, useMe } from '@/features/auth/api';
 import { usePendingCount } from '@/features/families/api';
-import { formatNumber, useLanguageStore, useT } from '@/i18n';
+import { formatDate, formatNumber, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useOnline } from '@/lib/offline';
 import { BrandMark } from './BrandMark';
@@ -38,6 +38,7 @@ export function AppShell() {
   const logout = useLogout();
   const me = useMe();
   const online = useOnline();
+  const language = useLanguageStore((s) => s.language);
   // A page's code is still downloading: say so at once, so a tap on a slow connection isn't met with nothing.
   const loadingPage = useNavigation().state === 'loading';
   const role = me.data?.role;
@@ -110,6 +111,12 @@ export function AppShell() {
           </div>
         </header>
 
+        {me.data?.deletionDueAt && (
+          <NavLink to="/profile/privacy" role="status" className="flex items-center justify-center gap-2 bg-danger-soft px-4 py-2 text-center text-sm text-fg">
+            <Icon icon={TriangleAlert} size="sm" className="text-danger" />
+            {t('privacy.banner', { date: formatDate(me.data.deletionDueAt, language) })}
+          </NavLink>
+        )}
         {!online && (
           <p role="status" className="sticky top-15 z-20 flex items-center justify-center gap-2 bg-warning-soft px-4 py-2 text-center text-sm text-fg md:top-0">
             <Icon icon={WifiOff} size="sm" className="text-warning" />

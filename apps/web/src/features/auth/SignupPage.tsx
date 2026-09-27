@@ -7,12 +7,13 @@ import { Button, Card, Icon, Input, Select, Skeleton } from '@/components/ui';
 import { branchName, groupBranches, useBranches } from '@/features/branches/api';
 import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { useSignup } from './api';
+import { ConsentField } from '@/features/privacy/ConsentField';
 import { AuthLayout } from './AuthLayout';
 import { FormAlert } from './FormAlert';
 import { applyServerIssues, fieldError } from './form-errors';
 import { PasswordInput } from './PasswordInput';
 
-const FIELDS = ['name', 'gender', 'phone', 'password', 'branchId'] as const;
+const FIELDS = ['name', 'gender', 'phone', 'password', 'branchId', 'consent'] as const;
 
 function BranchField({ error, register }: { error: string | undefined; register: UseFormRegisterReturn<'branchId'> }) {
   const t = useT();
@@ -63,7 +64,8 @@ export function SignupPage() {
   const signup = useSignup();
   const form = useForm({
     resolver: zodResolver(signupSchema),
-    defaultValues: { name: '', gender: '' as SignupInput['gender'], phone: '', password: '', branchId: '' } satisfies SignupInput,
+    // consent starts unticked; the schema requires true.
+    defaultValues: { name: '', gender: '' as SignupInput['gender'], phone: '', password: '', branchId: '', consent: false as unknown as true } satisfies SignupInput,
   });
   const { errors } = form.formState;
 
@@ -130,6 +132,7 @@ export function SignupPage() {
           {...form.register('password')}
         />
         <BranchField error={fieldError(t, errors.branchId?.message)} register={form.register('branchId')} />
+        <ConsentField label="privacy.consentSignup" register={form.register('consent')} error={fieldError(t, errors.consent?.message)} />
         <Button type="submit" size="lg" fullWidth loading={signup.isPending}>
           {t('auth.signup.submit')}
         </Button>

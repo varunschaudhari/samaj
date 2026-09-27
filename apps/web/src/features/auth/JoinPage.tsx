@@ -6,12 +6,13 @@ import { Link, useNavigate } from 'react-router';
 import { Button, Card, Icon, Input } from '@/components/ui';
 import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { useJoin } from './api';
+import { ConsentField } from '@/features/privacy/ConsentField';
 import { AuthLayout } from './AuthLayout';
 import { FormAlert } from './FormAlert';
 import { applyServerIssues, fieldError } from './form-errors';
 import { PasswordInput } from './PasswordInput';
 
-const FIELDS = ['phone', 'code', 'password'] as const;
+const FIELDS = ['phone', 'code', 'password', 'consent'] as const;
 
 /**
  * For someone already listed in a family: their family head or branch
@@ -23,7 +24,7 @@ export function JoinPage() {
   const errorMessage = useErrorMessage();
   const navigate = useNavigate();
   const join = useJoin();
-  const form = useForm({ resolver: zodResolver(joinSchema), defaultValues: { phone: '', code: '', password: '' } satisfies JoinInput });
+  const form = useForm({ resolver: zodResolver(joinSchema), defaultValues: { phone: '', code: '', password: '', consent: false as unknown as true } satisfies JoinInput });
   const { errors } = form.formState;
   const showBanner = join.isError && !FIELDS.some((f) => errors[f]?.type === 'server');
 
@@ -83,6 +84,7 @@ export function JoinPage() {
           error={fieldError(t, errors.password?.message)}
           {...form.register('password')}
         />
+        <ConsentField label="privacy.consentSignup" register={form.register('consent')} error={fieldError(t, errors.consent?.message)} />
         <Button type="submit" size="lg" fullWidth loading={join.isPending}>
           {t('join.submit')}
         </Button>

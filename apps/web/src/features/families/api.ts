@@ -35,7 +35,7 @@ export function useUpdateFamily(familyId: string) {
 }
 
 export function useSaveMember(familyId: string) {
-  return useFamilyMutation(familyId, ({ memberId, input }: { memberId: string | null; input: MemberInput }) =>
+  return useFamilyMutation(familyId, ({ memberId, input }: { memberId: string | null; input: MemberInput & { consent?: true } }) =>
     memberId ? api.put(`/families/${familyId}/members/${memberId}`, input) : api.post(`/families/${familyId}/members`, input),
   );
 }

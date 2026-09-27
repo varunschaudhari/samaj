@@ -17,6 +17,7 @@ import { MemberFormModal } from './MemberFormModal';
 import { ResetCodeModal } from '@/features/users/ResetCodeModal';
 import { ReviewPanel } from './ReviewPanel';
 import { FamilyRequestsPanel, RelatedFamilies } from './FamilyLinks';
+import { MemberPrivacyModal } from '@/features/privacy/PrivacyControls';
 
 /** /family: the signed-in user's own family. */
 export function MyFamilyRedirect() {
@@ -136,6 +137,7 @@ export function FamilyPage() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [resetTarget, setResetTarget] = useState<{ userId: string; name: string } | null>(null);
   const [inviting, setInviting] = useState<FamilyMember | null>(null);
+  const [privacyFor, setPrivacyFor] = useState<FamilyMember | null>(null);
 
   if (family.isPending) return <FamilySkeleton />;
 
@@ -179,6 +181,7 @@ export function FamilyPage() {
             onRemove={() => setRemoving(m)}
             onResetPassword={() => m.accountId && setResetTarget({ userId: m.accountId, name: m.name })}
             onInvite={() => setInviting(m)}
+            onPrivacy={() => setPrivacyFor(m)}
           />
         ))}
       </ul>
@@ -246,6 +249,7 @@ export function FamilyPage() {
         members
       )}
 
+      <MemberPrivacyModal member={privacyFor} isSelf={privacyFor?.id === me.data?.memberId} onClose={() => setPrivacyFor(null)} />
       <MemberFormModal familyId={data.id} member={editing?.member ?? null} open={editing !== null} onClose={() => setEditing(null)} />
       <FamilyDetailsModal family={data} open={detailsOpen} onClose={() => setDetailsOpen(false)} />
       <ResetCodeModal target={resetTarget} onClose={() => setResetTarget(null)} />

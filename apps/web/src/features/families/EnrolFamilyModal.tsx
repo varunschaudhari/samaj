@@ -4,7 +4,7 @@ import { Phone } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
-import { Button, Input, Modal, Select, Textarea, toast } from '@/components/ui';
+import { Button, Checkbox, Input, Modal, Select, Textarea, toast } from '@/components/ui';
 import { useMe } from '@/features/auth/api';
 import { FormAlert } from '@/features/auth/FormAlert';
 import { applyServerIssues, fieldError } from '@/features/auth/form-errors';
@@ -24,6 +24,7 @@ const FIELDS = [
   'head.occupation',
   'head.education',
   'head.phone',
+  'consent',
 ] as const;
 
 const emptyForm = (branchId: string): EnrolFamilyInput => ({
@@ -32,6 +33,7 @@ const emptyForm = (branchId: string): EnrolFamilyInput => ({
   gotra: '',
   address: '',
   head: { name: '', gender: '' as EnrolFamilyInput['head']['gender'], birthYear: '', occupation: '', education: '', phone: '' },
+  consent: false as unknown as true,
 });
 
 /** Admins pick any branch; committee members their own and the towns inside it. The API enforces the same. */
@@ -183,6 +185,7 @@ export function EnrolFamilyModal({ open, onClose }: { open: boolean; onClose: ()
           error={fieldError(t, errors.address?.message)}
           {...form.register('address')}
         />
+        <Checkbox label={t('privacy.consentEnrol')} error={fieldError(t, errors.consent?.message)} {...form.register('consent')} />
       </form>
     </Modal>
   );

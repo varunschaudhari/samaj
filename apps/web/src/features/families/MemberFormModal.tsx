@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type FamilyMember, GENDERS, type MemberInput, RELATIONS, memberInputSchema } from '@samaj/shared';
 import { Phone } from '@/components/ui/icons';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Button, Input, Modal, Select, toast } from '@/components/ui';
+import { Button, Checkbox, Input, Modal, Select, toast } from '@/components/ui';
 import { FormAlert } from '@/features/auth/FormAlert';
 import { applyServerIssues, fieldError } from '@/features/auth/form-errors';
 import { useErrorMessage, useT } from '@/i18n';
@@ -38,12 +38,17 @@ export function MemberFormModal({ familyId, member, open, onClose }: MemberFormM
   const save = useSaveMember(familyId);
   const form = useForm({ resolver: zodResolver(memberInputSchema), defaultValues: toFormValues(member) });
   const { errors } = form.formState;
+  // Adding someone: the person adding them confirms consent (or guardianship, for a child).
+  const [consent, setConsent] = useState(false);
+  const [consentMissing, setConsentMissing] = useState(false);
 
   // Refill the form whenever the modal opens for a different person.
   useEffect(() => {
     if (open) {
       form.reset(toFormValues(member));
       save.reset();
+      setConsent(false);
+      setConsentMissing(false);
     }
     // Only when the modal opens or switches person; resetting on every render would wipe typing.
   }, [open, member?.id]);
@@ -54,8 +59,12 @@ export function MemberFormModal({ familyId, member, open, onClose }: MemberFormM
   const showBanner = save.isError && !FIELDS.some((f) => errors[f]?.type === 'server');
 
   const onSubmit = form.handleSubmit((values) => {
+    if (!member && !consent) {
+      setConsentMissing(true);
+      return;
+    }
     save.mutate(
-      { memberId: member?.id ?? null, input: values },
+      { memberId: member?.id ?? null, input: member ? values : { ...values, consent: true } },
       {
         onSuccess: ({ family }) => {
           // Added to a verified family by the family itself: they wait for the committee.
@@ -134,6 +143,17 @@ export function MemberFormModal({ familyId, member, open, onClose }: MemberFormM
             error={fieldError(t, errors.phone?.message)}
             {...form.register('phone')}
           />
+          {!member && (
+            <Checkbox
+              label={t('privacy.consentMember')}
+              checked={consent}
+              onChange={(e) => {
+                setConsent(e.target.checked);
+                setConsentMissing(false);
+              }}
+              error={consentMissing ? t('validation.consentRequired') : undefined}
+            />
+          )}
         </form>
       </div>
     </Modal>

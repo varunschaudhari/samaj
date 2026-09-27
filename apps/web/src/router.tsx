@@ -70,6 +70,8 @@ export const router = createBrowserRouter([
           return () => <RedirectIfAuthed><ResetPasswordPage /></RedirectIfAuthed>;
         }),
       },
+      // Public, so it can be read before signing up.
+      { path: '/privacy', lazy: page(async () => (await import('@/features/privacy/PrivacyNoticePage')).PrivacyNoticePage) },
       // Public so the design system can be reviewed without an account.
       { path: '/styleguide', lazy: page(async () => (await import('@/features/styleguide/StyleguidePage')).StyleguidePage) },
       {
@@ -124,6 +126,7 @@ export const router = createBrowserRouter([
           // Old address from before People and Branches were grouped under Admin.
           { path: '/branches', element: <Navigate to="/admin/branches" replace /> },
           { path: '/profile', lazy: page(async () => (await import('@/features/profile/ProfilePage')).ProfilePage) },
+          { path: '/profile/privacy', lazy: page(async () => (await import('@/features/privacy/PrivacySettingsPage')).PrivacySettingsPage) },
         ],
       },
       { path: '*', element: <NotFoundPage /> },

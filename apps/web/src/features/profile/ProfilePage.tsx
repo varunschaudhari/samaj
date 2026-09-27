@@ -1,5 +1,5 @@
 import { formatPhone } from '@samaj/shared';
-import { Download, House, KeyRound, LogOut, Pencil } from '@/components/ui/icons';
+import { Download, House, KeyRound, LogOut, Pencil, ShieldCheck } from '@/components/ui/icons';
 import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
 import { LanguageSwitch } from '@/components/layout/LanguageSwitch';
@@ -92,6 +92,15 @@ export function ProfilePage() {
           </Button>
         </Card>
       )}
+
+      <Card padding="lg" className="flex flex-col gap-3">
+        <CardTitle>{t('privacy.settingsTitle')}</CardTitle>
+        <p className="max-w-prose text-sm text-fg-muted">{t('privacy.profileBody')}</p>
+        <Link to="/profile/privacy" className={buttonVariants({ variant: 'secondary', className: 'self-start' })}>
+          <Icon icon={ShieldCheck} />
+          {t('privacy.open')}
+        </Link>
+      </Card>
 
       <Card padding="lg" className="flex flex-col gap-3">
         <CardTitle>{t('password.title')}</CardTitle>

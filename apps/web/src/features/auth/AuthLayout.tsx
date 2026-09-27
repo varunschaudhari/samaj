@@ -1,5 +1,6 @@
 import { BookUser, CalendarDays, HeartHandshake, type AppIcon } from '@/components/ui/icons';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 import { BrandMark } from '@/components/layout/BrandMark';
 import { LanguageSwitch } from '@/components/layout/LanguageSwitch';
 import { Icon } from '@/components/ui';
@@ -54,6 +55,9 @@ export function AuthLayout({ title, subtitle, children, footer }: { title: strin
           </div>
           {children}
           <p className="text-center text-sm text-fg-muted">{footer}</p>
+          <Link to="/privacy" className="self-center text-xs text-fg-muted underline-offset-2 hover:text-fg hover:underline">
+            {t('privacy.noticeTitle')}
+          </Link>
         </div>
       </main>
     </div>
