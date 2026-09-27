@@ -39,3 +39,13 @@ export const pageQuerySchema = z.object({
   cursor: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(MEMBER_PAGE_SIZE),
 });
+
+export const REVIEW_SORTS = ['oldest', 'newest'] as const;
+export type ReviewSort = (typeof REVIEW_SORTS)[number];
+
+/** The review queue: optionally one branch (inside the viewer's reach), oldest or newest first. */
+export const pendingQuerySchema = pageQuerySchema.extend({
+  branchId: objectIdSchema.optional(),
+  sort: z.enum(REVIEW_SORTS).default('oldest'),
+});
+export type PendingQuery = z.input<typeof pendingQuerySchema>;

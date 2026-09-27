@@ -30,6 +30,26 @@ describe('the review queue', () => {
     expect(count.body).toEqual({ pending: 2, families: 2, profiles: 0 });
   });
 
+  it('filters by a branch inside the committee reach, and sorts newest first', async () => {
+    await createFamily(branches.bhusawal, { status: 'pending', people: [{ name: 'First Family' }] });
+    await createFamily(branches.amalner, { status: 'pending', people: [{ name: 'Second Family' }] });
+    await createFamily(branches.bhusawal, { status: 'pending', people: [{ name: 'Third Family' }] });
+    await createFamily(branches.pune, { status: 'pending', people: [{ name: 'Pune Family' }] });
+    const committee = await createFamily(branches.district, { account: 'committee' });
+    const heads = async (query: string) =>
+      ((await api.get(`/api/verifications${query}`).set('Cookie', committee.cookie)).body as PendingFamilyPage).items.map((f) => f.headName);
+
+    expect(await heads(`?branchId=${branches.bhusawal}`)).toEqual(['First Family', 'Third Family']);
+    expect(await heads('?sort=newest')).toEqual(['Third Family', 'Second Family', 'First Family']);
+    // Outside their reach: nothing, rather than Pune's queue.
+    expect(await heads(`?branchId=${branches.pune}`)).toEqual([]);
+
+    // Newest first also pages correctly.
+    const first = (await api.get('/api/verifications?sort=newest&limit=2').set('Cookie', committee.cookie)).body as PendingFamilyPage;
+    const rest = (await api.get(`/api/verifications?sort=newest&limit=2&cursor=${first.nextCursor}`).set('Cookie', committee.cookie)).body as PendingFamilyPage;
+    expect([...first.items, ...rest.items].map((f) => f.headName)).toEqual(['Third Family', 'Second Family', 'First Family']);
+  });
+
   it('is not available to ordinary members', async () => {
     const { cookie } = await createFamily(branches.bhusawal, { account: 'member' });
     expect((await api.get('/api/verifications').set('Cookie', cookie)).status).toBe(403);

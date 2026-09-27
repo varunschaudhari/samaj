@@ -61,6 +61,12 @@ function decodeCursor(cursor: string): { name: string; id: Types.ObjectId } {
 export async function listUsers(query: ListQuery): Promise<AdminUserPage> {
   const conditions: QueryFilter<UserDoc>[] = [];
   if (query.role) conditions.push({ role: query.role });
+  if (query.branchId) {
+    // Accounts carry their branch, not the path above it, so expand the subtree (a few dozen branches at most).
+    const id = new Types.ObjectId(query.branchId);
+    const subtree = await BranchModel.find({ $or: [{ _id: id }, { ancestors: id }] }, { _id: 1 }).lean();
+    conditions.push({ branchId: { $in: subtree.map((b) => b._id) } });
+  }
   if (query.q) {
     // A number matches from its start (after +91), and each word typed starts
     // a word of the name, so both use an index.

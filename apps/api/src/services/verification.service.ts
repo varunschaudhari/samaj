@@ -1,4 +1,4 @@
-import { BRANCH_SCOPED_ROLES, type FamilyDetail, type PendingFamilyPage, can, type pageQuerySchema } from '@samaj/shared';
+import { BRANCH_SCOPED_ROLES, type FamilyDetail, type PendingFamilyPage, can, type pendingQuerySchema } from '@samaj/shared';
 import { type QueryFilter, Types } from 'mongoose';
 import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
@@ -11,7 +11,7 @@ import { inBranch } from './audience';
 import { getFamily, loadFamily, recordHistory } from './family.service';
 import type { Viewer } from './viewer';
 
-type PageQuery = z.output<typeof pageQuerySchema>;
+type PageQuery = z.output<typeof pendingQuerySchema>;
 
 /** Pending families this viewer may review: their branch subtree, never their own (unless admin). */
 function queueFilter(viewer: Viewer): QueryFilter<FamilyDoc> {
@@ -41,17 +41,23 @@ function decodeCursor(cursor: string): { at: Date; id: Types.ObjectId } {
   throw new AppError(400, 'VALIDATION_FAILED', 'The page link is invalid. Reload the list.');
 }
 
-/** Oldest first, so families don't wait longer than they need to. */
+/** Oldest first by default, so families don't wait longer than they need to. */
 export async function listPending(viewer: Viewer, query: PageQuery): Promise<PendingFamilyPage> {
   const base = queueFilter(viewer);
-  const page: QueryFilter<FamilyDoc> = { ...base };
+  // A committee member's own scope is already in base; a branch filter narrows it.
+  if (query.branchId) base.$and = [inBranch(query.branchId)];
+  const page: QueryFilter<FamilyDoc> = { ...base, $and: [...(base.$and ?? [])] };
+  const newest = query.sort === 'newest';
   if (query.cursor) {
     const after = decodeCursor(query.cursor);
-    page.$and = [{ $or: [{ submittedAt: { $gt: after.at } }, { submittedAt: after.at, _id: { $gt: after.id } }] }];
+    const past = newest ? '$lt' : '$gt';
+    page.$and?.push({ $or: [{ submittedAt: { [past]: after.at } }, { submittedAt: after.at, _id: { [past]: after.id } }] });
   }
+  if (page.$and?.length === 0) delete page.$and;
+  const direction = newest ? -1 : 1;
 
   const [docs, total] = await Promise.all([
-    FamilyModel.find(page, { history: 0 }).sort({ submittedAt: 1, _id: 1 }).limit(query.limit + 1).lean(),
+    FamilyModel.find(page, { history: 0 }).sort({ submittedAt: direction, _id: direction }).limit(query.limit + 1).lean(),
     cappedCount(FamilyModel, base),
   ]);
   const hasMore = docs.length > query.limit;

@@ -8,6 +8,8 @@ import { objectIdSchema, phoneSchema, resetCodeSchema } from './common';
 export const userListQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
   role: z.enum(ROLES).optional(),
+  /** A branch and everything under it. */
+  branchId: objectIdSchema.optional(),
   cursor: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(MEMBER_PAGE_SIZE),
 });

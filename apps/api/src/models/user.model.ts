@@ -24,6 +24,7 @@ userSchema.index({ nameTokens: 1, name: 1, _id: 1 });
 userSchema.index({ name: 1, _id: 1 });
 userSchema.index({ role: 1, name: 1, _id: 1 });
 userSchema.index({ branchId: 1, role: 1 });
+userSchema.index({ branchId: 1, name: 1, _id: 1 });
 
 export type UserDoc = InferSchemaType<typeof userSchema> & { _id: Types.ObjectId };
 export const UserModel = model('User', userSchema);

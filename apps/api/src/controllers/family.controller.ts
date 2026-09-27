@@ -1,4 +1,4 @@
-import { enrolFamilySchema, familyUpdateSchema, memberInputSchema, pageQuerySchema, rejectFamilySchema } from '@samaj/shared';
+import { enrolFamilySchema, familyUpdateSchema, memberInputSchema, pendingQuerySchema, rejectFamilySchema } from '@samaj/shared';
 import type { Request, Response } from 'express';
 import * as familyService from '../services/family.service';
 import * as inviteService from '../services/invite.service';
@@ -63,7 +63,7 @@ export async function getPhoto(req: Request, res: Response) {
 }
 
 export async function listPending(req: Request, res: Response) {
-  const query = pageQuerySchema.parse(req.query);
+  const query = pendingQuerySchema.parse(req.query);
   res.json(await verificationService.listPending(viewer(req), query));
 }
 

@@ -38,6 +38,12 @@ describe('GET /api/users', () => {
 
     const committee = (await api.get('/api/users?role=committee').set('Cookie', admin.cookie)).body as AdminUserPage;
     expect(committee.items.map((u) => u.name)).toEqual(['Anil Wagh']);
+
+    // A district includes its towns.
+    const inDistrict = (await api.get(`/api/users?branchId=${branches.district}`).set('Cookie', admin.cookie)).body as AdminUserPage;
+    expect(inDistrict.items.map((u) => u.name)).toEqual(['Anil Wagh', 'Kavita Dhole']);
+    const inTown = (await api.get(`/api/users?branchId=${branches.amalner}`).set('Cookie', admin.cookie)).body as AdminUserPage;
+    expect(inTown.items.map((u) => u.name)).toEqual(['Kavita Dhole']);
   });
 
   it('is closed to committee members and members', async () => {
