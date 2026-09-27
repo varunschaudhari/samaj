@@ -1,4 +1,4 @@
-import { FAMILY_STATUSES, GOTRA_IDS, HISTORY_ACTIONS } from '@samaj/shared';
+import { TREE_VISIBILITIES, FAMILY_STATUSES, GOTRA_IDS, HISTORY_ACTIONS } from '@samaj/shared';
 import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
 import { branchPathPlugin } from './plugins';
 
@@ -27,6 +27,8 @@ const familySchema = new Schema(
     /** An id from the fixed list in packages/shared/src/gotras.ts, or null. */
     gotra: { type: String, enum: GOTRA_IDS, default: null },
     address: { type: String, default: null, trim: true },
+    /** Who besides the family and its committee sees the family tree. */
+    treeVisibility: { type: String, enum: TREE_VISIBILITIES, default: 'all' },
     status: { type: String, enum: FAMILY_STATUSES, default: 'pending', required: true },
     rejectionReason: { type: String, default: null },
     /** When the family last entered the review queue (signup or resubmission). */

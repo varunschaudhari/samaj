@@ -23,7 +23,7 @@ import { UserModel } from '../models/user.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { storage } from '../utils/storage';
 import { closeForRemovedMember, syncFamilyGotra, syncMember } from './matrimony.service';
-import { canEditFamily, canEnrolIn, canResetPasswordFor, canReviewFamily, canSeeContact, canSeePhone, canViewFamily, hasReach, isOwnFamily } from './access';
+import { canEditFamily, canEnrolIn, canResetPasswordFor, canReviewFamily, canSeeContact, canSeePhone, canSeeTree, canViewFamily, hasReach, isOwnFamily } from './access';
 import { actsForOwnFamily, familySummaries, linksOf, movedInFrom, movesOutOf } from './links.service';
 import { assertPhoneFree } from './phones';
 import type { Viewer } from './viewer';
@@ -171,7 +171,9 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
       canResubmit: isOwnFamily(viewer, family) && family.status === 'rejected',
       canLink: fromOwnFamily && !links.some((l) => l.family.id === viewer.familyId) && links.length < MAX_FAMILY_LINKS,
       canRequestMove: fromOwnFamily,
+      canViewTree: canSeeTree(viewer, family, links.some((l) => l.family.id === viewer.familyId)),
     },
+    ...(canEdit && { treeVisibility: family.treeVisibility ?? 'all' }),
     links,
     movedOut: movedOut
       .filter((o) => (o.family.canView || canEdit) && (seesPending || o.member.listed !== false))
@@ -243,6 +245,10 @@ export async function updateFamily(viewer: Viewer, familyId: string, input: Fami
   family.place = input.place;
   family.gotra = input.gotra;
   family.address = input.address;
+  if (input.treeVisibility && input.treeVisibility !== (family.treeVisibility ?? 'all')) {
+    family.treeVisibility = input.treeVisibility;
+    recordHistory(family, viewer, 'updated', `Family tree shown to: ${{ all: 'everyone who can see the family', linked: 'linked families', family: 'the family only' }[input.treeVisibility]}`);
+  }
   recordHistory(family, viewer, 'updated', 'Family details');
   await family.save();
   await MemberModel.updateMany({ familyId: family._id }, { $set: { place: family.place, gotra: family.gotra } });

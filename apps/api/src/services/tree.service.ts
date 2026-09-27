@@ -18,10 +18,10 @@ import { FamilyModel } from '../models/family.model';
 import { MemberModel } from '../models/member.model';
 import { MemberMoveModel } from '../models/member-move.model';
 import { SamePersonModel, personPair } from '../models/same-person.model';
-import { notFound } from '../utils/app-error';
-import { canEditFamily, canViewFamily, hasReach } from './access';
+import { AppError, notFound } from '../utils/app-error';
+import { canEditFamily, canSeeTree, canViewFamily, hasReach } from './access';
 import { photoUrl } from './family.service';
-import { familySummaries, movesOutOf } from './links.service';
+import { familySummaries, linkedToViewer, movesOutOf } from './links.service';
 import type { Viewer } from './viewer';
 
 /** Links that place a household in the tree, and the generation step each one takes. */
@@ -154,6 +154,11 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
   if (!Types.ObjectId.isValid(familyId)) throw gone();
   const root = await FamilyModel.findById(familyId, { history: 0 }).lean();
   if (!root || !canViewFamily(viewer, root)) throw gone();
+  // Families that keep their tree to themselves (or to linked families): neither drawn for others nor in their trees.
+  const linked = await linkedToViewer(viewer);
+  if (!canSeeTree(viewer, root, linked.has(familyId))) {
+    throw new AppError(403, 'FORBIDDEN', 'This family keeps its tree to itself.', [{ path: 'tree', message: 'validation.treePrivate' }]);
+  }
 
   type Placement = { generation: number; via: LinkKind | 'person' | null; from: string | null };
   const placed = new Map<string, Placement>([[familyId, { generation: 0, via: null, from: null }]]);
@@ -265,8 +270,8 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
   for (const [id, at] of placed) {
     const family = familyBy.get(id);
     const summary = summaries.get(id);
-    // Only families the viewer could open anyway.
-    if (!family || !summary?.canView) continue;
+    // Only families the viewer could open anyway, and whose tree they may see.
+    if (!family || !summary?.canView || !canSeeTree(viewer, family, linked.has(id))) continue;
     const canEdit = canEditFamily(viewer, family);
     const seesPending = canEdit || hasReach(viewer, 'member:verify', family);
     rules.set(id, { canEdit, seesPending });

@@ -133,6 +133,14 @@ export function actsForOwnFamily(viewer: Viewer, family: Pick<FamilyDoc, 'status
   return viewer.familyStatus === 'verified' && String(family._id) !== viewer.familyId && family.status === 'verified' && canViewFamily(viewer, family as FamilyDocument);
 }
 
+/** The families linked (accepted) to the viewer's own. */
+export async function linkedToViewer(viewer: Viewer): Promise<Set<string>> {
+  if (!Types.ObjectId.isValid(viewer.familyId)) return new Set();
+  const own = new Types.ObjectId(viewer.familyId);
+  const links = await FamilyLinkModel.find({ status: 'accepted', $or: [{ fromFamilyId: own }, { toFamilyId: own }] }, { fromFamilyId: 1, toFamilyId: 1 }).lean();
+  return new Set(links.map((l) => String(String(l.fromFamilyId) === viewer.familyId ? l.toFamilyId : l.fromFamilyId)));
+}
+
 /** Accepted links on a family page. The family itself sees all of them; others see the families they may open. */
 export async function linksOf(viewer: Viewer, family: FamilyDocument): Promise<FamilyLinkView[]> {
   const id = String(family._id);

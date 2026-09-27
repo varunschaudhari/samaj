@@ -230,6 +230,8 @@ export function FamilyTreePage() {
     body =
       tree.error instanceof ApiError && tree.error.status === 404 ? (
         <EmptyState icon={SearchX} title={t('family.notFound.title')} body={t('family.notFound.body')} />
+      ) : tree.error instanceof ApiError && tree.error.status === 403 ? (
+        <EmptyState icon={Network} title={t('tree.private.title')} body={t('tree.private.body')} />
       ) : (
         <ErrorState title={t('tree.error')} error={tree.error} onRetry={() => tree.refetch()} retrying={tree.isFetching} />
       );

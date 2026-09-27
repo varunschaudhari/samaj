@@ -65,10 +65,12 @@ export function FamilySummary({ family, onAdd, onEditDetails }: { family: Family
             {t('family.addMember')}
           </Button>
         )}
-        <Link to={`/families/${family.id}/tree`} className={buttonVariants({ variant: 'secondary' })}>
-          <Icon icon={Network} />
-          {t('tree.open')}
-        </Link>
+        {family.permissions.canViewTree && (
+          <Link to={`/families/${family.id}/tree`} className={buttonVariants({ variant: 'secondary' })}>
+            <Icon icon={Network} />
+            {t('tree.open')}
+          </Link>
+        )}
         {canEdit && (
           <Button variant="ghost" leadingIcon={Pencil} onClick={onEditDetails}>
             {t('family.editDetails')}

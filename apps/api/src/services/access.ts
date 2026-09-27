@@ -45,6 +45,18 @@ export function canEditFamily(viewer: Viewer, family: FamilyLike): boolean {
   return isOwnFamily(viewer, family) || hasReach(viewer, 'member:write', family);
 }
 
+/**
+ * A family's tree: the family and its branch committee always see it; others
+ * who may see the family, as the family chose: everyone, only families linked
+ * to theirs (`linked`: the viewer's family is one), or no one.
+ */
+export function canSeeTree(viewer: Viewer, family: FamilyLike & { treeVisibility?: string | null }, linked: boolean): boolean {
+  if (!canViewFamily(viewer, family)) return false;
+  if (canEditFamily(viewer, family) || hasReach(viewer, 'member:verify', family)) return true;
+  const visibility = family.treeVisibility ?? 'all';
+  return visibility === 'all' || (visibility === 'linked' && linked);
+}
+
 /** Committee members register families on their behalf inside their own branch; admins anywhere. */
 export function canEnrolIn(viewer: Viewer, branch: BranchPlaced): boolean {
   return hasReach(viewer, 'member:write', branch);

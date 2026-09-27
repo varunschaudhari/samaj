@@ -220,10 +220,19 @@ export const gotraSchema = z
   .transform((v) => (typeof v === 'string' ? v.trim() : '') || null)
   .pipe(z.enum(GOTRA_IDS, { error: 'validation.gotra' }).nullable());
 
+/**
+ * Who sees a family's tree, besides the family and its branch committee:
+ * everyone who may see the family, only families linked to it, or no one.
+ */
+export const TREE_VISIBILITIES = ['all', 'linked', 'family'] as const;
+export type TreeVisibility = (typeof TREE_VISIBILITIES)[number];
+
 export const familyUpdateSchema = z.object({
   place: z.string().trim().min(2, 'validation.placeMin').max(60, 'validation.tooLong'),
   gotra: gotraSchema,
   address: optionalText(200),
+  /** Left out: unchanged. */
+  treeVisibility: z.enum(TREE_VISIBILITIES).optional(),
 });
 export type FamilyUpdateInput = z.input<typeof familyUpdateSchema>;
 
@@ -346,7 +355,11 @@ export interface FamilyDetail {
     canLink: boolean;
     /** The viewer's own family may ask for people from this one to move in. */
     canRequestMove: boolean;
+    /** The viewer may open this family's tree (see TREE_VISIBILITIES). */
+    canViewTree: boolean;
   };
+  /** Who sees the tree. Present for those who may edit the family. */
+  treeVisibility?: TreeVisibility;
   /** Accepted links to other families. */
   links: FamilyLinkView[];
   /** People who moved from this family to another, newest first. */

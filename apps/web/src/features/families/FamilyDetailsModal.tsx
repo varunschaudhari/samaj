@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { type FamilyDetail, type FamilyUpdateInput, familyUpdateSchema } from '@samaj/shared';
+import { type FamilyDetail, type FamilyUpdateInput, TREE_VISIBILITIES, familyUpdateSchema } from '@samaj/shared';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button, Input, Modal, Select, Textarea, toast } from '@/components/ui';
@@ -9,12 +9,13 @@ import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { useUpdateFamily } from './api';
 import { gotraOptions } from './gotra-options';
 
-const FIELDS = ['place', 'gotra', 'address'] as const;
+const FIELDS = ['place', 'gotra', 'address', 'treeVisibility'] as const;
 
 const toFormValues = (family: FamilyDetail): FamilyUpdateInput => ({
   place: family.place,
   gotra: family.gotra ?? '',
   address: family.address ?? '',
+  treeVisibility: family.treeVisibility ?? 'all',
 });
 
 export function FamilyDetailsModal({ family, open, onClose }: { family: FamilyDetail; open: boolean; onClose: () => void }) {
@@ -78,6 +79,13 @@ export function FamilyDetailsModal({ family, open, onClose }: { family: FamilyDe
           error={fieldError(t, errors.address?.message)}
           {...form.register('address')}
         />
+        <Select label={t('tree.visibility.label')} hint={t('tree.visibility.hint')} error={fieldError(t, errors.treeVisibility?.message)} {...form.register('treeVisibility')}>
+          {TREE_VISIBILITIES.map((v) => (
+            <option key={v} value={v}>
+              {t(`tree.visibility.${v}`)}
+            </option>
+          ))}
+        </Select>
       </form>
     </Modal>
   );

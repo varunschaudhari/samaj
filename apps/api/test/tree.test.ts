@@ -299,4 +299,28 @@ describe('GET /api/families/:id/tree', () => {
     await edit({ birthYear: '2020', parentId: sagar });
     expect(await history()).toHaveLength(entries);
   });
+
+  it('lets a family choose who sees its tree', async () => {
+    const own = await createFamily(branches.amalner, { account: 'member', people: [{ name: 'Rohit Wagh' }] });
+    const parents = await createFamily(branches.bhusawal, { account: 'member', people: [{ name: 'Anil Wagh' }] });
+    const stranger = await createFamily(branches.pune, { account: 'member' });
+    const committee = await createFamily(branches.district, { account: 'committee' });
+    await link(own.familyId, parents.familyId, 'parents');
+    const status = async (cookie: string, id = own.familyId) => (await api.get(`/api/families/${id}/tree`).set('Cookie', cookie)).status;
+    const show = (to: string) => api.put(`/api/families/${own.familyId}`).set('Cookie', own.cookie).send({ place: 'Amalner', gotra: '', address: '', treeVisibility: to });
+
+    expect(await status(stranger.cookie)).toBe(200);
+    expect((await show('linked')).body.family).toMatchObject({ treeVisibility: 'linked' });
+    expect(await status(stranger.cookie)).toBe(403);
+    expect(await status(parents.cookie)).toBe(200);
+    expect(((await api.get(`/api/families/${own.familyId}`).set('Cookie', stranger.cookie)).body.family as FamilyDetail).permissions.canViewTree).toBe(false);
+
+    await show('family');
+    expect(await status(parents.cookie)).toBe(403);
+    expect(await status(committee.cookie)).toBe(200);
+    expect(await status(own.cookie)).toBe(200);
+    // And it is left out of the parents' own tree for anyone else.
+    const theirs = (await api.get(`/api/families/${parents.familyId}/tree`).set('Cookie', stranger.cookie)).body.tree as FamilyTree;
+    expect(theirs.households.map((h) => h.family.headName)).toEqual(['Anil Wagh']);
+  });
 });
