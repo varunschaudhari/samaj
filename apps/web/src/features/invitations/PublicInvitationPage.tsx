@@ -13,6 +13,7 @@ import { AnswerRows, answerLabels, answersReady, answersToInput, startAnswers } 
 import { useLinkReply, usePublicInvitation } from './api';
 import { InvitationCard } from './InvitationCard';
 import { isRemembrance } from './kinds';
+import { PatrikaShown } from './Patrika';
 
 /** The reply this phone sent, kept so it can be changed rather than sent twice. */
 const storageKey = (token: string) => `samaj.inviteReply.${token}`;
@@ -109,6 +110,7 @@ export function PublicInvitationPage() {
   return wrap(
     <>
       <InvitationCard cancelled={inv.cancelled} data={{ kind: inv.kind, forNames: inv.forNames, message: inv.message, hostName: inv.hostName, functions: inv.functions }} />
+      {inv.patrika && <PatrikaShown patrika={inv.patrika} src={`/api/public/invitations/${token}/patrika`} />}
       {inv.closed ? (
         <p className="text-center text-sm text-fg-muted">{inv.cancelled ? t('invite.rsvp.cancelled') : t('invite.rsvp.closed')}</p>
       ) : receipt && !editing ? (

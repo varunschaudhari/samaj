@@ -161,6 +161,8 @@ export const VALIDATION_KEYS = [
   'validation.dailyInvitations',
   'validation.invitationCancelled',
   'validation.invitationClosed',
+  'validation.patrikaSize',
+  'validation.patrikaType',
   'validation.linkRepliesFull',
 ] as const;
 export type ValidationKey = (typeof VALIDATION_KEYS)[number];

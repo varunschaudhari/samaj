@@ -210,4 +210,36 @@ describe('invitations', () => {
     expect((await api.get(`/api/public/invitations/${again.shareToken}`)).body.invitation).toMatchObject({ cancelled: true, closed: true });
     expect((await api.post(`/api/public/invitations/${again.shareToken}/reply`).send({ name: 'Late comer', answers: [{ functionId: haldi, answer: 'yes', people: 1 }] })).status).toBe(409);
   });
+
+  it('carries the family’s printed patrika, a picture or a PDF, to guests and the link', async () => {
+    const { host, parents, stranger } = await setup();
+    const inv = (await api.post('/api/invitations').set('Cookie', host.cookie).send(wedding([parents.familyId]))).body.invitation as InvitationDetail;
+    expect(inv.patrika).toBeNull();
+    const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46]);
+    const PDF = Buffer.from('%PDF-1.4 fake patrika');
+
+    expect((await api.put(`/api/invitations/${inv.id}/patrika`).set('Cookie', parents.cookie).set('Content-Type', 'image/jpeg').send(JPEG)).status).toBe(403);
+    const bad = await api.put(`/api/invitations/${inv.id}/patrika`).set('Cookie', host.cookie).set('Content-Type', 'image/png').send(Buffer.from('not an image'));
+    expect(bad.body.error.issues).toEqual([{ path: 'patrika', message: 'validation.patrikaType' }]);
+
+    const up = (await api.put(`/api/invitations/${inv.id}/patrika`).set('Cookie', host.cookie).set('Content-Type', 'image/jpeg').send(JPEG)).body.invitation as InvitationDetail;
+    expect(up.patrika).toEqual({ kind: 'image', version: 1 });
+    const got = await api.get(`/api/invitations/${inv.id}/patrika`).set('Cookie', parents.cookie);
+    expect(got.status).toBe(200);
+    expect(got.headers['content-type']).toBe('image/jpeg');
+    expect((await api.get(`/api/invitations/${inv.id}/patrika`).set('Cookie', stranger.cookie)).status).toBe(404);
+
+    // A PDF replaces it, and opens sandboxed.
+    const pdf = (await api.put(`/api/invitations/${inv.id}/patrika`).set('Cookie', host.cookie).set('Content-Type', 'application/pdf').send(PDF)).body.invitation as InvitationDetail;
+    expect(pdf.patrika).toEqual({ kind: 'pdf', version: 2 });
+    const token = ((await api.put(`/api/invitations/${inv.id}/link`).set('Cookie', host.cookie)).body.invitation as InvitationDetail).shareToken;
+    expect((await api.get(`/api/public/invitations/${token}`)).body.invitation.patrika).toEqual({ kind: 'pdf', version: 2 });
+    const shared = await api.get(`/api/public/invitations/${token}/patrika`);
+    expect(shared.headers['content-type']).toBe('application/pdf');
+    expect(shared.headers['content-security-policy']).toBe('sandbox');
+
+    const gone = (await api.delete(`/api/invitations/${inv.id}/patrika`).set('Cookie', host.cookie)).body.invitation as InvitationDetail;
+    expect(gone.patrika).toBeNull();
+    expect((await api.get(`/api/public/invitations/${token}/patrika`)).status).toBe(404);
+  });
 });

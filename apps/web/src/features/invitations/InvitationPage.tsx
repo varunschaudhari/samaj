@@ -2,7 +2,7 @@ import type { InvitationAnswer, InvitationDetail, InvitationFunction, Invitation
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Badge, Button, Card, EmptyState, ErrorState, Icon, Modal, Skeleton, buttonVariants, toast } from '@/components/ui';
-import { ArrowLeft, Download, EyeOff, Pencil, Printer, SearchX, Share, Trash2, UserPlus, XCircle } from '@/components/ui/icons';
+import { ArrowLeft, Download, EyeOff, Pencil, Printer, ImageIcon, SearchX, Share, Trash2, UserPlus, XCircle } from '@/components/ui/icons';
 import { useMe } from '@/features/auth/api';
 import { FormAlert } from '@/features/auth/FormAlert';
 import { placeLabel } from '@/features/branches/api';
@@ -15,7 +15,9 @@ import { GuestPicker, type GuestPicks, emptyPicks, pickCount, picksToInput } fro
 import { InvitationCard } from './InvitationCard';
 import { InvitationForm, draftErrors, draftFrom, draftToInput } from './InvitationForm';
 import { isRemembrance, shareText } from './kinds';
+import { PatrikaEditor, PatrikaShown } from './Patrika';
 import { ShareLinkPanel } from './ShareLinkPanel';
+import { useCardImage } from './useCardImage';
 
 /** A guest family's answer, function by function, with how many are coming. */
 function RsvpPanel({ invitation }: { invitation: InvitationDetail }) {
@@ -127,6 +129,7 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(
     shareText(invitation, { kind: t(`invite.kind.${invitation.kind}`), from: t('invite.from', { name: invitation.host.headName }), open: t('invite.share.link') }, language, url),
   )}`;
+  const image = useCardImage({ ...invitation, hostName: invitation.host.headName }, url);
   const invited = new Set((invitation.guests ?? []).map((g) => g.family.id));
 
   return (
@@ -136,6 +139,9 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
           <Icon icon={Share} />
           {t('invite.host.share')}
         </a>
+        <Button variant="secondary" size="sm" leadingIcon={ImageIcon} loading={image.busy} onClick={() => void image.make()}>
+          {t('invite.image.make')}
+        </Button>
         {!invitation.closed && (
           <>
             <Button variant="secondary" size="sm" leadingIcon={UserPlus} onClick={() => setAdding(true)}>
@@ -169,6 +175,7 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
       </div>
 
       <ShareLinkPanel invitation={invitation} />
+      <PatrikaEditor invitationId={invitation.id} patrika={invitation.patrika} />
 
       <Card as="section" aria-labelledby="tally" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -389,6 +396,7 @@ export function InvitationPage() {
         cancelled={inv.cancelled}
         data={{ kind: inv.kind, forNames: inv.forNames, message: inv.message, hostName: inv.host.headName, functions: inv.functions }}
       />
+      {inv.patrika && <PatrikaShown patrika={inv.patrika} src={`/api/invitations/${inv.id}/patrika`} />}
       {inv.isHost ? (
         <HostPanel invitation={inv} />
       ) : (

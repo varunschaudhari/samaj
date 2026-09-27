@@ -38,6 +38,16 @@ export const MAX_INVITATION_GUESTS = 300;
 export const DAILY_INVITATION_GUESTS = 600;
 export const MAX_INVITATION_FUNCTIONS = 6;
 export const MAX_INVITATION_PEOPLE = 30;
+/** The family's own printed patrika, scanned or as its PDF. */
+export const PATRIKA_MAX_BYTES = 5 * 1024 * 1024;
+export const PATRIKA_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] as const;
+
+/** An uploaded patrika: a picture shown on the page, or a PDF to open. */
+export interface PatrikaView {
+  kind: 'image' | 'pdf';
+  /** Changes with each upload, so the file's URL can be cached. */
+  version: number;
+}
 
 const optionalText = (max: number) =>
   z
@@ -191,6 +201,7 @@ export interface InvitationDetail extends InvitationSummary {
   /** For the host: the secret part of the link anyone can open, or null when the link is off. */
   shareToken?: string | null;
   linkReplies?: LinkReplyView[];
+  patrika: PatrikaView | null;
 }
 
 /** What the link shows: the card, and nothing about who else was invited. */
@@ -202,6 +213,7 @@ export interface PublicInvitation {
   functions: InvitationFunction[];
   cancelled: boolean;
   closed: boolean;
+  patrika: PatrikaView | null;
 }
 
 /** A link reply as its sender sees it, with the key to change it later. */

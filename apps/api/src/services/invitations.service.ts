@@ -2,6 +2,8 @@ import {
   DAILY_INVITATION_GUESTS,
   type LinkReplyReceipt,
   MAX_LINK_REPLIES,
+  PATRIKA_MAX_BYTES,
+  type PatrikaView,
   type PublicInvitation,
   type GuestVia,
   type InvitationAnswer,
@@ -23,8 +25,9 @@ import { FamilyModel } from '../models/family.model';
 import { type InvitationDoc, InvitationGuestModel, InvitationLinkReplyModel, InvitationModel, InvitationMuteModel } from '../models/invitation.model';
 import { MemberModel } from '../models/member.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
+import { storage } from '../utils/storage';
 import { canViewFamily } from './access';
-import { loadFamily } from './family.service';
+import { CONTENT_TYPES, imageType, loadFamily } from './family.service';
 import { familySummaries, linksOf } from './links.service';
 import { getTree } from './tree.service';
 import type { Viewer } from './viewer';
@@ -40,6 +43,9 @@ const DAY = 86_400_000;
 const CLOSES_AFTER = 12 * 60 * 60 * 1000;
 const gone = () => notFound('That invitation is no longer there.');
 const issue = (message: string, path = 'guestFamilyIds') => [{ path, message }];
+
+const patrikaOf = (inv: Pick<InvitationDoc, 'patrikaKey' | 'patrikaVersion'>): PatrikaView | null =>
+  inv.patrikaKey ? { kind: inv.patrikaKey.endsWith('.pdf') ? 'pdf' : 'image', version: inv.patrikaVersion ?? 0 } : null;
 
 const isClosed = (inv: Pick<InvitationDoc, 'lastAt' | 'cancelledAt'>) => Boolean(inv.cancelledAt) || inv.lastAt.getTime() + CLOSES_AFTER < Date.now();
 
@@ -187,6 +193,7 @@ export async function getInvitation(viewer: Viewer, id: string): Promise<Invitat
     sentByName: invitation.sentByName,
     functions: invitation.functions.map((f) => ({ id: f.fid, name: f.name, startsAt: f.startsAt.toISOString(), endsAt: f.endsAt?.toISOString() ?? null, venue: f.venue, mapUrl: f.mapUrl ?? null })),
     isHost: host,
+    patrika: patrikaOf(invitation),
   };
   if (mine) detail.mine = { answers: answersOf(mine.answers), respondedByName: mine.respondedByName ?? null, respondedAt: mine.respondedAt?.toISOString() ?? null };
   if (host) {
@@ -285,6 +292,7 @@ export async function publicInvitation(token: string): Promise<PublicInvitation>
     functions: invitation.functions.map((f) => ({ id: f.fid, name: f.name, startsAt: f.startsAt.toISOString(), endsAt: f.endsAt?.toISOString() ?? null, venue: f.venue, mapUrl: f.mapUrl ?? null })),
     cancelled: Boolean(invitation.cancelledAt),
     closed: isClosed(invitation),
+    patrika: patrikaOf(invitation),
   };
 }
 
@@ -376,4 +384,58 @@ export async function hideFamily(viewer: Viewer, familyId: string, hidden: boole
   const filter = { familyId: new Types.ObjectId(viewer.familyId), mutedFamilyId: new Types.ObjectId(familyId) };
   if (hidden) await InvitationMuteModel.updateOne(filter, { $setOnInsert: filter }, { upsert: true });
   else await InvitationMuteModel.deleteOne(filter);
+}
+
+/** A PDF starts with "%PDF-"; pictures are recognised as for member photos. */
+function patrikaType(data: Buffer): { ext: string } | null {
+  if (data.length >= 5 && data.subarray(0, 5).toString('ascii') === '%PDF-') return { ext: 'pdf' };
+  return imageType(data);
+}
+
+/** The host adds the family's printed patrika, or replaces it. */
+export async function setPatrika(viewer: Viewer, id: string, data: Buffer): Promise<InvitationDetail> {
+  const invitation = await loadHosted(viewer, id);
+  if (data.length > PATRIKA_MAX_BYTES) throw new AppError(400, 'VALIDATION_FAILED', 'The patrika is too large.', issue('validation.patrikaSize', 'patrika'));
+  const type = patrikaType(data);
+  if (!type) throw new AppError(400, 'VALIDATION_FAILED', 'Upload a photo (JPEG, PNG, WebP) or a PDF.', issue('validation.patrikaType', 'patrika'));
+  const previous = invitation.patrikaKey;
+  const key = `invitations/${String(invitation._id)}-${randomBytes(6).toString('hex')}.${type.ext}`;
+  await storage.put(key, data);
+  invitation.patrikaKey = key;
+  invitation.patrikaVersion = (invitation.patrikaVersion ?? 0) + 1;
+  await invitation.save();
+  if (previous) await storage.remove(previous);
+  return getInvitation(viewer, id);
+}
+
+export async function removePatrika(viewer: Viewer, id: string): Promise<InvitationDetail> {
+  const invitation = await loadHosted(viewer, id);
+  if (invitation.patrikaKey) {
+    await storage.remove(invitation.patrikaKey);
+    invitation.patrikaKey = null;
+    invitation.patrikaVersion = (invitation.patrikaVersion ?? 0) + 1;
+    await invitation.save();
+  }
+  return getInvitation(viewer, id);
+}
+
+async function patrikaFile(inv: Pick<InvitationDoc, 'patrikaKey'>) {
+  const missing = () => notFound('No patrika here.');
+  if (!inv.patrikaKey) throw missing();
+  const data = await storage.read(inv.patrikaKey);
+  if (!data) throw missing();
+  const ext = inv.patrikaKey.split('.').pop() ?? '';
+  return { data, contentType: ext === 'pdf' ? 'application/pdf' : (CONTENT_TYPES[ext] ?? 'application/octet-stream') };
+}
+
+/** The patrika for the host and invited families. */
+export async function getPatrika(viewer: Viewer, id: string) {
+  const invitation = await load(id);
+  if (!isHostOf(viewer, invitation) && !(await InvitationGuestModel.exists({ invitationId: invitation._id, familyId: new Types.ObjectId(viewer.familyId) }))) throw gone();
+  return patrikaFile(invitation);
+}
+
+/** The patrika for anyone with the link. */
+export async function getSharedPatrika(token: string) {
+  return patrikaFile(await loadShared(token));
 }

@@ -86,3 +86,8 @@ export const useLinkReply = (token: string) =>
 
 /** The link to send: the page anyone can open, in the language it was shared in. */
 export const publicLink = (token: string, language: string) => `${window.location.origin}/i/${token}${language === 'mr' ? '?lang=mr' : ''}`;
+
+/** The family's printed patrika: a photo of it or its PDF. */
+export const useSetPatrika = (id: string) =>
+  useInvitationMutation(async (file: File) => (await api.upload<{ invitation: InvitationDetail }>(`/invitations/${id}/patrika`, file)).invitation);
+export const useRemovePatrika = (id: string) => useInvitationMutation(async () => (await api.delete<{ invitation: InvitationDetail }>(`/invitations/${id}/patrika`)).invitation);

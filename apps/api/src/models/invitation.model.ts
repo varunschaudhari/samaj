@@ -30,6 +30,9 @@ const invitationSchema = new Schema(
     cancelledAt: { type: Date, default: null },
     /** The secret in the link anyone can open, for people not on the app; null when the link is off. */
     shareToken: { type: String, default: null },
+    /** The family's own printed patrika: a storage key ending in .jpg, .png, .webp or .pdf. */
+    patrikaKey: { type: String, default: null },
+    patrikaVersion: { type: Number, default: 0 },
   },
   { timestamps: true },
 );
