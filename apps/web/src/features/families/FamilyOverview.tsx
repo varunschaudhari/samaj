@@ -1,7 +1,7 @@
-import { type FamilyDetail, type FamilyMember, PARENT_CHOICES, PARTNER_CHOICES, type Relation, gotraName } from '@samaj/shared';
+import { type FamilyDetail, type FamilyMember, PARENT_CHOICES, PARTNER_CHOICES, type Relation, birthYearProblems, gotraName } from '@samaj/shared';
 import { Link } from 'react-router';
 import { Avatar, Button, Card, Icon, buttonVariants } from '@/components/ui';
-import { type AppIcon, Camera, ChevronRight, CircleCheck, MapPin, Network, Pencil, Smartphone, UserPlus, Users } from '@/components/ui/icons';
+import { type AppIcon, Camera, ChevronRight, CircleCheck, MapPin, Network, Pencil, Smartphone, TriangleAlert, UserPlus, Users } from '@/components/ui/icons';
 import { branchName, placeLabel } from '@/features/branches/api';
 import { formatNumber, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
@@ -122,6 +122,8 @@ export function FamilyChecklist({
   const headSpouses = family.members.filter((m) => m.relation === 'spouse').length;
   const openOther = (m: FamilyMember) => headSpouses > 1 && (m.relation === 'son' || m.relation === 'daughter');
   const tieable = family.members.filter((m) => openParent(m) || openPartner(m) || openOther(m));
+  // Birth years that can't both be right (a son older than his father).
+  const unlikely = birthYearProblems(family.members);
   const untied = tieable.filter((m) => (openParent(m) && !m.parentId) || (openPartner(m) && !m.partnerId) || (openOther(m) && !m.otherParentId));
 
   const steps: Step[] = [
@@ -142,6 +144,20 @@ export function FamilyChecklist({
       done: noPhoto.length === 0,
       onFix: () => onEditMember(first(noPhoto)),
     },
+    ...(unlikely.length > 0
+      ? [
+          {
+            key: 'years',
+            icon: TriangleAlert,
+            label: t('family.check.years', { count: formatNumber(unlikely.length, language) }),
+            done: false,
+            onFix: () => {
+              const first = family.members.find((m) => m.id === unlikely[0]?.memberId);
+              if (first) onEditMember(first);
+            },
+          },
+        ]
+      : []),
     ...(tieable.length > 0
       ? [
           {

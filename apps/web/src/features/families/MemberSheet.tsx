@@ -1,4 +1,4 @@
-import { CHILD_RELATIONS, type FamilyMember, formatPhone } from '@samaj/shared';
+import { CHILD_RELATIONS, type FamilyMember, birthYearProblems, formatPhone } from '@samaj/shared';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Avatar, Badge, Icon, Modal, buttonVariants } from '@/components/ui';
@@ -18,12 +18,13 @@ import {
   ShieldCheck,
   Smartphone,
   Trash2,
+  TriangleAlert,
   UserRound,
   Users,
   Network,
 } from '@/components/ui/icons';
 import { placeLabel } from '@/features/branches/api';
-import { formatYear, useLanguageStore, useT } from '@/i18n';
+import { formatNumber, formatYear, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useDisplayName, useLifeLabel } from './life';
 
@@ -104,6 +105,8 @@ export function MemberSheet({
   const removable = Boolean(actions.onRemove) && !member.isHead && !member.hasAccount;
   const parent = member.parentId ? members.find((m) => m.id === member.parentId) : undefined;
   const partner = member.partnerId ? members.find((m) => m.id === member.partnerId) : undefined;
+  const unlikely = birthYearProblems(members).find((p) => p.memberId === member.id);
+  const unlikelyParent = unlikely ? members.find((m) => m.id === unlikely.parentId) : undefined;
 
   return (
     <Modal open onClose={onClose} title={displayName(member)} description={[t(`relation.${member.relation}`), life(member)].filter(Boolean).join(' · ')}>
@@ -129,6 +132,16 @@ export function MemberSheet({
           </div>
         </div>
 
+        {unlikely && unlikelyParent && (
+          <p role="note" className="flex items-start gap-2 rounded-md bg-warning-soft px-3 py-2 text-sm text-fg">
+            <Icon icon={TriangleAlert} size="sm" className="mt-0.5 shrink-0 text-warning" />
+            {unlikely.kind === 'afterDeath'
+              ? t('member.sheet.yearsAfterDeath', { name: unlikelyParent.name })
+              : (unlikely.years ?? 0) <= 0
+                ? t('member.sheet.yearsOlder', { name: unlikelyParent.name })
+                : t('member.sheet.yearsClose', { name: unlikelyParent.name, years: formatNumber(unlikely.years ?? 0, language) })}
+          </p>
+        )}
         <ul className="flex flex-col gap-2">
           <Fact icon={UserRound}>
             {t(`gender.${member.gender}`)}
