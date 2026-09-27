@@ -149,4 +149,65 @@ describe('invitations', () => {
     expect(res.status).toBe(409);
     expect(res.body.error.issues).toEqual([{ path: 'guestFamilyIds', message: 'validation.dailyInvitations' }]);
   });
+
+  it('opens by its link for anyone, takes replies there, and stops when the link is turned off', async () => {
+    const { host, parents } = await setup();
+    const inv = (await api.post('/api/invitations').set('Cookie', host.cookie).send(wedding([parents.familyId]))).body.invitation as InvitationDetail;
+    expect(inv.shareToken).toBeNull();
+
+    // Only the host makes the link.
+    expect((await api.put(`/api/invitations/${inv.id}/link`).set('Cookie', parents.cookie)).status).toBe(403);
+    const on = (await api.put(`/api/invitations/${inv.id}/link`).set('Cookie', host.cookie)).body.invitation as InvitationDetail;
+    const token = on.shareToken as string;
+    expect(token).toMatch(/^[\w-]{16}$/);
+
+    // No cookie: the card, and nothing about the guests.
+    const card = await api.get(`/api/public/invitations/${token}`);
+    expect(card.status).toBe(200);
+    expect(card.body.invitation).toMatchObject({ kind: 'wedding', forNames: 'Rohit & Kavya', hostName: 'Anil Wagh', closed: false });
+    expect(JSON.stringify(card.body)).not.toContain(parents.familyId);
+    expect((await api.get('/api/public/invitations/not-a-real-token1')).status).toBe(404);
+
+    const [haldi, lagna] = on.functions.map((f) => f.id);
+    const first = await api.post(`/api/public/invitations/${token}/reply`).send({
+      name: 'Ramesh Patil',
+      place: 'Nashik',
+      answers: [
+        { functionId: haldi, answer: 'yes', people: 3 },
+        { functionId: lagna, answer: 'no', people: 5 },
+      ],
+    });
+    expect(first.status).toBe(200);
+    const key = first.body.reply.key as string;
+    expect(first.body.reply.answers[1]).toEqual({ functionId: lagna, answer: 'no', people: 0 });
+
+    // The same phone changes its answer rather than adding a second one.
+    await api.post(`/api/public/invitations/${token}/reply`).send({ name: 'Ramesh Patil', place: 'Nashik', key, answers: [{ functionId: haldi, answer: 'yes', people: 4 }, { functionId: lagna, answer: 'maybe', people: 2 }] });
+    await api.post(`/api/public/invitations/${token}/reply`).send({ name: 'Sunita', answers: [{ functionId: haldi, answer: 'yes', people: 2 }, { functionId: lagna, answer: 'yes', people: 2 }] });
+    expect((await api.post(`/api/public/invitations/${token}/reply`).send({ name: 'x', answers: [{ functionId: haldi, answer: 'yes', people: 1 }] })).body.error.issues).toContainEqual({ path: 'name', message: 'validation.replyName' });
+
+    let seen = (await api.get(`/api/invitations/${inv.id}`).set('Cookie', host.cookie)).body.invitation as InvitationDetail;
+    expect(seen.linkReplies?.map((r) => [r.name, r.place])).toEqual([['Ramesh Patil', 'Nashik'], ['Sunita', null]]);
+    expect(seen.tally?.find((x) => x.functionId === haldi)).toMatchObject({ yes: 2, people: 6 });
+    // A guest family sees none of it.
+    const guestView = (await api.get(`/api/invitations/${inv.id}`).set('Cookie', parents.cookie)).body.invitation as InvitationDetail;
+    expect(guestView.linkReplies).toBeUndefined();
+    expect(guestView.shareToken).toBeUndefined();
+
+    // The host removes a reply.
+    seen = (await api.delete(`/api/invitations/${inv.id}/link-replies/${seen.linkReplies?.[1]?.id}`).set('Cookie', host.cookie)).body.invitation as InvitationDetail;
+    expect(seen.linkReplies).toHaveLength(1);
+
+    // Off: the old link is dead; on again: a new one. Replies stay.
+    await api.delete(`/api/invitations/${inv.id}/link`).set('Cookie', host.cookie);
+    expect((await api.get(`/api/public/invitations/${token}`)).status).toBe(404);
+    const again = (await api.put(`/api/invitations/${inv.id}/link`).set('Cookie', host.cookie)).body.invitation as InvitationDetail;
+    expect(again.shareToken).not.toBe(token);
+    expect(again.linkReplies).toHaveLength(1);
+
+    // Cancelled: the card says so, and replies are refused.
+    await api.post(`/api/invitations/${inv.id}/cancel`).set('Cookie', host.cookie);
+    expect((await api.get(`/api/public/invitations/${again.shareToken}`)).body.invitation).toMatchObject({ cancelled: true, closed: true });
+    expect((await api.post(`/api/public/invitations/${again.shareToken}/reply`).send({ name: 'Late comer', answers: [{ functionId: haldi, answer: 'yes', people: 1 }] })).status).toBe(409);
+  });
 });

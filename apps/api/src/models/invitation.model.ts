@@ -28,10 +28,13 @@ const invitationSchema = new Schema(
     sentByUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     sentByName: { type: String, required: true },
     cancelledAt: { type: Date, default: null },
+    /** The secret in the link anyone can open, for people not on the app; null when the link is off. */
+    shareToken: { type: String, default: null },
   },
   { timestamps: true },
 );
 invitationSchema.index({ familyId: 1, lastAt: -1 });
+invitationSchema.index({ shareToken: 1 }, { unique: true, partialFilterExpression: { shareToken: { $type: 'string' } } });
 
 const answerSchema = new Schema(
   {
@@ -62,6 +65,21 @@ invitationGuestSchema.index({ invitationId: 1, familyId: 1 }, { unique: true });
 invitationGuestSchema.index({ familyId: 1, lastAt: -1 });
 invitationGuestSchema.index({ hostFamilyId: 1, createdAt: -1 });
 
+/** A reply through the link from someone not on the app: a typed name, not a family. */
+const invitationLinkReplySchema = new Schema(
+  {
+    invitationId: { type: Schema.Types.ObjectId, ref: 'Invitation', required: true },
+    name: { type: String, required: true, trim: true },
+    place: { type: String, default: null, trim: true },
+    answers: { type: [answerSchema], default: [] },
+    /** SHA-256 of the key the sender's phone keeps, so only that phone can change the reply. */
+    keyHash: { type: String, required: true },
+  },
+  { timestamps: true },
+);
+invitationLinkReplySchema.index({ invitationId: 1, createdAt: 1 });
+invitationLinkReplySchema.index({ invitationId: 1, keyHash: 1 }, { unique: true });
+
 /** A family chose not to see another family's invitations. */
 const invitationMuteSchema = new Schema(
   {
@@ -77,4 +95,5 @@ export type InvitationDoc = InferSchemaType<typeof invitationSchema> & { _id: Ty
 export type InvitationGuestDoc = InferSchemaType<typeof invitationGuestSchema> & { _id: Types.ObjectId };
 export const InvitationModel = model('Invitation', invitationSchema);
 export const InvitationGuestModel = model('InvitationGuest', invitationGuestSchema);
+export const InvitationLinkReplyModel = model('InvitationLinkReply', invitationLinkReplySchema);
 export const InvitationMuteModel = model('InvitationMute', invitationMuteSchema);

@@ -128,3 +128,18 @@ export const authIpLimiter = rateLimit({
   handler: (_req, _res, next) =>
     next(new AppError(429, 'RATE_LIMITED', 'Too many sign-in attempts from this network. Wait 15 minutes and try again.')),
 });
+
+/**
+ * Replies through an invitation's link come from people who aren't signed
+ * in: a few per phone, so one machine can't fill the host's list.
+ */
+export const linkReplyLimiter = rateLimit({
+  windowMs: FIFTEEN_MINUTES,
+  limit: 20,
+  keyGenerator: ipKey,
+  store: store('link-reply:'),
+  passOnStoreError: true,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  handler: (_req, _res, next) => next(new AppError(429, 'RATE_LIMITED', 'Too many replies from this device. Wait a few minutes and try again.')),
+});

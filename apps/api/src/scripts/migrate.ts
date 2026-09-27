@@ -17,7 +17,7 @@ import { FamilyLinkModel } from '../models/family-link.model';
 import { MemberMoveModel } from '../models/member-move.model';
 import { FamilyModel } from '../models/family.model';
 import { InterestModel } from '../models/interest.model';
-import { InvitationGuestModel, InvitationModel, InvitationMuteModel } from '../models/invitation.model';
+import { InvitationGuestModel, InvitationLinkReplyModel, InvitationModel, InvitationMuteModel } from '../models/invitation.model';
 import { InviteModel } from '../models/invite.model';
 import { MemberModel } from '../models/member.model';
 import { SamePersonModel } from '../models/same-person.model';
@@ -78,7 +78,7 @@ async function main() {
   await backfill(MemberModel, { phoneVisibility: { $exists: false } }, [], () => ({ phoneVisibility: 'committee', listed: true }));
 
   const models: AnyModel[] = [
-    BranchModel, EventModel, FamilyLinkModel, FamilyModel, InterestModel, MemberMoveModel, InvitationGuestModel, InvitationModel, InvitationMuteModel, InviteModel, MemberModel, NoticeModel, OfficeBearerModel,
+    BranchModel, EventModel, FamilyLinkModel, FamilyModel, InterestModel, MemberMoveModel, InvitationGuestModel, InvitationLinkReplyModel, InvitationModel, InvitationMuteModel, InviteModel, MemberModel, NoticeModel, OfficeBearerModel,
     PasswordResetModel, ProfileModel, RoleChangeModel, RsvpModel, SamePersonModel, SessionModel, UserModel,
   ];
   for (const model of models) {

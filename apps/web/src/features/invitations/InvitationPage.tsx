@@ -1,23 +1,21 @@
-import { type InvitationAnswer, type InvitationDetail, MAX_INVITATION_PEOPLE, type RsvpAnswer } from '@samaj/shared';
+import type { InvitationAnswer, InvitationDetail, InvitationFunction, InvitationKind } from '@samaj/shared';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { Badge, Button, Card, Chip, EmptyState, ErrorState, Icon, Input, Modal, Skeleton, buttonVariants, toast } from '@/components/ui';
-import { ArrowLeft, Download, EyeOff, Pencil, Printer, SearchX, Share, UserPlus, XCircle } from '@/components/ui/icons';
+import { Badge, Button, Card, EmptyState, ErrorState, Icon, Modal, Skeleton, buttonVariants, toast } from '@/components/ui';
+import { ArrowLeft, Download, EyeOff, Pencil, Printer, SearchX, Share, Trash2, UserPlus, XCircle } from '@/components/ui/icons';
 import { useMe } from '@/features/auth/api';
 import { FormAlert } from '@/features/auth/FormAlert';
 import { placeLabel } from '@/features/branches/api';
-import { formatEventTime } from '@/features/community/events-api';
-import { type MessageKey, formatDate, formatNumber, useErrorMessage, useLanguageStore, useT } from '@/i18n';
+import { formatDate, formatNumber, useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
-import { useAddGuests, useAnswerInvitation, useAudience, useCancelInvitation, useHideFamily, useInvitation, useUpdateInvitation } from './api';
+import { AnswerRows, answerLabels, answersReady, answersToInput, startAnswers } from './AnswerRows';
+import { publicLink, useAddGuests, useRemoveLinkReply, useAnswerInvitation, useAudience, useCancelInvitation, useHideFamily, useInvitation, useUpdateInvitation } from './api';
 import { GuestPicker, type GuestPicks, emptyPicks, pickCount, picksToInput } from './GuestPicker';
 import { InvitationCard } from './InvitationCard';
 import { InvitationForm, draftErrors, draftFrom, draftToInput } from './InvitationForm';
 import { isRemembrance, shareText } from './kinds';
-
-const ANSWER_LABEL = (quiet: boolean): Record<RsvpAnswer, MessageKey> =>
-  quiet ? { yes: 'invite.rsvp.attend', maybe: 'invite.rsvp.maybe', no: 'invite.rsvp.notAttend' } : { yes: 'invite.rsvp.yes', maybe: 'invite.rsvp.maybe', no: 'invite.rsvp.no' };
+import { ShareLinkPanel } from './ShareLinkPanel';
 
 /** A guest family's answer, function by function, with how many are coming. */
 function RsvpPanel({ invitation }: { invitation: InvitationDetail }) {
@@ -26,14 +24,8 @@ function RsvpPanel({ invitation }: { invitation: InvitationDetail }) {
   const errorMessage = useErrorMessage();
   const answer = useAnswerInvitation(invitation.id);
   const quiet = isRemembrance(invitation.kind);
-  const labels = ANSWER_LABEL(quiet);
-  // Remembrance: attend or not, no "maybe".
-  const choices: RsvpAnswer[] = quiet ? ['yes', 'no'] : ['yes', 'maybe', 'no'];
-  const start = () => invitation.functions.map((f) => invitation.mine?.answers.find((a) => a.functionId === f.id) ?? { functionId: f.id, answer: '' as const, people: 2 });
-  const [answers, setAnswers] = useState<(Omit<InvitationAnswer, 'answer'> & { answer: RsvpAnswer | '' })[]>(start);
-  useEffect(() => setAnswers(start()), [invitation.id, invitation.mine?.respondedAt]);
-  const set = (i: number, patch: Partial<(typeof answers)[number]>) => setAnswers((a) => a.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-  const ready = answers.every((a) => a.answer !== '');
+  const [answers, setAnswers] = useState(() => startAnswers(invitation.functions, invitation.mine?.answers));
+  useEffect(() => setAnswers(startAnswers(invitation.functions, invitation.mine?.answers)), [invitation.id, invitation.mine?.respondedAt]);
 
   if (invitation.closed) {
     return <p className="text-center text-sm text-fg-muted">{invitation.cancelled ? t('invite.rsvp.cancelled') : t('invite.rsvp.closed')}</p>;
@@ -43,48 +35,13 @@ function RsvpPanel({ invitation }: { invitation: InvitationDetail }) {
       <h2 id="rsvp" className="font-display text-lg font-semibold text-fg">
         {t(quiet ? 'invite.rsvp.titleRemembrance' : 'invite.rsvp.title')}
       </h2>
-      {invitation.functions.map((f, i) => {
-        const a = answers[i];
-        if (!a) return null;
-        return (
-          <div key={f.id} className="flex flex-col gap-2 border-b border-line pb-4 last:border-0 last:pb-0">
-            <div className="flex flex-col">
-              <span className="font-semibold text-fg">{f.name}</span>
-              <span className="text-sm text-fg-muted">{formatEventTime(f.startsAt, f.endsAt, language)}</span>
-            </div>
-            <div className="flex flex-wrap items-end gap-2" role="group" aria-label={f.name}>
-              {choices.map((c) => (
-                <Chip key={c} selected={a.answer === c} onClick={() => set(i, { answer: c })} className="px-4">
-                  {t(labels[c])}
-                </Chip>
-              ))}
-              {a.answer && a.answer !== 'no' && (
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={MAX_INVITATION_PEOPLE}
-                  label={t('invite.rsvp.people')}
-                  value={String(a.people)}
-                  onChange={(e) => set(i, { people: Math.max(0, Math.min(MAX_INVITATION_PEOPLE, Number(e.target.value) || 0)) })}
-                  fieldClassName="w-32"
-                />
-              )}
-            </div>
-          </div>
-        );
-      })}
+      <AnswerRows kind={invitation.kind} functions={invitation.functions} answers={answers} onChange={setAnswers} />
       {answer.isError && <FormAlert message={errorMessage(answer.error)} />}
       <div className="flex flex-wrap items-center gap-3">
         <Button
-          disabled={!ready}
+          disabled={!answersReady(answers)}
           loading={answer.isPending}
-          onClick={() =>
-            answer.mutate(
-              { answers: answers.map((a) => ({ functionId: a.functionId, answer: a.answer as RsvpAnswer, people: a.people })) },
-              { onSuccess: () => toast.success(t('invite.rsvp.saved', { family: invitation.host.headName })) },
-            )
-          }
+          onClick={() => answer.mutate({ answers: answersToInput(answers) }, { onSuccess: () => toast.success(t('invite.rsvp.saved', { family: invitation.host.headName })) })}
         >
           {t('invite.rsvp.save')}
         </Button>
@@ -98,21 +55,45 @@ function RsvpPanel({ invitation }: { invitation: InvitationDetail }) {
   );
 }
 
+/** Each function's answer as a coloured pill: coming, maybe, not. */
+function AnswerPills({ kind, functions, answers }: { kind: InvitationKind; functions: InvitationFunction[]; answers: InvitationAnswer[] }) {
+  const t = useT();
+  const language = useLanguageStore((s) => s.language);
+  const labels = answerLabels(kind);
+  return (
+    <div className="flex flex-wrap gap-1.5 text-xs">
+      {functions.map((f) => {
+        const a = answers.find((x) => x.functionId === f.id);
+        return a ? (
+          <span key={f.id} className={cn('rounded-full px-2.5 py-1 font-semibold', a.answer === 'yes' ? 'bg-success-soft text-success' : a.answer === 'maybe' ? 'bg-warning-soft text-warning' : 'bg-surface-muted text-fg-muted')}>
+            {f.name}: {t(labels[a.answer])}
+            {a.answer !== 'no' && ` · ${formatNumber(a.people, language)}`}
+          </span>
+        ) : null;
+      })}
+    </div>
+  );
+}
+
 /** The guest list as a spreadsheet: family, place, how they were invited, and each function's answer. */
 function downloadCsv(inv: InvitationDetail, t: ReturnType<typeof useT>, language: 'en' | 'mr') {
-  const labels = ANSWER_LABEL(isRemembrance(inv.kind));
+  const labels = answerLabels(inv.kind);
   const cell = (v: string) => `"${v.replace(/"/g, '""')}"`;
   const header = [t('invite.csv.family'), t('invite.csv.place'), t('invite.csv.via'), ...inv.functions.map((f) => f.name), t('invite.csv.answeredBy')];
+  const cellsOf = (answers: InvitationAnswer[]) =>
+    inv.functions.map((f) => {
+      const a = answers.find((x) => x.functionId === f.id);
+      return a ? `${t(labels[a.answer])}${a.answer !== 'no' ? ` (${a.people})` : ''}` : '';
+    });
   const rows = (inv.guests ?? []).map((g) => [
     t('family.title', { name: g.family.headName }),
     placeLabel(g.family.place, g.family.branch, language),
     t(`invite.host.via.${g.via}`),
-    ...inv.functions.map((f) => {
-      const a = g.answers.find((x) => x.functionId === f.id);
-      return a ? `${t(labels[a.answer])}${a.answer !== 'no' ? ` (${a.people})` : ''}` : '';
-    }),
+    ...cellsOf(g.answers),
     g.respondedByName ?? '',
   ]);
+  // People not on the app who replied through the link.
+  rows.push(...(inv.linkReplies ?? []).map((r) => [r.name, r.place ?? '', t('invite.host.via.link'), ...cellsOf(r.answers), r.name]));
   // A byte-order mark so spreadsheet apps read Marathi correctly.
   const csv = `﻿${[header, ...rows].map((r) => r.map(cell).join(',')).join('\r\n')}`;
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -129,7 +110,6 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
   const language = useLanguageStore((s) => s.language);
   const errorMessage = useErrorMessage();
   const me = useMe();
-  const labels = ANSWER_LABEL(isRemembrance(invitation.kind));
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -141,7 +121,9 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
   const cancel = useCancelInvitation(invitation.id);
   const audience = useAudience(adding);
   const n = (v: number) => formatNumber(v, language);
-  const url = `${window.location.origin}/invitations/${invitation.id}`;
+  const removeReply = useRemoveLinkReply(invitation.id);
+  // With the link on, WhatsApp gets the page anyone can open; without it, the app's page, for members.
+  const url = invitation.shareToken ? publicLink(invitation.shareToken, language) : `${window.location.origin}/invitations/${invitation.id}`;
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(
     shareText(invitation, { kind: t(`invite.kind.${invitation.kind}`), from: t('invite.from', { name: invitation.host.headName }), open: t('invite.share.link') }, language, url),
   )}`;
@@ -186,6 +168,8 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
         )}
       </div>
 
+      <ShareLinkPanel invitation={invitation} />
+
       <Card as="section" aria-labelledby="tally" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="tally" className="font-display text-lg font-semibold text-fg">
@@ -223,25 +207,49 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
                 </span>
                 <span className="text-xs text-fg-muted">{placeLabel(g.family.place, g.family.branch, language)}</span>
               </div>
-              <div className="flex flex-wrap gap-1.5 text-xs">
-                {g.respondedAt ? (
-                  invitation.functions.map((f) => {
-                    const a = g.answers.find((x) => x.functionId === f.id);
-                    return a ? (
-                      <span key={f.id} className={cn('rounded-full px-2.5 py-1 font-semibold', a.answer === 'yes' ? 'bg-success-soft text-success' : a.answer === 'maybe' ? 'bg-warning-soft text-warning' : 'bg-surface-muted text-fg-muted')}>
-                        {f.name}: {t(labels[a.answer])}
-                        {a.answer !== 'no' && ` · ${n(a.people)}`}
-                      </span>
-                    ) : null;
-                  })
-                ) : (
-                  <span className="text-fg-muted">{t('invite.host.noAnswer')}</span>
-                )}
-              </div>
+              {g.respondedAt ? (
+                <AnswerPills kind={invitation.kind} functions={invitation.functions} answers={g.answers} />
+              ) : (
+                <span className="text-xs text-fg-muted">{t('invite.host.noAnswer')}</span>
+              )}
             </li>
           ))}
         </ul>
       </Card>
+
+      {(invitation.linkReplies?.length ?? 0) > 0 && (
+        <Card as="section" aria-labelledby="link-replies" className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 id="link-replies" className="font-display text-lg font-semibold text-fg">
+              {t('invite.link.replies', { count: n(invitation.linkReplies?.length ?? 0) })}
+            </h2>
+            <p className="text-sm text-fg-muted">{t('invite.link.repliesHint')}</p>
+          </div>
+          <ul className="divide-y divide-line">
+            {(invitation.linkReplies ?? []).map((r) => (
+              <li key={r.id} className="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-center sm:gap-4">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-fg">{r.name}</span>
+                    <Badge>{t('invite.host.via.link')}</Badge>
+                  </span>
+                  <span className="text-xs text-fg-muted">{[r.place, formatDate(r.respondedAt, language)].filter(Boolean).join(' · ')}</span>
+                </div>
+                <AnswerPills kind={invitation.kind} functions={invitation.functions} answers={r.answers} />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leadingIcon={Trash2}
+                  aria-label={t('invite.link.remove', { name: r.name })}
+                  className="self-start sm:self-center print:hidden"
+                  loading={removeReply.isPending && removeReply.variables === r.id}
+                  onClick={() => removeReply.mutate(r.id, { onSuccess: () => toast.success(t('invite.link.removed')) })}
+                />
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <Modal
         open={editing}

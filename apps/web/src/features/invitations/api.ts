@@ -1,4 +1,4 @@
-import type { CreateInvitationInput, InvitationAudience, InvitationDetail, InvitationInput, InvitationRsvpInput, MyInvitations } from '@samaj/shared';
+import type { CreateInvitationInput, InvitationAudience, InvitationDetail, InvitationInput, InvitationRsvpInput, LinkReplyInput, LinkReplyReceipt, MyInvitations, PublicInvitation } from '@samaj/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
@@ -65,3 +65,24 @@ export function useHideFamily() {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: invitationsKey, exact: true }),
   });
 }
+
+/** The link for people not on the app: on gives a link (a new one if it was off), off stops it. */
+export const useShareLink = (id: string) =>
+  useInvitationMutation(async (on: boolean) => (on ? await api.put<{ invitation: InvitationDetail }>(`/invitations/${id}/link`) : await api.delete<{ invitation: InvitationDetail }>(`/invitations/${id}/link`)).invitation);
+export const useRemoveLinkReply = (id: string) =>
+  useInvitationMutation(async (replyId: string) => (await api.delete<{ invitation: InvitationDetail }>(`/invitations/${id}/link-replies/${replyId}`)).invitation);
+
+/** The card behind a link, for anyone who has it. */
+export function usePublicInvitation(token: string) {
+  return useQuery({
+    queryKey: ['public-invitation', token],
+    queryFn: async ({ signal }) => (await api.get<{ invitation: PublicInvitation }>(`/public/invitations/${token}`, undefined, signal)).invitation,
+    retry: false,
+  });
+}
+
+export const useLinkReply = (token: string) =>
+  useMutation({ mutationFn: async (input: LinkReplyInput) => (await api.post<{ reply: LinkReplyReceipt }>(`/public/invitations/${token}/reply`, input)).reply });
+
+/** The link to send: the page anyone can open, in the language it was shared in. */
+export const publicLink = (token: string, language: string) => `${window.location.origin}/i/${token}${language === 'mr' ? '?lang=mr' : ''}`;

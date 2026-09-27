@@ -1,5 +1,8 @@
 import {
   DAILY_INVITATION_GUESTS,
+  type LinkReplyReceipt,
+  MAX_LINK_REPLIES,
+  type PublicInvitation,
   type GuestVia,
   type InvitationAnswer,
   type InvitationAudience,
@@ -11,11 +14,14 @@ import {
   type createInvitationSchema,
   type invitationInputSchema,
   type invitationRsvpSchema,
+  type linkReplySchema,
 } from '@samaj/shared';
+import { createHash, randomBytes } from 'node:crypto';
 import { Types } from 'mongoose';
 import type { z } from 'zod';
 import { FamilyModel } from '../models/family.model';
-import { type InvitationDoc, InvitationGuestModel, InvitationModel, InvitationMuteModel } from '../models/invitation.model';
+import { type InvitationDoc, InvitationGuestModel, InvitationLinkReplyModel, InvitationModel, InvitationMuteModel } from '../models/invitation.model';
+import { MemberModel } from '../models/member.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { canViewFamily } from './access';
 import { loadFamily } from './family.service';
@@ -27,6 +33,7 @@ type InvitationInput = z.output<typeof invitationInputSchema>;
 type CreateInput = z.output<typeof createInvitationSchema>;
 type GuestsInput = z.output<typeof addGuestsSchema>;
 type RsvpInput = z.output<typeof invitationRsvpSchema>;
+type LinkReplyInput = z.output<typeof linkReplySchema>;
 
 const DAY = 86_400_000;
 /** Answers close half a day after the last function. */
@@ -168,7 +175,9 @@ export async function getInvitation(viewer: Viewer, id: string): Promise<Invitat
   const mine = host ? null : await InvitationGuestModel.findOne({ invitationId: invitation._id, familyId: new Types.ObjectId(viewer.familyId) }).lean();
   if (!host && !mine) throw gone();
 
-  const guests = host ? await InvitationGuestModel.find({ invitationId: invitation._id }).sort({ createdAt: 1 }).lean() : [];
+  const [guests, linkReplies] = host
+    ? await Promise.all([InvitationGuestModel.find({ invitationId: invitation._id }).sort({ createdAt: 1 }).lean(), InvitationLinkReplyModel.find({ invitationId: invitation._id }).sort({ createdAt: 1 }).lean()])
+    : [[], []];
   const summaries = await familySummaries(viewer, [invitation.familyId, ...guests.map((g) => g.familyId)]);
   const base = summaryOf(invitation.toObject(), summaries.get(String(invitation.familyId)), host ? { invitedCount: guests.length, repliedCount: guests.filter((g) => g.respondedAt).length } : { answered: Boolean(mine?.respondedAt) });
   if (!base) throw gone();
@@ -185,8 +194,11 @@ export async function getInvitation(viewer: Viewer, id: string): Promise<Invitat
       const family = summaries.get(String(g.familyId));
       return family ? [{ family, via: g.via, answers: answersOf(g.answers), respondedByName: g.respondedByName ?? null, respondedAt: g.respondedAt?.toISOString() ?? null }] : [];
     });
+    detail.shareToken = invitation.shareToken ?? null;
+    detail.linkReplies = linkReplies.map((r) => ({ id: String(r._id), name: r.name, place: r.place ?? null, answers: answersOf(r.answers), respondedAt: r.updatedAt.toISOString() }));
+    // Families and link replies count the same in the headcount.
     detail.tally = invitation.functions.map((f) => {
-      const answers = guests.flatMap((g) => g.answers.filter((a) => a.fid === f.fid));
+      const answers = [...guests, ...linkReplies].flatMap((g) => g.answers.filter((a) => a.fid === f.fid));
       const count = (a: InvitationAnswer['answer']) => answers.filter((x) => x.answer === a).length;
       return { functionId: f.fid, yes: count('yes'), maybe: count('maybe'), no: count('no'), people: answers.filter((a) => a.answer === 'yes').reduce((sum, a) => sum + (a.people ?? 0), 0) };
     });
@@ -207,7 +219,10 @@ export async function updateInvitation(viewer: Viewer, id: string, input: Invita
   await invitation.save();
   // Answers to functions that were removed go with them.
   const kept = functions.map((f) => f.fid);
-  await InvitationGuestModel.updateMany({ invitationId: invitation._id }, { $set: { lastAt }, $pull: { answers: { fid: { $nin: kept } } } });
+  await Promise.all([
+    InvitationGuestModel.updateMany({ invitationId: invitation._id }, { $set: { lastAt }, $pull: { answers: { fid: { $nin: kept } } } }),
+    InvitationLinkReplyModel.updateMany({ invitationId: invitation._id }, { $pull: { answers: { fid: { $nin: kept } } } }),
+  ]);
   return getInvitation(viewer, id);
 }
 
@@ -228,17 +243,88 @@ export async function cancelInvitation(viewer: Viewer, id: string): Promise<Invi
   return getInvitation(viewer, id);
 }
 
+const closedError = () => new AppError(409, 'CONFLICT', 'Answers are closed for this invitation.', issue('validation.invitationClosed', 'invitation'));
+
+/** Answers for functions the invitation still has; "no" means nobody is coming. */
+const cleanAnswers = (invitation: InvitationDoc, answers: RsvpInput['answers']) => {
+  const known = new Set(invitation.functions.map((f) => f.fid));
+  return answers.filter((a) => known.has(a.functionId)).map((a) => ({ fid: a.functionId, answer: a.answer, people: a.answer === 'no' ? 0 : a.people }));
+};
+
+/**
+ * Turn the link for people not on the app on or off. Turning it off and on
+ * again gives a new link, so a link forwarded too widely can be stopped.
+ * Replies already received stay.
+ */
+export async function setShareLink(viewer: Viewer, id: string, on: boolean): Promise<InvitationDetail> {
+  const invitation = await loadHosted(viewer, id);
+  if (on && !invitation.shareToken) {
+    if (isClosed(invitation)) throw closedError();
+    invitation.shareToken = randomBytes(12).toString('base64url');
+  }
+  if (!on) invitation.shareToken = null;
+  await invitation.save();
+  return getInvitation(viewer, id);
+}
+
+async function loadShared(token: string) {
+  const invitation = /^[\w-]{16}$/.test(token) ? await InvitationModel.findOne({ shareToken: token }).lean() : null;
+  if (!invitation) throw gone();
+  return invitation;
+}
+
+/** The card, as anyone with the link sees it: no guest list, no answers, nothing about the family beyond its name. */
+export async function publicInvitation(token: string): Promise<PublicInvitation> {
+  const invitation = await loadShared(token);
+  const head = await MemberModel.findOne({ familyId: invitation.familyId, isHead: true }, { name: 1 }).lean();
+  return {
+    kind: invitation.kind,
+    forNames: invitation.forNames ?? null,
+    message: invitation.message ?? null,
+    hostName: head?.name ?? invitation.sentByName,
+    functions: invitation.functions.map((f) => ({ id: f.fid, name: f.name, startsAt: f.startsAt.toISOString(), endsAt: f.endsAt?.toISOString() ?? null, venue: f.venue, mapUrl: f.mapUrl ?? null })),
+    cancelled: Boolean(invitation.cancelledAt),
+    closed: isClosed(invitation),
+  };
+}
+
+const hashKey = (key: string) => createHash('sha256').update(key).digest('hex');
+
+/**
+ * Someone not on the app answers through the link. The first reply gets a
+ * key the phone keeps; sending it again changes that reply instead of adding
+ * another.
+ */
+export async function replyByLink(token: string, input: LinkReplyInput): Promise<LinkReplyReceipt> {
+  const invitation = await loadShared(token);
+  if (isClosed(invitation)) throw closedError();
+  const fields = { name: input.name, place: input.place, answers: cleanAnswers(invitation, input.answers) };
+  if (input.key) {
+    const updated = await InvitationLinkReplyModel.findOneAndUpdate({ invitationId: invitation._id, keyHash: hashKey(input.key) }, { $set: fields }, { new: true }).lean();
+    if (updated) return { key: input.key, name: updated.name, place: updated.place ?? null, answers: answersOf(updated.answers) };
+  }
+  if ((await InvitationLinkReplyModel.countDocuments({ invitationId: invitation._id })) >= MAX_LINK_REPLIES) {
+    throw new AppError(409, 'CONFLICT', 'This invitation has had as many replies through its link as it can take.', issue('validation.linkRepliesFull', 'invitation'));
+  }
+  const key = randomBytes(18).toString('base64url');
+  const reply = await InvitationLinkReplyModel.create({ ...fields, invitationId: invitation._id, keyHash: hashKey(key) });
+  return { key, name: reply.name, place: reply.place ?? null, answers: answersOf(reply.answers) };
+}
+
+/** The host removes a link reply: a joke, a duplicate, a stranger. */
+export async function removeLinkReply(viewer: Viewer, id: string, replyId: string): Promise<InvitationDetail> {
+  const invitation = await loadHosted(viewer, id);
+  if (Types.ObjectId.isValid(replyId)) await InvitationLinkReplyModel.deleteOne({ _id: new Types.ObjectId(replyId), invitationId: invitation._id });
+  return getInvitation(viewer, id);
+}
+
 /** A guest family answers each function, with how many are coming. */
 export async function answerInvitation(viewer: Viewer, id: string, input: RsvpInput): Promise<InvitationDetail> {
   const invitation = await load(id);
   const guest = await InvitationGuestModel.findOne({ invitationId: invitation._id, familyId: new Types.ObjectId(viewer.familyId) });
   if (!guest) throw gone();
-  if (isClosed(invitation)) throw new AppError(409, 'CONFLICT', 'Answers are closed for this invitation.', issue('validation.invitationClosed', 'invitation'));
-  const known = new Set(invitation.functions.map((f) => f.fid));
-  guest.set(
-    'answers',
-    input.answers.filter((a) => known.has(a.functionId)).map((a) => ({ fid: a.functionId, answer: a.answer, people: a.answer === 'no' ? 0 : a.people })),
-  );
+  if (isClosed(invitation)) throw closedError();
+  guest.set('answers', cleanAnswers(invitation, input.answers));
   guest.respondedByName = viewer.name;
   guest.respondedAt = new Date();
   await guest.save();

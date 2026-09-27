@@ -12,7 +12,7 @@ import { privacyRouter } from './privacy.routes';
 import { eventRouter } from './event.routes';
 import { noticeRouter } from './notice.routes';
 import { userRouter } from './user.routes';
-import { invitationRouter } from './invitation.routes';
+import { invitationRouter, publicInvitationRouter } from './invitation.routes';
 
 export const apiRouter = Router();
 
@@ -42,3 +42,5 @@ apiRouter.use('/people', peopleRouter);
 apiRouter.use('/member-approvals', approvalRouter);
 apiRouter.use('/privacy', privacyRouter);
 apiRouter.use('/invitations', invitationRouter);
+// Anyone with an invitation's link, signed in or not.
+apiRouter.use('/public/invitations', publicInvitationRouter);

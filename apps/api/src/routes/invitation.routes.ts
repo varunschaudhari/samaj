@@ -1,6 +1,7 @@
-import { addGuestsSchema, createInvitationSchema, invitationInputSchema, invitationRsvpSchema } from '@samaj/shared';
+import { addGuestsSchema, createInvitationSchema, invitationInputSchema, invitationRsvpSchema, linkReplySchema } from '@samaj/shared';
 import { type Request, Router } from 'express';
 import { requireAuth } from '../middleware/auth';
+import { linkReplyLimiter } from '../middleware/rate-limit';
 import * as invitations from '../services/invitations.service';
 import type { Viewer } from '../services/viewer';
 import { unauthenticated } from '../utils/app-error';
@@ -46,4 +47,23 @@ invitationRouter.post('/:id/cancel', async (req, res) => {
 });
 invitationRouter.put('/:id/rsvp', async (req, res) => {
   res.json({ invitation: await invitations.answerInvitation(viewer(req), param(req, 'id'), invitationRsvpSchema.parse(req.body)) });
+});
+// The link for people not on the app: on (a new link if it was off), off, and removing a reply.
+invitationRouter.put('/:id/link', async (req, res) => {
+  res.json({ invitation: await invitations.setShareLink(viewer(req), param(req, 'id'), true) });
+});
+invitationRouter.delete('/:id/link', async (req, res) => {
+  res.json({ invitation: await invitations.setShareLink(viewer(req), param(req, 'id'), false) });
+});
+invitationRouter.delete('/:id/link-replies/:replyId', async (req, res) => {
+  res.json({ invitation: await invitations.removeLinkReply(viewer(req), param(req, 'id'), param(req, 'replyId')) });
+});
+
+/** What anyone with an invitation's link can do, signed in or not: see the card and reply. */
+export const publicInvitationRouter = Router();
+publicInvitationRouter.get('/:token', async (req, res) => {
+  res.json({ invitation: await invitations.publicInvitation(param(req, 'token')) });
+});
+publicInvitationRouter.post('/:token/reply', linkReplyLimiter, async (req, res) => {
+  res.json({ reply: await invitations.replyByLink(param(req, 'token'), linkReplySchema.parse(req.body)) });
 });

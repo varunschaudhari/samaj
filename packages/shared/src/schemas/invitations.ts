@@ -112,6 +112,18 @@ export const invitationRsvpSchema = z.object({
 });
 export type InvitationRsvpInput = z.input<typeof invitationRsvpSchema>;
 
+/** Replies through an invitation's link, from people not on the app. */
+export const MAX_LINK_REPLIES = 500;
+
+/** A reply through the link: who is answering (typed, not checked) and their answers. */
+export const linkReplySchema = invitationRsvpSchema.extend({
+  name: z.string().trim().min(2, 'validation.replyName').max(80, 'validation.tooLong'),
+  place: optionalText(60),
+  /** Given back with the first reply, so the same phone can change its answer. */
+  key: z.string().min(16).max(64).optional(),
+});
+export type LinkReplyInput = z.input<typeof linkReplySchema>;
+
 export interface InvitationFunction {
   id: string;
   name: string;
@@ -157,6 +169,15 @@ export interface InvitationGuestView {
   respondedAt: string | null;
 }
 
+/** Someone not on the app who replied through the link. */
+export interface LinkReplyView {
+  id: string;
+  name: string;
+  place: string | null;
+  answers: InvitationAnswer[];
+  respondedAt: string;
+}
+
 export interface InvitationDetail extends InvitationSummary {
   message: string | null;
   sentByName: string;
@@ -167,6 +188,28 @@ export interface InvitationDetail extends InvitationSummary {
   /** For the host: every guest family and the headcount per function. */
   guests?: InvitationGuestView[];
   tally?: { functionId: string; yes: number; maybe: number; no: number; people: number }[];
+  /** For the host: the secret part of the link anyone can open, or null when the link is off. */
+  shareToken?: string | null;
+  linkReplies?: LinkReplyView[];
+}
+
+/** What the link shows: the card, and nothing about who else was invited. */
+export interface PublicInvitation {
+  kind: InvitationKind;
+  forNames: string | null;
+  message: string | null;
+  hostName: string;
+  functions: InvitationFunction[];
+  cancelled: boolean;
+  closed: boolean;
+}
+
+/** A link reply as its sender sees it, with the key to change it later. */
+export interface LinkReplyReceipt {
+  key: string;
+  name: string;
+  place: string | null;
+  answers: InvitationAnswer[];
 }
 
 /** Families the host can pick from: their family tree and linked families. */
