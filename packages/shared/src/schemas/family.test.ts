@@ -20,6 +20,7 @@ describe('memberInputSchema', () => {
       adopted: false,
       otherParentId: null,
       formerPartner: false,
+      birthFamilyId: null,
     });
   });
 

@@ -219,3 +219,32 @@ describe('interests', () => {
     expect(await ProfileModel.countDocuments()).toBe(0);
   });
 });
+
+describe('adoption and the gotra rule', () => {
+  it('keeps an adopted son from his birth family’s gotra as well as his family’s', async () => {
+    const birth = await createFamily(branches.bhusawal, { gotra: 'atri', people: [{ name: 'Birth Head' }] });
+    const son = await familyWithChild(branches.amalner, { name: 'Adopted Son', gender: 'male', age: 27 }, 'kashyap');
+    const marked = await api
+      .put(`/api/families/${son.familyId}/members/${son.childId}`)
+      .set('Cookie', son.cookie)
+      .send({ name: 'Adopted Son', relation: 'son', gender: 'male', birthYear: String(year - 27), adopted: true, birthFamilyId: birth.familyId });
+    expect(marked.status).toBe(200);
+    expect(marked.body.family.members.find((m: { id: string }) => m.id === son.childId)).toMatchObject({ adopted: true, birthFamily: { id: birth.familyId } });
+    const sonProfile = await liveProfile(son);
+
+    const atri = await familyWithChild(branches.amalner, { name: 'Atri Girl', gender: 'female', age: 24 }, 'atri');
+    const atriProfile = await liveProfile(atri);
+    const garg = await familyWithChild(branches.amalner, { name: 'Garg Girl', gender: 'female', age: 24 }, 'garg');
+    await liveProfile(garg);
+
+    const names = async (cookie: string, forProfile: string) => ((await api.get(`/api/matrimony/search?forProfile=${forProfile}`).set('Cookie', cookie)).body as ProfilePage).items.map((p) => p.name);
+    expect(await names(son.cookie, sonProfile)).toEqual(['Garg Girl']);
+    expect(await names(atri.cookie, atriProfile)).not.toContain('Adopted Son');
+    expect((await api.post('/api/matrimony/interests').set('Cookie', son.cookie).send({ fromProfileId: sonProfile, toProfileId: atriProfile })).status).toBe(403);
+
+    // The birth family's gotra changing follows through.
+    const birthAdmin = await createFamily(branches.district, { account: 'admin' });
+    expect((await api.put(`/api/families/${birth.familyId}`).set('Cookie', birthAdmin.cookie).send({ place: 'Bhusawal', gotra: 'garg', address: '' })).status).toBe(200);
+    expect(await names(son.cookie, sonProfile)).toEqual(['Atri Girl']);
+  });
+});

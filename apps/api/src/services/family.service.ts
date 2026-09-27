@@ -96,7 +96,11 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
   // Parents listed in other families, for those who may see them.
   const externalIds = members.flatMap((m) => (m.externalParentId ? [m.externalParentId] : []));
   const externalPeople = externalIds.length ? await MemberModel.find({ _id: { $in: externalIds } }, { name: 1, familyId: 1 }).lean() : [];
-  const externalFamilies = await familySummaries(viewer, externalPeople.map((p) => p.familyId));
+  const externalFamilies = await familySummaries(viewer, [
+    ...externalPeople.map((p) => p.familyId),
+    // Birth families of adopted people, for those who see adoption.
+    ...(seesPending ? members.flatMap((m) => (m.birthFamilyId ? [m.birthFamilyId] : [])) : []),
+  ]);
   const externalOf = (id: unknown) => {
     const p = id ? externalPeople.find((x) => String(x._id) === String(id)) : undefined;
     const f = p ? externalFamilies.get(String(p.familyId)) : undefined;
@@ -145,6 +149,7 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     formerPartner: m.formerPartner === true,
     ...(seesPending && { adopted: m.adopted === true }),
     ...(externalOf(m.externalParentId) && { externalParent: externalOf(m.externalParentId) }),
+    ...(seesPending && m.birthFamilyId && externalFamilies.get(String(m.birthFamilyId)) && { birthFamily: externalFamilies.get(String(m.birthFamilyId)) }),
     ...(maher(m._id) && { movedFrom: maher(m._id) }),
     };
   };
@@ -249,7 +254,13 @@ export async function updateFamily(viewer: Viewer, familyId: string, input: Fami
  * relation fits: a grandchild's parent is a son or daughter, a
  * daughter-in-law's husband a son.
  */
-async function checkTies(familyId: Types.ObjectId, input: MemberInputParsed, self?: Types.ObjectId) {
+async function checkTies(familyId: Types.ObjectId, input: MemberInputParsed, self?: Types.ObjectId, viewer?: Viewer) {
+  if (input.birthFamilyId) {
+    const birth = input.birthFamilyId === String(familyId) ? null : await FamilyModel.findById(input.birthFamilyId, { history: 0 }).lean();
+    if (!birth || (viewer && !canViewFamily(viewer, birth))) {
+      throw new AppError(400, 'VALIDATION_FAILED', 'Pick the family they were born into from the directory.', [{ path: 'birthFamilyId', message: 'validation.birthFamily' }]);
+    }
+  }
   const ties = [
     ['parentId', input.parentId, PARENT_CHOICES[input.relation]],
     ['partnerId', input.partnerId, PARTNER_CHOICES[input.relation]],
@@ -281,7 +292,7 @@ export async function addMember(viewer: Viewer, familyId: string, input: MemberI
     throw new AppError(400, 'VALIDATION_FAILED', `A family can list up to ${MAX_FAMILY_MEMBERS} people.`);
   }
 
-  await checkTies(family._id, input);
+  await checkTies(family._id, input, undefined, viewer);
   // A verified family's additions wait for the committee, unless a reviewer added them.
   const waits = family.status === 'verified' && !canReviewFamily(viewer, family);
   await MemberModel.create({
@@ -314,7 +325,7 @@ export async function updateMember(viewer: Viewer, familyId: string, memberId: s
     ]);
   }
   const passedAway = input.deceased && !member.deceased;
-  await checkTies(family._id, input, member._id);
+  await checkTies(family._id, input, member._id, viewer);
   const relationChanged = !member.isHead && member.relation !== input.relation;
 
   member.name = input.name;
@@ -332,6 +343,7 @@ export async function updateMember(viewer: Viewer, familyId: string, memberId: s
   member.adopted = input.adopted;
   member.otherParentId = input.otherParentId ? new Types.ObjectId(input.otherParentId) : null;
   member.formerPartner = input.formerPartner;
+  member.birthFamilyId = input.birthFamilyId ? new Types.ObjectId(input.birthFamilyId) : null;
   await member.save();
   // A son who is now a nephew is no longer anyone's father here.
   if (relationChanged) await untie(family._id, member._id);

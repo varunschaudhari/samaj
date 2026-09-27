@@ -64,6 +64,8 @@ const memberSchema = new Schema(
     otherParentId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
     /** Divorced or separated from whoever they married. */
     formerPartner: { type: Boolean, default: false },
+    /** Adopted: the family they were born into. Its gotra counts in matrimony too. */
+    birthFamilyId: { type: Schema.Types.ObjectId, ref: 'Family', default: null },
     /** Their parent, listed in another family linked to this one (a head's father, a wife's father in her माहेर). */
     externalParentId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
   },

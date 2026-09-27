@@ -12,6 +12,7 @@ import {
   type profileFieldsSchema,
   type profileSearchSchema,
 } from '@samaj/shared';
+import type { GotraId } from '@samaj/shared';
 import { type HydratedDocument, type QueryFilter, Types } from 'mongoose';
 import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
@@ -161,6 +162,7 @@ export async function createProfile(viewer: Viewer, input: CreateInput): Promise
     gender: member.gender,
     birthYear,
     gotra: family.gotra,
+    ...(await birthGotraOf(member)),
     branchId: family.branchId,
     branchAncestors: family.branchAncestors,
   });
@@ -288,8 +290,9 @@ export async function search(viewer: Viewer, query: SearchQuery): Promise<Profil
     { gender: own.gender === 'male' ? 'female' : 'male' },
     { familyId: { $ne: own.familyId } },
   ];
-  // The gotra rule. Profiles whose family hasn't recorded a gotra still appear.
-  if (own.gotra) conditions.push({ gotra: { $ne: own.gotra } });
+  // The gotra rule: neither their gotra nor, for someone adopted, the one they were born into. Profiles whose family hasn't recorded a gotra still appear.
+  const mine = gotrasOf(own);
+  if (mine.length) conditions.push({ gotra: { $nin: mine } }, { birthGotra: { $nin: mine } });
   if (query.ageMin) conditions.push({ birthYear: { $lte: year - query.ageMin } });
   if (query.ageMax) conditions.push({ birthYear: { $gte: year - query.ageMax } });
   if (query.branchId) {
@@ -379,12 +382,24 @@ export async function removeProfile(viewer: Viewer, id: string, reason: string):
 
 export async function syncFamilyGotra(familyId: Types.ObjectId, gotra: string | null) {
   await ProfileModel.updateMany({ familyId }, { $set: { gotra } });
+  await ProfileModel.updateMany({ birthFamilyId: familyId }, { $set: { birthGotra: gotra } });
 }
 
-export async function syncMember(member: Pick<MemberDoc, '_id' | 'gender' | 'birthYear'>) {
+export async function syncMember(member: Pick<MemberDoc, '_id' | 'gender' | 'birthYear' | 'adopted' | 'birthFamilyId'>) {
+  const birth = await birthGotraOf(member);
   // A profile needs a birth year; if it was cleared, keep the last known one.
-  await ProfileModel.updateOne({ memberId: member._id }, { $set: { gender: member.gender, ...(member.birthYear && { birthYear: member.birthYear }) } });
+  await ProfileModel.updateOne({ memberId: member._id }, { $set: { gender: member.gender, ...(member.birthYear && { birthYear: member.birthYear }), ...birth } });
 }
+
+/** An adopted person's birth family and its gotra, kept on their profile for the gotra rule. */
+async function birthGotraOf(member: Pick<MemberDoc, 'adopted' | 'birthFamilyId'>) {
+  const birthFamilyId = member.adopted && member.birthFamilyId ? member.birthFamilyId : null;
+  const family = birthFamilyId ? await FamilyModel.findById(birthFamilyId, { gotra: 1 }).lean() : null;
+  return { birthFamilyId: family ? birthFamilyId : null, birthGotra: family?.gotra ?? null };
+}
+
+/** Gotras a profile keeps matches away from: the family's, and for someone adopted, their birth family's. */
+export const gotrasOf = (p: { gotra?: GotraId | null; birthGotra?: GotraId | null }) => [p.gotra, p.birthGotra].filter((g): g is GotraId => Boolean(g));
 
 /** A removed family member's profile closes, and their open interests are withdrawn. */
 /** The person married and moved to another family: their profile closes as 'married' and open interests end. */

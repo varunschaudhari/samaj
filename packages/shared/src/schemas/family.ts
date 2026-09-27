@@ -167,6 +167,8 @@ const memberFields = z.object({
   otherParentId: optionalId,
   /** Divorced or separated from whoever they married. Widowed is simply their partner having passed away. */
   formerPartner: z.boolean().default(false),
+  /** For someone adopted: the family they were born into, if it is in the directory. Its gotra counts for matrimony too. */
+  birthFamilyId: optionalId,
 });
 
 type MemberFields = z.output<typeof memberFields>;
@@ -187,6 +189,7 @@ const tidy = <T extends MemberFields>(v: T): T => ({
   adopted: v.adopted && ADOPTABLE_RELATIONS.includes(v.relation),
   otherParentId: CHILD_RELATIONS.includes(v.relation) ? v.otherParentId : null,
   formerPartner: v.formerPartner && SPOUSE_RELATIONS.includes(v.relation),
+  birthFamilyId: v.adopted && ADOPTABLE_RELATIONS.includes(v.relation) ? v.birthFamilyId : null,
 });
 
 export const memberInputSchema = memberFields.superRefine(checkYears).transform(tidy);
@@ -231,7 +234,7 @@ export const enrolFamilySchema = z.object({
   place: optionalText(60).pipe(z.string().min(2, 'validation.placeMin').nullable()),
   gotra: gotraSchema,
   address: optionalText(200),
-  head: memberFields.omit({ relation: true, deceased: true, deathYear: true, parentId: true, partnerId: true, adopted: true, otherParentId: true, formerPartner: true }),
+  head: memberFields.omit({ relation: true, deceased: true, deathYear: true, parentId: true, partnerId: true, adopted: true, otherParentId: true, formerPartner: true, birthFamilyId: true }),
   /** The committee confirms the family agreed to be registered. */
   consent: z.literal(true, { error: 'validation.consentRequired' }),
 });
@@ -287,6 +290,8 @@ export interface FamilyMember {
   otherParentId: string | null;
   /** Divorced or separated from whoever they married. */
   formerPartner: boolean;
+  /** Adopted: the family they were born into. For the family and its committee only, like adoption itself. */
+  birthFamily?: LinkedFamily;
 }
 
 /** Someone who was in this family and moved to another, usually after marriage. */

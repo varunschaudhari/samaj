@@ -21,9 +21,10 @@ import { FormAlert } from '@/features/auth/FormAlert';
 import { applyServerIssues, fieldError } from '@/features/auth/form-errors';
 import { formatNumber, useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { useSaveMember } from './api';
+import { BirthFamilyField } from './BirthFamilyField';
 import { PhotoField } from './PhotoField';
 
-const FIELDS = ['name', 'relation', 'gender', 'birthYear', 'occupation', 'education', 'phone', 'deceased', 'deathYear', 'parentId', 'partnerId', 'adopted', 'otherParentId', 'formerPartner'] as const;
+const FIELDS = ['name', 'relation', 'gender', 'birthYear', 'occupation', 'education', 'phone', 'deceased', 'deathYear', 'parentId', 'partnerId', 'adopted', 'otherParentId', 'formerPartner', 'birthFamilyId'] as const;
 
 /** The gender most relations imply, so picking "Son" fills it in. Spouse is the opposite of the head. */
 const RELATION_GENDER: Partial<Record<Relation, Gender>> = {
@@ -75,6 +76,7 @@ function toFormValues(member: FamilyMember | null, relation?: Relation): MemberI
     adopted: member?.adopted ?? false,
     otherParentId: member?.otherParentId ?? '',
     formerPartner: member?.formerPartner ?? false,
+    birthFamilyId: member?.birthFamily?.id ?? '',
   };
 }
 
@@ -139,6 +141,8 @@ export function MemberFormModal({ familyId, member, open, onClose, initialRelati
   const onlyOne = (options: FamilyMember[]) => (options.length === 1 ? (options[0]?.id ?? null) : null);
   // After a second marriage: which of the parent's spouses is this child's other parent.
   const otherParentId = form.watch('otherParentId');
+  const adopted = form.watch('adopted');
+  const birthFamilyId = form.watch('birthFamilyId');
   const theirParent = !CHILD_RELATIONS.includes(relation)
     ? undefined
     : relation === 'son' || relation === 'daughter'
@@ -331,6 +335,15 @@ export function MemberFormModal({ familyId, member, open, onClose, initialRelati
             </fieldset>
           )}
           {ADOPTABLE_RELATIONS.includes(relation) && <Checkbox label={t('member.adopted')} hint={t('member.adoptedHint')} {...form.register('adopted')} />}
+          {adopted && ADOPTABLE_RELATIONS.includes(relation) && (
+            <BirthFamilyField
+              value={birthFamilyId ?? ''}
+              known={member?.birthFamily}
+              exclude={familyId}
+              onChange={(id) => form.setValue('birthFamilyId', id)}
+              error={fieldError(t, errors.birthFamilyId?.message)}
+            />
+          )}
           {SPOUSE_RELATIONS.includes(relation) && <Checkbox label={t('member.formerPartner')} hint={t('member.formerPartnerHint')} {...form.register('formerPartner')} />}
 
           <Input

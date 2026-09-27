@@ -7,6 +7,7 @@ import { canBrowseDirectory, canViewProfile } from './access';
 import { toCards } from './matrimony.service';
 import { notVerified } from './member.service';
 import type { Viewer } from './viewer';
+import { gotrasOf } from './matrimony.service';
 
 const refuse = (status: number, message: string, key: string) =>
   new AppError(status, status === 409 ? 'CONFLICT' : 'FORBIDDEN', message, [{ path: 'interest', message: key }] satisfies FieldIssue[]);
@@ -21,7 +22,7 @@ export async function sendInterest(viewer: Viewer, fromProfileId: string, toProf
   if (String(from.familyId) === String(to.familyId)) throw refuse(403, 'Both profiles are in the same family.', 'validation.interestSameFamily');
   if (from.gender === to.gender) throw refuse(403, 'Interest is only for the opposite gender.', 'validation.interestGender');
   // Same rule as search: the API refuses same-gotra matches even if someone crafts the request.
-  if (from.gotra && from.gotra === to.gotra) throw refuse(403, 'Both families have the same gotra.', 'validation.interestSameGotra');
+  if (gotrasOf(from).some((g) => gotrasOf(to).includes(g))) throw refuse(403, 'Both families have the same gotra.', 'validation.interestSameGotra');
 
   const reverse = await InterestModel.findOne({ fromProfileId: to._id, toProfileId: from._id, status: { $in: ['pending', 'accepted'] } }).lean();
   if (reverse) throw refuse(409, 'They already sent you interest. Answer it in Interests.', 'validation.interestReverse');

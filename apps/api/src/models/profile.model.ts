@@ -40,6 +40,9 @@ const profileSchema = new Schema(
     gender: { type: String, enum: GENDERS, required: true },
     birthYear: { type: Number, required: true },
     gotra: { type: String, enum: GOTRA_IDS, default: null },
+    /** For someone adopted: the family they were born into, and its gotra, which matches are kept from too. */
+    birthFamilyId: { type: Schema.Types.ObjectId, ref: 'Family', default: null },
+    birthGotra: { type: String, enum: GOTRA_IDS, default: null },
     branchId: { type: Schema.Types.ObjectId, ref: 'Branch', required: true },
     branchAncestors: { type: [Schema.Types.ObjectId], default: [] },
   },
