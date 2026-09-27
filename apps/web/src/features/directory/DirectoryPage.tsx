@@ -14,10 +14,9 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatTotal, useLanguageStore, useT } from '@/i18n';
 import { gotraOptions } from '@/features/families/gotra-options';
 import { type DirectoryFilters, useMembers } from './api';
-import { MemberCard, MemberCardSkeleton, MemberListHeader } from './MemberCard';
+import { MEMBER_LIST, MemberCard, MemberCardSkeleton, MemberListHeader } from './MemberCard';
 
 const SKELETON_COUNT = 8;
-const LIST = 'divide-y divide-line overflow-hidden rounded-md border border-line bg-surface shadow-card';
 
 /** Filters live in the URL, so back, reload and shared links keep them. */
 function useFilterParams() {
@@ -156,7 +155,7 @@ function Directory() {
   if (members.isPending) {
     // 1. Loading: skeletons in the same grid the cards will fill.
     body = (
-      <ul className={LIST} aria-busy="true" aria-label={t('common.loading')}>
+      <ul className={MEMBER_LIST} aria-busy="true" aria-label={t('common.loading')}>
         <MemberListHeader />
         {Array.from({ length: SKELETON_COUNT }, (_, i) => (
           <MemberCardSkeleton key={i} />
@@ -188,7 +187,7 @@ function Directory() {
     // 4. Loaded.
     body = (
       <div className="flex flex-col gap-4">
-        <ul className={LIST} aria-busy={members.isPlaceholderData || undefined}>
+        <ul className={MEMBER_LIST} aria-busy={members.isPlaceholderData || undefined}>
           <MemberListHeader />
           {items.map((m) => (
             <MemberCard key={m.id} member={m} />

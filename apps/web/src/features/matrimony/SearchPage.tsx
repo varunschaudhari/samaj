@@ -1,15 +1,18 @@
-import { gotraName } from '@samaj/shared';
-import { Clock, HeartHandshake, SearchX, X } from '@/components/ui/icons';
+import { DIETS, type Diet, MARITAL_STATUSES, type MaritalStatus, SEARCH_SORTS, type SearchSort, gotraName } from '@samaj/shared';
+import { Clock, HeartHandshake, Info, SearchX, X } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { type ActiveFilter, Button, EmptyState, ErrorState, ListToolbar, LoadMore, Select, Skeleton, buttonVariants } from '@/components/ui';
+import { type ActiveFilter, Button, Chip, ChipRow, EmptyState, ErrorState, Icon, ListToolbar, LoadMore, Select, Skeleton, buttonVariants } from '@/components/ui';
 import { BranchSelect, useBranchLabel } from '@/features/branches/BranchSelect';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatTotal, useLanguageStore, useT } from '@/i18n';
-import { type SearchFilters, useMyMatrimony, useProfileSearch } from './api';
+import { type SearchFilters, formatHeight, useMyMatrimony, useProfile, useProfileSearch } from './api';
 import { ProfileCardSkeleton, ProfileCardView } from './ProfileCardView';
 
 const AGES = Array.from({ length: 43 }, (_, i) => 18 + i);
+const HEIGHTS = Array.from({ length: 13 }, (_, i) => 145 + i * 5);
+
+const oneOf = <T extends string>(values: readonly T[], value: string | null): T | '' => ((values as readonly string[]).includes(value ?? '') ? (value as T) : '');
 
 /** Search on behalf of one of the family's live profiles; filters live in the URL. */
 export function SearchPage() {
@@ -26,11 +29,21 @@ export function SearchPage() {
 
   const filters: SearchFilters = {
     forProfile,
+    sort: oneOf<SearchSort>(SEARCH_SORTS, params.get('sort')) || 'match',
     ageMin: params.get('ageMin') ?? '',
     ageMax: params.get('ageMax') ?? '',
+    heightMin: params.get('height') ?? '',
+    maritalStatus: oneOf<MaritalStatus>(MARITAL_STATUSES, params.get('marital')),
+    diet: oneOf<Diet>(DIETS, params.get('diet')),
     branchId: params.get('branch') ?? '',
     education: debouncedEducation,
   };
+  // Whether this profile's family said what they're looking for; without it, best matches has nothing to rank by.
+  const ownDetail = useProfile(forProfile || undefined);
+  const prefs = ownDetail.data?.preferences;
+  const hasPrefs = Boolean(
+    prefs && (prefs.ageMin !== null || prefs.ageMax !== null || prefs.heightMinCm !== null || prefs.maritalStatuses.length || prefs.diets.length || prefs.branches.length),
+  );
   const set = (key: string, value: string) =>
     setParams(
       (prev) => {
@@ -46,10 +59,13 @@ export function SearchPage() {
   const results = useProfileSearch(filters);
   const items = results.data?.pages.flatMap((p) => p.items) ?? [];
   const total = results.data?.pages[0]?.total;
-  const filtered = Boolean(filters.ageMin || filters.ageMax || filters.branchId || filters.education);
+  const filtered = Boolean(filters.ageMin || filters.ageMax || filters.heightMin || filters.maritalStatus || filters.diet || filters.branchId || filters.education);
   const clear = () => {
     setEducation('');
-    setParams(forProfile ? { for: forProfile } : {}, { replace: true });
+    const keep: Record<string, string> = {};
+    if (forProfile) keep.for = forProfile;
+    if (params.get('sort')) keep.sort = params.get('sort') ?? '';
+    setParams(keep, { replace: true });
   };
   const branchLabel = useBranchLabel(filters.branchId);
   const ageLabel =
@@ -79,6 +95,9 @@ export function SearchPage() {
           },
         ]
       : []),
+    ...(filters.heightMin ? [{ key: 'height', label: `${t('matrimony.search.heightMin')}: ${formatHeight(Number(filters.heightMin))}`, onRemove: () => set('height', '') }] : []),
+    ...(filters.maritalStatus ? [{ key: 'marital', label: t(`matrimony.marital.${filters.maritalStatus}`), onRemove: () => set('marital', '') }] : []),
+    ...(filters.diet ? [{ key: 'diet', label: t(`matrimony.diet.${filters.diet}`), onRemove: () => set('diet', '') }] : []),
     ...(branchLabel ? [{ key: 'branch', label: `${t('directory.filterBranch')}: ${branchLabel}`, onRemove: () => set('branch', '') }] : []),
   ];
 
@@ -104,7 +123,7 @@ export function SearchPage() {
   let body;
   if (results.isPending) {
     body = (
-      <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-busy="true" aria-label={t('common.loading')}>
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4" aria-busy="true" aria-label={t('common.loading')}>
         {[0, 1, 2, 3].map((i) => (
           <ProfileCardSkeleton key={i} />
         ))}
@@ -130,7 +149,7 @@ export function SearchPage() {
   } else {
     body = (
       <div className="flex flex-col gap-4">
-        <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-busy={results.isPlaceholderData || undefined}>
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4" aria-busy={results.isPlaceholderData || undefined}>
           {items.map((p) => (
             <ProfileCardView key={p.id} profile={p} href={`/matrimony/profiles/${p.id}?from=${forProfile}`} />
           ))}
@@ -155,6 +174,23 @@ export function SearchPage() {
       )}
       {own.gotra && <p className="text-sm text-fg-muted">{t('matrimony.search.gotraRule', { gotra: gotraName(own.gotra, language) ?? '' })}</p>}
 
+      <ChipRow label={t('matrimony.search.sort')}>
+        {SEARCH_SORTS.map((sort) => (
+          <Chip key={sort} selected={filters.sort === sort} onClick={() => set('sort', sort === 'match' ? '' : sort)}>
+            {t(`matrimony.search.sort.${sort}`)}
+          </Chip>
+        ))}
+      </ChipRow>
+      {filters.sort === 'match' && ownDetail.isSuccess && !hasPrefs && (
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-muted">
+          <Icon icon={Info} size="sm" />
+          {t('matrimony.search.noPrefs')}
+          <Link to={`/matrimony/profiles/${forProfile}`} className="font-semibold text-primary underline-offset-4 hover:underline">
+            {t('matrimony.search.setPrefs')}
+          </Link>
+        </p>
+      )}
+
       <ListToolbar
         search={{ value: education, onChange: setEducation, label: t('matrimony.search.education'), placeholder: t('matrimony.search.educationPlaceholder') }}
         active={active}
@@ -169,7 +205,7 @@ export function SearchPage() {
               onChange={(e) => set('ageMin', e.target.value)}
               fieldClassName="md:w-32"
             >
-              <option value="">{t('matrimony.search.ageMinAny')}</option>
+              <option value="">{t('matrimony.search.ageMin')}</option>
               {AGES.map((a) => (
                 <option key={a} value={a}>
                   {t('matrimony.search.fromAge', { age: a })}
@@ -183,10 +219,34 @@ export function SearchPage() {
               onChange={(e) => set('ageMax', e.target.value)}
               fieldClassName="md:w-32"
             >
-              <option value="">{t('matrimony.search.ageMaxAny')}</option>
+              <option value="">{t('matrimony.search.ageMax')}</option>
               {AGES.map((a) => (
                 <option key={a} value={a}>
                   {t('matrimony.search.toAge', { age: a })}
+                </option>
+              ))}
+            </Select>
+            <Select label={t('matrimony.search.heightMin')} hideLabel value={filters.heightMin} onChange={(e) => set('height', e.target.value)} fieldClassName="md:w-36">
+              <option value="">{t('matrimony.height')}</option>
+              {HEIGHTS.map((cm) => (
+                <option key={cm} value={cm}>
+                  {formatHeight(cm)}
+                </option>
+              ))}
+            </Select>
+            <Select label={t('matrimony.maritalStatus')} hideLabel value={filters.maritalStatus} onChange={(e) => set('marital', e.target.value)} fieldClassName="md:w-44">
+              <option value="">{t('matrimony.maritalStatus')}</option>
+              {MARITAL_STATUSES.map((m) => (
+                <option key={m} value={m}>
+                  {t(`matrimony.marital.${m}`)}
+                </option>
+              ))}
+            </Select>
+            <Select label={t('matrimony.diet')} hideLabel value={filters.diet} onChange={(e) => set('diet', e.target.value)} fieldClassName="md:w-36">
+              <option value="">{t('matrimony.diet')}</option>
+              {DIETS.map((d) => (
+                <option key={d} value={d}>
+                  {t(`matrimony.diet.${d}`)}
                 </option>
               ))}
             </Select>

@@ -71,14 +71,14 @@ const SWATCHES: { name: string; className: string; note?: string }[] = [
 ];
 
 const TYPE_SCALE: { token: string; size: string; className: string; sample: string }[] = [
-  { token: '4xl', size: '2.488rem', className: 'font-display text-4xl font-semibold', sample: 'वार्षिक मेळावा' },
-  { token: '3xl', size: '2.074rem', className: 'font-display text-3xl font-semibold', sample: 'Member directory' },
-  { token: '2xl', size: '1.728rem', className: 'font-display text-2xl font-semibold', sample: 'समिती सूचना' },
-  { token: 'xl', size: '1.44rem', className: 'font-display text-xl font-semibold', sample: 'Chaudhari family, Jalgaon' },
-  { token: 'lg', size: '1.2rem', className: 'text-lg font-semibold', sample: 'कार्ड शीर्षक · Card title' },
-  { token: 'base', size: '1rem', className: 'text-base', sample: 'Body text sets at 1.6 line height so Devanagari matras have room: नवीन सदस्य नोंदणीसाठी कुटुंबप्रमुखाचे नाव आवश्यक आहे.' },
-  { token: 'sm', size: '0.917rem', className: 'text-sm', sample: 'Helper text under inputs · मदत मजकूर' },
-  { token: 'xs', size: '0.833rem', className: 'text-xs', sample: 'Badges and timestamps · बॅज' },
+  { token: '4xl', size: '2.125rem', className: 'font-display text-4xl font-semibold', sample: 'वार्षिक मेळावा' },
+  { token: '3xl', size: '1.75rem', className: 'font-display text-3xl font-semibold', sample: 'Member directory' },
+  { token: '2xl', size: '1.5rem', className: 'font-display text-2xl font-semibold', sample: 'समिती सूचना' },
+  { token: 'xl', size: '1.25rem', className: 'font-display text-xl font-semibold', sample: 'Chaudhari family, Jalgaon' },
+  { token: 'lg', size: '1.0625rem', className: 'text-lg font-semibold', sample: 'कार्ड शीर्षक · Card title' },
+  { token: 'base', size: '0.9375rem', className: 'text-base', sample: 'Body text is 15px in English and 16px in Marathi, with taller lines so Devanagari matras have room: नवीन सदस्य नोंदणीसाठी कुटुंबप्रमुखाचे नाव आवश्यक आहे.' },
+  { token: 'sm', size: '0.875rem', className: 'text-sm', sample: 'Helper text under inputs · मदत मजकूर' },
+  { token: 'xs', size: '0.8125rem', className: 'text-xs', sample: 'Badges and timestamps · बॅज' },
 ];
 
 const RADII = [
@@ -186,7 +186,7 @@ export function StyleguidePage() {
 
         <Section id="type" title="Type">
           <p className="max-w-prose text-sm text-fg-muted">
-            Poppins for display, Noto Sans Devanagari for everything else, both Google Fonts, self-hosted. Ratio 1.2 from 16px, all in rem.
+            Display: Plus Jakarta Sans, with Mukta for Marathi. Body and UI: Inter, with Noto Sans Devanagari for Marathi. All Google Fonts, self-hosted. English body text is 15px; Marathi steps up one size with taller lines. All in rem.
           </p>
           <dl className="flex flex-col divide-y divide-line border-y border-line">
             {TYPE_SCALE.map((row) => (
@@ -318,7 +318,7 @@ export function StyleguidePage() {
             </Card>
           </div>
           <Row label="In use: directory rows, and their skeleton">
-            <ul className="w-full max-w-xl divide-y divide-line overflow-hidden rounded-md border border-line bg-surface shadow-card">
+            <ul className="w-full max-w-xl overflow-hidden rounded-md border border-line bg-surface shadow-card">
               <MemberCard member={SAMPLE_MEMBER} />
               <MemberCardSkeleton />
             </ul>

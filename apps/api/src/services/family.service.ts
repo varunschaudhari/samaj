@@ -441,7 +441,7 @@ export async function removeMember(viewer: Viewer, familyId: string, memberId: s
 }
 
 /** Recognise the image by its first bytes rather than trusting the Content-Type header. */
-function imageType(data: Buffer): { ext: string; contentType: string } | null {
+export function imageType(data: Buffer): { ext: string; contentType: string } | null {
   if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return { ext: 'jpg', contentType: 'image/jpeg' };
   if (data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
     return { ext: 'png', contentType: 'image/png' };
@@ -452,7 +452,7 @@ function imageType(data: Buffer): { ext: string; contentType: string } | null {
   return null;
 }
 
-const CONTENT_TYPES: Record<string, string> = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+export const CONTENT_TYPES: Record<string, string> = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
 
 export async function setPhoto(viewer: Viewer, familyId: string, memberId: string, data: Buffer): Promise<FamilyDetail> {
   const family = await loadEditable(viewer, familyId);

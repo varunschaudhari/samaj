@@ -74,6 +74,14 @@ export const router = createBrowserRouter([
       { path: '/privacy', lazy: page(async () => (await import('@/features/privacy/PrivacyNoticePage')).PrivacyNoticePage) },
       // Public so the design system can be reviewed without an account.
       { path: '/styleguide', lazy: page(async () => (await import('@/features/styleguide/StyleguidePage')).StyleguidePage) },
+      // Outside the app shell, so it prints as a clean page.
+      {
+        path: '/matrimony/profiles/:id/biodata',
+        lazy: page(async () => {
+          const { BiodataPage } = await import('@/features/matrimony/BiodataPage');
+          return () => <RequireAuth><BiodataPage /></RequireAuth>;
+        }),
+      },
       {
         element: <RequireAuth><AppShell /></RequireAuth>,
         children: [

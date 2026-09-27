@@ -7,7 +7,7 @@
  * number below is invented.
  */
 import argon2 from 'argon2';
-import { type BranchKind, type FamilyStatus, type Gender, type GotraId, type LinkKind, PRIVACY_NOTICE_VERSION, type Relation, type Role } from '@samaj/shared';
+import { type BranchKind, type FamilyStatus, type Gender, type GotraId, type LinkKind, NAKSHATRA_IDS, PRIVACY_NOTICE_VERSION, RASHI_IDS, type Relation, type Role } from '@samaj/shared';
 import { Types } from 'mongoose';
 import { env } from '../config/env';
 import { connectDb, disconnectDb } from '../config/db';
@@ -588,6 +588,36 @@ async function main() {
     marriages++;
   }
 
+  /** Biodata details and preferences, varied by index so search has something to rank. */
+  const seedBiodata = (person: { gender: string; birthYear?: number | null }, family: { place: string; branchAncestors: Types.ObjectId[]; branchId: Types.ObjectId }, i: number) => {
+    const age = new Date().getFullYear() - (person.birthYear ?? 2000);
+    const male = person.gender === 'male';
+    const diet = (['vegetarian', 'vegetarian', 'eggetarian', 'nonVegetarian'] as const)[i % 4];
+    return {
+      maritalStatus: i % 9 === 8 ? ('divorced' as const) : ('neverMarried' as const),
+      diet,
+      birthDate: `${person.birthYear}-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 27) + 1).padStart(2, '0')}`,
+      birthTime: `${String(5 + (i % 14)).padStart(2, '0')}:${i % 2 ? '15' : '40'}`,
+      birthPlace: family.place,
+      rashi: RASHI_IDS[i % RASHI_IDS.length],
+      nakshatra: NAKSHATRA_IDS[(i * 5) % NAKSHATRA_IDS.length],
+      workLocation: pick(['Pune', 'Mumbai', 'Jalgaon', 'Nashik', 'Aurangabad'], i),
+      fatherOccupation: pick(['Farmer', 'Oil mill owner', 'Retired teacher', 'Shopkeeper', 'Government service'], i),
+      motherOccupation: pick(['Homemaker', 'Teacher', 'Homemaker', 'Tailoring business'], i),
+      nativePlace: family.place,
+      siblings: { brothers: i % 3, brothersMarried: i % 3 ? 1 : 0, sisters: (i + 1) % 3, sistersMarried: 0 },
+      preferences: {
+        // Grooms' families usually look a few years younger, brides' a few years older.
+        ageMin: male ? Math.max(18, age - 7) : age,
+        ageMax: male ? age : age + 6,
+        heightMinCm: male ? null : 160,
+        maritalStatuses: ['neverMarried' as const],
+        diets: diet === 'nonVegetarian' ? [] : ['vegetarian' as const, 'eggetarian' as const],
+        branchIds: i % 2 ? [family.branchAncestors[0] ?? family.branchId] : [],
+      },
+    };
+  };
+
   // Matrimonial profiles for grown, unmarried children of verified families.
   const verified = await FamilyModel.find({ status: 'verified' }).lean();
   let profileCount = 0;
@@ -607,6 +637,7 @@ async function main() {
       occupation: candidate.occupation ?? null,
       income: (['3to6', '6to10', '10to20', null, 'above20', 'below3'] as const)[i % 6],
       manglik: (['no', 'dontKnow', 'no', 'yes'] as const)[i % 4],
+      ...seedBiodata(candidate, family, i),
       about: pick(
         [
           'Close-knit family. Enjoys reading and travel, and helps with the family business on weekends.',

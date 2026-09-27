@@ -11,8 +11,9 @@
  */
 
 :root {
-  --font-body-stack: 'Noto Sans Devanagari Variable', 'Samaj Sans Fallback', 'Noto Sans Devanagari', system-ui, sans-serif;
-  --font-display-stack: 'Poppins', 'Samaj Display Fallback', 'Noto Sans Devanagari', system-ui, sans-serif;
+  /* Latin family first, then its Devanagari partner: see fonts.css. */
+  --font-body-stack: 'Inter Variable', 'Noto Sans Devanagari Variable', 'Samaj Sans Fallback', 'Noto Sans Devanagari', system-ui, sans-serif;
+  --font-display-stack: 'Plus Jakarta Sans Variable', 'Mukta', 'Samaj Display Fallback', 'Noto Sans Devanagari', system-ui, sans-serif;
 
   /* Surfaces */
   --canvas: #f8f5ee;

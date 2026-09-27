@@ -1,5 +1,9 @@
 import type {
+  Diet,
   InterestItem,
+  Language,
+  MaritalStatus,
+  SearchSort,
   MyMatrimony,
   ProfileCard,
   ProfileCreateInput,
@@ -9,6 +13,7 @@ import type {
 } from '@samaj/shared';
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { resizeImage } from '@/lib/image';
 
 const keys = {
   mine: ['matrimony', 'mine'] as const,
@@ -31,8 +36,12 @@ export function useProfile(id: string | undefined) {
 
 export interface SearchFilters {
   forProfile: string;
+  sort: SearchSort;
   ageMin: string;
   ageMax: string;
+  heightMin: string;
+  maritalStatus: MaritalStatus | '';
+  diet: Diet | '';
   branchId: string;
   education: string;
 }
@@ -104,6 +113,28 @@ export function useProfileAction(id: string) {
   return { simple, withReason };
 }
 
+/**
+ * Profile photos: add (resized in the browser, which also drops location
+ * data), make one the main photo, or remove one. Each returns the profile.
+ */
+export function useProfilePhotos(id: string) {
+  const queryClient = useQueryClient();
+  const store = (profile: ProfileDetail) => queryClient.setQueryData(keys.profile(id), profile);
+  const add = useMatrimonyMutation(
+    async (file: File) => (await api.upload<{ profile: ProfileDetail }>(`/matrimony/profiles/${id}/photos`, await resizeImage(file, 1080), 'POST')).profile,
+    store,
+  );
+  const makeMain = useMatrimonyMutation(
+    async (photoId: string) => (await api.post<{ profile: ProfileDetail }>(`/matrimony/profiles/${id}/photos/${photoId}/main`)).profile,
+    store,
+  );
+  const remove = useMatrimonyMutation(
+    async (photoId: string) => (await api.delete<{ profile: ProfileDetail }>(`/matrimony/profiles/${id}/photos/${photoId}`)).profile,
+    store,
+  );
+  return { add, makeMain, remove };
+}
+
 export function useSendInterest() {
   return useMatrimonyMutation(async (input: { fromProfileId: string; toProfileId: string }) => (await api.post<{ interest: InterestItem }>('/matrimony/interests', input)).interest);
 }
@@ -111,6 +142,28 @@ export function useSendInterest() {
 export function useInterestAction() {
   return useMatrimonyMutation(async ({ id, action }: { id: string; action: 'accept' | 'decline' | 'withdraw' }) =>
     (await api.post<{ items: InterestItem[] }>(`/matrimony/interests/${id}/${action}`)).items,
+  );
+}
+
+/** 5′7″ alone, for compact summaries. */
+export function formatFeet(cm: number): string {
+  const inches = Math.round(cm / 2.54);
+  return `${Math.floor(inches / 12)}′${inches % 12}″`;
+}
+
+/** 21 Aug 1998 from 1998-08-21, without shifting across time zones. */
+export function formatBirthDate(iso: string, language: Language): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Intl.DateTimeFormat(language === 'mr' ? 'mr-IN' : 'en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
+    new Date(Date.UTC(y ?? 2000, (m ?? 1) - 1, d ?? 1)),
+  );
+}
+
+/** 6:45 am from 06:45. */
+export function formatBirthTime(hhmm: string, language: Language): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  return new Intl.DateTimeFormat(language === 'mr' ? 'mr-IN' : 'en-IN', { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }).format(
+    new Date(Date.UTC(2000, 0, 1, h ?? 0, m ?? 0)),
   );
 }
 

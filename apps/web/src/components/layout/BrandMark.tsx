@@ -1,7 +1,7 @@
 import { useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 
-/** The Samaj wordmark: a zari ring on peacock green, and the name in Poppins. */
+/** The Samaj wordmark: a zari ring on peacock green, and the name in the display face (Plus Jakarta Sans). */
 export function BrandMark({ className, onHero = false }: { className?: string; onHero?: boolean }) {
   const t = useT();
   return (

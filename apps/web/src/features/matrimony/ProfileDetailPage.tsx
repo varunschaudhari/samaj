@@ -1,23 +1,76 @@
 import { type ProfileDetail, formatPhone, gotraName } from '@samaj/shared';
-import { BadgeCheck, Check, Clock, EyeOff, HeartHandshake, MapPin, Pause, Pencil, Phone, Play, Send, Trash2, TriangleAlert, X } from '@/components/ui/icons';
-import { type ReactNode, useState } from 'react';
+import {
+  BadgeCheck,
+  Briefcase,
+  Check,
+  Clock,
+  EyeOff,
+  FileText,
+  GraduationCap,
+  HeartHandshake,
+  MapPin,
+  Pause,
+  Pencil,
+  Phone,
+  Play,
+  Send,
+  Trash2,
+  TriangleAlert,
+  X,
+} from '@/components/ui/icons';
+import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
-import { Avatar, Button, Card, CardTitle, EmptyState, ErrorState, Icon, Modal, Select, Skeleton, Textarea, buttonVariants, toast } from '@/components/ui';
+import { Badge, Button, Card, CardTitle, EmptyState, ErrorState, Icon, Modal, Select, Skeleton, Textarea, buttonVariants, toast } from '@/components/ui';
 import { useMe } from '@/features/auth/api';
 import { placeLabel } from '@/features/branches/api';
-import { formatNumber, useErrorMessage, useLanguageStore, useT } from '@/i18n';
+import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
-import { formatHeight, useInterestAction, useMyMatrimony, useProfile, useProfileAction, useSendInterest } from './api';
+import { useInterestAction, useMyMatrimony, useProfile, useProfileAction, useSendInterest } from './api';
+import { type BiodataSection, biodataSections, headlineFacts, preferenceChips } from './biodata';
 import { ProfileStatusBadge } from './ProfileCardView';
 import { type ProfileFormTarget, ProfileFormModal } from './ProfileFormModal';
+import { PhotoGallery, PhotoManager } from './ProfilePhotos';
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+/** One biodata section as a card: label on the left, value on the right. */
+function SectionCard({ section }: { section: BiodataSection }) {
   return (
-    <div className="flex flex-col gap-0.5 py-2.5 sm:flex-row sm:gap-4">
-      <dt className="text-sm text-fg-muted sm:w-40 sm:shrink-0">{label}</dt>
-      <dd className="font-semibold break-words text-fg">{children}</dd>
-    </div>
+    <Card as="section" className="flex flex-col gap-2">
+      <h3 className="flex items-center gap-2 font-display text-lg font-semibold text-fg">
+        <span className="flex size-8 items-center justify-center rounded-full bg-primary-soft text-primary">
+          <Icon icon={section.icon} size="sm" />
+        </span>
+        {section.title}
+      </h3>
+      <dl className="divide-y divide-line">
+        {section.rows.map((r) => (
+          <div key={r.label} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3 py-2.5 text-sm">
+            <dt className="text-fg-muted">{r.label}</dt>
+            <dd className="font-medium break-words text-fg">{r.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
+  );
+}
+
+/** Education, work and place, with icons, under the name. */
+function QuickFacts({ profile }: { profile: ProfileDetail }) {
+  const language = useLanguageStore((s) => s.language);
+  const facts = [
+    { icon: GraduationCap, text: profile.education },
+    { icon: Briefcase, text: [profile.occupation, profile.workLocation].filter(Boolean).join(' · ') || null },
+    { icon: MapPin, text: placeLabel(profile.place, profile.branch, language) },
+  ].filter((f) => f.text);
+  return (
+    <ul className="flex flex-col gap-2 text-sm text-fg">
+      {facts.map((f) => (
+        <li key={f.text} className="flex items-start gap-2">
+          <Icon icon={f.icon} size="sm" className="mt-0.5 shrink-0 text-fg-muted" />
+          <span className="min-w-0 break-words">{f.text}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -273,10 +326,13 @@ export function ProfileDetailPage() {
 
   if (profile.isPending) {
     return (
-      <div className="flex flex-col gap-4" aria-busy="true">
-        <Skeleton className="aspect-square w-full max-w-xs rounded-lg" />
-        <Skeleton className="h-8 w-1/2" />
-        <Skeleton className="h-40 w-full rounded-md" />
+      <div className="flex flex-col gap-4 md:grid md:grid-cols-[20rem_1fr]" aria-busy="true">
+        <Skeleton className="aspect-[4/5] w-full rounded-lg" />
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-8 w-1/2" />
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="h-40 w-full rounded-md" />
+        </div>
       </div>
     );
   }
@@ -302,70 +358,91 @@ export function ProfileDetailPage() {
   // Own family, not "can edit": committee members can edit profiles in their branch too,
   // but they act on them as reviewers.
   const own = me.data?.familyId === p.familyId;
+  const sections = biodataSections(p, t, language);
+  const prefs = preferenceChips(p, t, language);
+  const facts = headlineFacts(p, t, language);
+  const gotra = gotraName(p.gotra, language);
 
   return (
-    <div className="flex flex-col gap-5 md:grid md:grid-cols-[minmax(0,18rem)_1fr] md:items-start md:gap-6">
-      <div className="flex flex-col gap-3">
-        {p.photoUrl ? (
-          <img src={p.photoUrl} alt={t('matrimony.photoOf', { name: p.name })} className="aspect-square w-full max-w-xs rounded-lg object-cover" />
-        ) : (
-          <Avatar name={p.name} size="xl" />
-        )}
-        {p.contact && (
-          <Card className="flex flex-col gap-2 border-success bg-success-soft">
-            <p className="text-sm text-fg">
-              {own ? t('matrimony.contactOwn') : t('matrimony.contactShared')} <span className="font-semibold">{p.contact.name}</span>
-            </p>
-            <a href={`tel:${p.contact.phone}`} className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'self-start tabular-nums')}>
-              <Icon icon={Phone} />
-              {formatPhone(p.contact.phone)}
-            </a>
-          </Card>
-        )}
-      </div>
+    <div className="flex flex-col gap-5">
+      {/* The header: photos on one side, who they are on the other. */}
+      <Card padding="none" className="overflow-hidden md:grid md:grid-cols-[20rem_1fr]">
+        <PhotoGallery profile={p} className="md:border-r md:border-line" />
+        <div className="flex flex-col gap-4 p-5">
+          <header className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* h2: the Matrimony page title above is the h1. */}
+              <h2 className="font-display text-2xl font-semibold break-words text-fg md:text-3xl">{p.name}</h2>
+              {(own || p.permissions.canReview) && <ProfileStatusBadge status={p.status} />}
+            </div>
+            {facts.length > 0 && <p className="text-base font-medium text-fg tabular-nums">{facts.join(' · ')}</p>}
+            <div className="flex flex-wrap gap-1.5">
+              {gotra && <Badge tone="zari">{gotra}</Badge>}
+              {p.diet && <Badge>{t(`matrimony.diet.${p.diet}`)}</Badge>}
+              {p.manglik === 'yes' && <Badge>{t('matrimony.manglik.yes')}</Badge>}
+            </div>
+          </header>
+          <QuickFacts profile={p} />
 
-      <div className="flex flex-col gap-4">
-        <header className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* h2: the Matrimony page title above is the h1. */}
-            <h2 className="font-display text-2xl font-semibold text-fg md:text-3xl">{p.name}</h2>
-            {(own || p.permissions.canReview) && <ProfileStatusBadge status={p.status} />}
+          {p.contact && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-success bg-success-soft p-3">
+              <p className="text-sm text-fg">
+                {own ? t('matrimony.contactOwn') : t('matrimony.contactShared')} <span className="font-semibold">{p.contact.name}</span>
+              </p>
+              <a href={`tel:${p.contact.phone}`} className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'tabular-nums')}>
+                <Icon icon={Phone} />
+                {formatPhone(p.contact.phone)}
+              </a>
+            </div>
+          )}
+
+          <div className="mt-auto flex flex-wrap gap-2">
+            <Link to={`/matrimony/profiles/${p.id}/biodata`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              <Icon icon={FileText} />
+              {t('matrimony.biodata')}
+            </Link>
           </div>
-          <p className="flex items-center gap-1 text-sm text-fg-muted">
-            <Icon icon={MapPin} size="sm" />
-            {placeLabel(p.place, p.branch, language)}
-          </p>
-        </header>
+        </div>
+      </Card>
 
-        {own && <FamilyPanel profile={p} onEdit={() => setFormTarget({ mode: 'edit', profile: p })} />}
-        {p.permissions.canReview && <ReviewerPanel profile={p} />}
-        {!own && <InterestPanel profile={p} />}
+      {own && <FamilyPanel profile={p} onEdit={() => setFormTarget({ mode: 'edit', profile: p })} />}
+      {own && p.status !== 'closed' && <PhotoManager profile={p} />}
+      {p.permissions.canReview && <ReviewerPanel profile={p} />}
+      {!own && <InterestPanel profile={p} />}
 
-        <Card>
-          <dl className="divide-y divide-line">
-            {p.age !== null && <Fact label={t('matrimony.age')}>{formatNumber(p.age, language)}</Fact>}
-            {p.heightCm && <Fact label={t('matrimony.height')}>{formatHeight(p.heightCm)}</Fact>}
-            {p.education && <Fact label={t('member.education')}>{p.education}</Fact>}
-            {p.occupation && <Fact label={t('member.occupation')}>{p.occupation}</Fact>}
-            {p.income && <Fact label={t('matrimony.income')}>{t(`matrimony.income.${p.income}`)}</Fact>}
-            <Fact label={t('family.gotra')}>{gotraName(p.gotra, language) ?? t('family.gotraNone')}</Fact>
-            {p.maternalGotra && <Fact label={t('matrimony.maternalGotra')}>{gotraName(p.maternalGotra, language)}</Fact>}
-            {p.manglik && <Fact label={t('matrimony.manglik')}>{t(`matrimony.manglik.${p.manglik}`)}</Fact>}
-          </dl>
-        </Card>
-        {p.about && (
-          <section className="flex flex-col gap-1">
-            <h2 className="text-sm font-semibold text-fg-muted">{t('matrimony.about')}</h2>
-            <p className="max-w-prose whitespace-pre-line text-fg">{p.about}</p>
-          </section>
-        )}
-        {p.expectations && (
-          <section className="flex flex-col gap-1">
-            <h2 className="text-sm font-semibold text-fg-muted">{t('matrimony.expectations')}</h2>
-            <p className="max-w-prose whitespace-pre-line text-fg">{p.expectations}</p>
-          </section>
-        )}
-      </div>
+      {sections.length > 0 && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {sections.map((section) => (
+            <SectionCard key={section.id} section={section} />
+          ))}
+        </div>
+      )}
+
+      {(p.about || p.expectations || prefs.length > 0) && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {p.about && (
+            <Card as="section" className="flex flex-col gap-2">
+              <CardTitle>{t('matrimony.about')}</CardTitle>
+              <p className="max-w-prose whitespace-pre-line text-fg">{p.about}</p>
+            </Card>
+          )}
+          {(p.expectations || prefs.length > 0) && (
+            <Card as="section" className="flex flex-col gap-3">
+              <CardTitle>{t('matrimony.expectations')}</CardTitle>
+              {prefs.length > 0 && (
+                <ul className="flex flex-wrap gap-1.5">
+                  {prefs.map((chip) => (
+                    <li key={chip}>
+                      <Badge tone="primary">{chip}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {p.expectations && <p className="max-w-prose whitespace-pre-line text-fg">{p.expectations}</p>}
+            </Card>
+          )}
+        </div>
+      )}
 
       <ProfileFormModal target={formTarget} onClose={() => setFormTarget(null)} />
     </div>

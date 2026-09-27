@@ -112,5 +112,6 @@ export const api = {
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
-  upload: <T>(path: string, data: Blob) => request<T>(path, { method: 'PUT', raw: { data, contentType: data.type } }),
+  /** Raw file bytes. PUT replaces a single file; POST adds one to a set. */
+  upload: <T>(path: string, data: Blob, method: 'PUT' | 'POST' = 'PUT') => request<T>(path, { method, raw: { data, contentType: data.type } }),
 };

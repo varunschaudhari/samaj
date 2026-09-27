@@ -145,7 +145,7 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
   let profileBody;
   if (profiles.isPending) {
     profileBody = (
-      <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-busy="true">
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4" aria-busy="true">
         {[0, 1].map((i) => (
           <ProfileCardSkeleton key={i} />
         ))}
@@ -157,7 +157,7 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
     profileBody = <EmptyState icon={HeartHandshake} title={t('matrimony.review.emptyTitle')} body={t('matrimony.review.emptyBody')} />;
   } else {
     profileBody = (
-      <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
         {profiles.data.map((p) => (
           <ProfileCardView key={p.id} profile={p} href={`/matrimony/profiles/${p.id}`} />
         ))}

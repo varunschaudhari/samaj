@@ -1,5 +1,6 @@
 export * from './constants';
 export * from './gotras';
+export * from './horoscope';
 export * from './rbac';
 export * from './errors';
 export * from './schemas/common';

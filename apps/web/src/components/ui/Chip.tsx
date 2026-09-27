@@ -9,14 +9,18 @@ interface ChipProps extends Omit<ComponentProps<'button'>, 'children'> {
   children: ReactNode;
 }
 
-/** A toggle in a row of filters. 44px tall, like every other touch target. */
+/**
+ * A toggle in a row of filters. It looks 36px tall, the size of a modern
+ * filter pill, but the tap area reaches 44px like every other touch target.
+ */
 export function Chip({ selected, icon, className, children, ...rest }: ChipProps) {
   return (
     <button
       type="button"
       aria-pressed={selected}
       className={cn(
-        'inline-flex min-h-touch shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold whitespace-nowrap transition-colors duration-150',
+        'relative inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium whitespace-nowrap transition-colors duration-150',
+        "before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']",
         selected ? 'border-primary bg-primary text-on-primary' : 'border-line-strong bg-surface text-fg-muted hover:text-fg',
         className,
       )}
@@ -34,7 +38,7 @@ export function Chip({ selected, icon, className, children, ...rest }: ChipProps
  */
 export function ChipRow({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
   return (
-    <div role="group" aria-label={label} className={cn('-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0', className)}>
+    <div role="group" aria-label={label} className={cn('-mx-4 flex gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0', className)}>
       {children}
     </div>
   );

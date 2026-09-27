@@ -102,7 +102,7 @@ export function AppShell() {
         <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-line bg-surface/95 py-2 pr-2 pl-4 backdrop-blur md:hidden print:hidden">
           <BrandMark />
           <div className="flex items-center gap-1">
-            <LanguageSwitch />
+            <LanguageSwitch compact />
             <Tooltip content={t('nav.profile')} side="bottom">
               <NavLink to="/profile" aria-label={t('nav.profile')} className="flex size-touch items-center justify-center rounded-full">
                 {me.data ? <Avatar name={me.data.name} size="sm" /> : <Icon icon={UserRound} />}

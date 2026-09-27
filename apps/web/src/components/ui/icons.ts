@@ -74,6 +74,8 @@ export { MagnifyingGlassMinus as ZoomOut } from '@phosphor-icons/react/dist/csr/
 export { CornersIn } from '@phosphor-icons/react/dist/csr/CornersIn';
 export { Rows } from '@phosphor-icons/react/dist/csr/Rows';
 export { Printer } from '@phosphor-icons/react/dist/csr/Printer';
+export { FileText } from '@phosphor-icons/react/dist/csr/FileText';
+export { Star } from '@phosphor-icons/react/dist/csr/Star';
 export { ShareNetwork as Share } from '@phosphor-icons/react/dist/csr/ShareNetwork';
 export { Funnel } from '@phosphor-icons/react/dist/csr/Funnel';
 export { SortAscending } from '@phosphor-icons/react/dist/csr/SortAscending';
