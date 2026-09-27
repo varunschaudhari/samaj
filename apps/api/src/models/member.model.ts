@@ -1,4 +1,4 @@
-import { FAMILY_STATUSES, GENDERS, GOTRA_IDS, MEMBER_APPROVALS, RELATIONS } from '@samaj/shared';
+import { FAMILY_STATUSES, GENDERS, GOTRA_IDS, MEMBER_APPROVALS, PHONE_VISIBILITIES, RELATIONS } from '@samaj/shared';
 import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
 import { branchPathPlugin, searchTokensPlugin } from './plugins';
 
@@ -41,6 +41,14 @@ const memberSchema = new Schema(
      */
     approval: { type: String, enum: MEMBER_APPROVALS, default: 'approved', required: true },
     addedByName: { type: String, default: null },
+
+    /** Who besides the family and its branch committee sees their phone number. */
+    phoneVisibility: { type: String, enum: PHONE_VISIBILITIES, default: 'committee', required: true },
+    /** false: kept out of the directory and off other families' view; the family and committee still see them. */
+    listed: { type: Boolean, default: true, required: true },
+    /** Whoever listed this person confirmed they agree (or is their parent or guardian). */
+    consentByUserId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    consentAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

@@ -30,7 +30,7 @@ async function householdWithSpouse(branchId: string, status: 'verified' | 'pendi
 const invite = (cookie: string, familyId: string, memberId: string) =>
   api.post(`/api/families/${familyId}/members/${memberId}/invite`).set('Cookie', cookie);
 
-const join = (phone: string, code: string, password = 'sunita-pass-1') => api.post('/api/auth/join').send({ phone, code, password });
+const join = (phone: string, code: string, password = 'sunita-pass-1') => api.post('/api/auth/join').send({ phone, code, password, consent: true });
 
 describe('invite codes', () => {
   it('lets the family give a listed person their own sign-in to the same family', async () => {
@@ -156,7 +156,7 @@ describe('signup with a number already listed in a family', () => {
     const home = await householdWithSpouse(branches.amalner);
     const res = await api
       .post('/api/auth/signup')
-      .send({ name: 'Sunita Wagh', phone: home.spousePhone, password: 'sunita-pass-1', branchId: branches.amalner, gender: 'female' });
+      .send({ name: 'Sunita Wagh', phone: home.spousePhone, password: 'sunita-pass-1', branchId: branches.amalner, gender: 'female', consent: true });
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('PHONE_LISTED');
     expect(res.body.error.issues).toEqual([{ path: 'phone', message: 'validation.phoneListed' }]);
@@ -171,6 +171,7 @@ describe('committee enrolment', () => {
     gotra: '',
     address: 'Near the temple',
     head: { name: 'Vitthal Mahajan', gender: 'male', birthYear: '1950', occupation: '', education: '', phone: '', ...head },
+    consent: true,
   });
   const enrol = (cookie: string, body: object) => api.post('/api/families').set('Cookie', cookie).send(body);
 

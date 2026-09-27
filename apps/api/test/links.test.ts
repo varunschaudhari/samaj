@@ -19,7 +19,7 @@ const requests = async (cookie: string, id: string) => (await api.get(`/api/fami
 const directory = async (cookie: string, q: string) => ((await api.get(`/api/members?q=${q}`).set('Cookie', cookie)).body as MemberPage).items.map((m) => m.name);
 
 describe('people added to a verified family wait for the committee', () => {
-  const son = { name: 'Rohit Wagh', relation: 'son', gender: 'male', birthYear: '1995', phone: '9822098220' };
+  const son = { name: 'Rohit Wagh', relation: 'son', gender: 'male', birthYear: '1995', phone: '9822098220', consent: true };
 
   it('keeps them out of the directory until the branch committee approves', async () => {
     const own = await createFamily(branches.bhusawal, { account: 'member', people: [{ name: 'Anil Wagh' }] });

@@ -44,6 +44,10 @@ const envSchema = z
     UPLOAD_DIR: z.string().min(1).default('uploads'),
     DB_POOL_SIZE: z.coerce.number().int().min(1).max(500).default(20),
     WEB_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(1),
+    // Shown in the privacy notice as the person to contact about personal data.
+    PRIVACY_CONTACT_NAME: z.string().trim().min(1).optional(),
+    PRIVACY_CONTACT_EMAIL: z.email().optional(),
+    PRIVACY_CONTACT_PHONE: z.string().trim().min(6).optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && !env.COOKIE_SECURE) {

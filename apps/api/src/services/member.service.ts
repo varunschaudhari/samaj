@@ -6,7 +6,7 @@ import { type MemberDoc, MemberModel } from '../models/member.model';
 import { AppError } from '../utils/app-error';
 import { searchWords } from '../models/plugins';
 import { cappedCount } from '../utils/count';
-import { canBrowseDirectory, canSeeContact } from './access';
+import { canBrowseDirectory, canSeePhone } from './access';
 import { inBranch } from './audience';
 import { photoUrl } from './family.service';
 import type { Viewer } from './viewer';
@@ -36,7 +36,8 @@ function decodeCursor(cursor: string): { name: string; id: Types.ObjectId } {
 export async function listMembers(viewer: Viewer, query: ListQuery): Promise<MemberPage> {
   if (!canBrowseDirectory(viewer)) throw notVerified();
 
-  const conditions: QueryFilter<MemberDoc>[] = [{ familyStatus: 'verified' }];
+  // People who asked not to be listed stay out of the directory.
+  const conditions: QueryFilter<MemberDoc>[] = [{ familyStatus: 'verified' }, { listed: { $ne: false } }];
   // A district includes every city and town under it.
   if (query.branchId) conditions.push(inBranch(query.branchId));
   if (query.gotra) conditions.push({ gotra: query.gotra });
@@ -86,7 +87,7 @@ export async function listMembers(viewer: Viewer, query: ListQuery): Promise<Mem
       branch: { id: String(m.branchId), name: branch?.name ?? '', nameMr: branch?.nameMr ?? '' },
       photoUrl: photoUrl(m),
     };
-    if (m.phone && canSeeContact(viewer, m)) item.phone = m.phone;
+    if (m.phone && canSeePhone(viewer, m)) item.phone = m.phone;
     return item;
   });
 

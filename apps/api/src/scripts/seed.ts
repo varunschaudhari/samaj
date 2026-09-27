@@ -4,7 +4,7 @@
  * Wipes existing data first. Every name and number below is invented.
  */
 import argon2 from 'argon2';
-import type { BranchKind, FamilyStatus, Gender, GotraId, Relation, Role } from '@samaj/shared';
+import { type BranchKind, type FamilyStatus, type Gender, type GotraId, PRIVACY_NOTICE_VERSION, type Relation, type Role } from '@samaj/shared';
 import { Types } from 'mongoose';
 import { env } from '../config/env';
 import { connectDb, disconnectDb } from '../config/db';
@@ -145,6 +145,9 @@ async function createFamily(seed: FamilySeed, passwordHash: string) {
       passwordHash,
       familyId: family._id,
       memberId: members[0]?._id,
+      // Demo accounts have agreed to the current privacy notice.
+      consentVersion: PRIVACY_NOTICE_VERSION,
+      consentAt: new Date(),
     });
   }
   return members.length;

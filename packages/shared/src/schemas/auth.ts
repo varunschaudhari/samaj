@@ -15,6 +15,8 @@ export const signupSchema = z.object({
   gender: z.enum(GENDERS, { error: 'validation.gender' }),
   /** The language picked on the signup screen becomes the account's preference. */
   language: z.enum(LANGUAGES).default('en'),
+  /** They agree to the privacy notice (PRIVACY_NOTICE_VERSION). */
+  consent: z.literal(true, { error: 'validation.consentRequired' }),
 });
 export type SignupInput = z.input<typeof signupSchema>;
 
@@ -28,6 +30,7 @@ export const joinSchema = z.object({
   code: resetCodeSchema,
   password: passwordSchema,
   language: z.enum(LANGUAGES).default('en'),
+  consent: z.literal(true, { error: 'validation.consentRequired' }),
 });
 export type JoinInput = z.input<typeof joinSchema>;
 
@@ -47,6 +50,10 @@ export const publicUserSchema = z.object({
   familyId: z.string(),
   memberId: z.string(),
   familyStatus: z.enum(FAMILY_STATUSES),
+  /** The privacy notice changed (or was never agreed to): show it before anything else. */
+  needsConsent: z.boolean(),
+  /** A deletion is scheduled; it can be cancelled until then. */
+  deletionDueAt: z.string().nullable(),
 });
 export type PublicUser = z.infer<typeof publicUserSchema>;
 
@@ -83,6 +90,13 @@ export const VALIDATION_KEYS = [
   'validation.roleProtected',
   'validation.alreadyAdmin',
   'validation.memberPending',
+  'validation.consentRequired',
+  'validation.consentOutdated',
+  'validation.deletionIsHead',
+  'validation.deletionNotHead',
+  'validation.deletionOtherAccounts',
+  'validation.deletionLastSuperadmin',
+  'validation.passwordWrong',
   'validation.linkExists',
   'validation.linkLimit',
   'validation.linkSelf',

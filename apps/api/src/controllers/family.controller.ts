@@ -1,4 +1,4 @@
-import { enrolFamilySchema, familyUpdateSchema, memberInputSchema, pendingQuerySchema, rejectFamilySchema } from '@samaj/shared';
+import { enrolFamilySchema, familyUpdateSchema, memberCreateSchema, memberInputSchema, pendingQuerySchema, rejectFamilySchema } from '@samaj/shared';
 import type { Request, Response } from 'express';
 import * as approvalsService from '../services/approvals.service';
 import * as familyService from '../services/family.service';
@@ -34,7 +34,7 @@ export async function update(req: Request, res: Response) {
 }
 
 export async function addMember(req: Request, res: Response) {
-  const input = memberInputSchema.parse(req.body);
+  const { consent: _consent, ...input } = memberCreateSchema.parse(req.body);
   res.status(201).json({ family: await familyService.addMember(viewer(req), param(req, 'familyId'), input) });
 }
 

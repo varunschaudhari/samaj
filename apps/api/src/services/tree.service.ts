@@ -82,7 +82,7 @@ export async function getTree(viewer: Viewer, familyId: string): Promise<FamilyT
         generation: at.generation,
         via: at.via,
         members: members
-          .filter((m) => String(m.familyId) === id && (seesPending || m.approval !== 'pending'))
+          .filter((m) => String(m.familyId) === id && (seesPending || (m.approval !== 'pending' && m.listed !== false)))
           .map((m) => ({
             id: String(m._id),
             name: m.name,

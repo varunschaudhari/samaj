@@ -12,7 +12,7 @@ beforeEach(async () => {
   branches = await seedBranches();
 });
 
-const son = { name: 'Rohit Wagh', relation: 'son', gender: 'male', birthYear: '1995', occupation: 'Engineer', education: 'B.E.', phone: '' };
+const son = { name: 'Rohit Wagh', relation: 'son', gender: 'male', birthYear: '1995', occupation: 'Engineer', education: 'B.E.', phone: '', consent: true };
 // Smallest valid JPEG header is enough: the API checks magic bytes, not the full image.
 const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(200, 1)]);
 
@@ -94,7 +94,7 @@ describe('editing a family', () => {
 
   it('validates member fields with translatable keys', async () => {
     const own = await createFamily(branches.bhusawal, { account: 'member' });
-    const res = await api.post(`/api/families/${own.familyId}/members`).set('Cookie', own.cookie).send({ name: 'R', relation: 'cousin', gender: 'male', birthYear: '95' });
+    const res = await api.post(`/api/families/${own.familyId}/members`).set('Cookie', own.cookie).send({ name: 'R', relation: 'cousin', gender: 'male', birthYear: '95', consent: true });
     const byPath = Object.fromEntries(res.body.error.issues.map((i: { path: string; message: string }) => [i.path, i.message]));
     expect(byPath).toEqual({ name: 'validation.nameMin', relation: 'validation.relation', birthYear: 'validation.birthYear' });
   });

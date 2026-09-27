@@ -19,7 +19,7 @@ import { UserModel } from '../models/user.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { storage } from '../utils/storage';
 import { closeForRemovedMember, syncFamilyGotra, syncMember } from './matrimony.service';
-import { canEditFamily, canEnrolIn, canResetPasswordFor, canReviewFamily, canSeeContact, canViewFamily, hasReach, isOwnFamily } from './access';
+import { canEditFamily, canEnrolIn, canResetPasswordFor, canReviewFamily, canSeeContact, canSeePhone, canViewFamily, hasReach, isOwnFamily } from './access';
 import { actsForOwnFamily, linksOf } from './links.service';
 import { assertPhoneFree } from './phones';
 import type { Viewer } from './viewer';
@@ -77,7 +77,8 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
   // People waiting for the committee show only to the family and its reviewers.
   const seesPending = canEdit || hasReach(viewer, 'member:verify', family);
   const [members, branch, links] = await Promise.all([
-    MemberModel.find({ familyId: family._id, ...(!seesPending && { approval: { $ne: 'pending' } }) })
+    // Others don't see people waiting for approval, or people who asked not to be listed.
+    MemberModel.find({ familyId: family._id, ...(!seesPending && { approval: { $ne: 'pending' }, listed: { $ne: false } }) })
       .sort({ isHead: -1, birthYear: 1, createdAt: 1 })
       .lean(),
     BranchModel.findById(family.branchId).lean(),
@@ -102,7 +103,7 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     birthYear: m.birthYear ?? null,
     occupation: m.occupation ?? null,
     education: m.education ?? null,
-    ...(showContact && { phone: m.phone ?? null }),
+    ...(canSeePhone(viewer, m) && { phone: m.phone ?? null }),
     photoUrl: photoUrl(m),
     isHead: m.isHead,
     hasAccount: m.userId !== null,
@@ -111,6 +112,9 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     canInvite: canEdit && m.userId === null && m.approval !== 'pending',
     // Records from before approvals existed have no value: they were listed already.
     approval: m.approval ?? 'approved',
+    ...(seesPending && { privacy: { phoneVisibility: m.phoneVisibility ?? 'committee', listed: m.listed !== false } }),
+    // An account holder decides for themselves; the family decides for those without one.
+    canEditPrivacy: m.userId ? String(m.userId) === viewer.id : canEdit,
     };
   };
 
@@ -176,6 +180,8 @@ export async function enrolFamily(viewer: Viewer, input: EnrolFamily): Promise<F
   try {
     await MemberModel.create({
       ...input.head,
+      consentByUserId: new Types.ObjectId(viewer.id),
+      consentAt: now,
       relation: 'head',
       isHead: true,
       familyId: family._id,
@@ -224,6 +230,8 @@ export async function addMember(viewer: Viewer, familyId: string, input: MemberI
     familyStatus: waits ? 'pending' : family.status,
     approval: waits ? 'pending' : 'approved',
     addedByName: viewer.name,
+    consentByUserId: new Types.ObjectId(viewer.id),
+    consentAt: new Date(),
   });
   recordHistory(family, viewer, 'updated', waits ? `Added ${input.name}, waiting for the committee` : `Added ${input.name}`);
   await family.save();

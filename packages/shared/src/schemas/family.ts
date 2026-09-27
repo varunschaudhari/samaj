@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FamilyLinkView } from './links';
+import type { PhoneVisibility } from './privacy';
 import { type FamilyStatus, type Gender, GENDERS } from '../constants';
 import { personNameSchema } from './auth';
 import { GOTRA_IDS, type GotraId } from '../gotras';
@@ -94,6 +95,13 @@ export const memberInputSchema = z.object({
 export type MemberInput = z.input<typeof memberInputSchema>;
 export type MemberInputParsed = z.output<typeof memberInputSchema>;
 
+/**
+ * Adding someone: the person adding them confirms that person agrees to be
+ * listed or, for anyone under 18, that they are their parent or guardian.
+ */
+export const memberCreateSchema = memberInputSchema.extend({ consent: z.literal(true, { error: 'validation.consentRequired' }) });
+export type MemberCreateInput = z.input<typeof memberCreateSchema>;
+
 /** One of the fixed gotras, or blank (null) for "not listed / not sure". */
 export const gotraSchema = z
   .string()
@@ -119,6 +127,8 @@ export const enrolFamilySchema = z.object({
   gotra: gotraSchema,
   address: optionalText(200),
   head: memberInputSchema.omit({ relation: true }),
+  /** The committee confirms the family agreed to be registered. */
+  consent: z.literal(true, { error: 'validation.consentRequired' }),
 });
 export type EnrolFamilyInput = z.input<typeof enrolFamilySchema>;
 
@@ -151,6 +161,10 @@ export interface FamilyMember {
   canInvite: boolean;
   /** 'pending': added to a verified family and waiting for the committee; only the family and reviewers see them. */
   approval: MemberApproval;
+  /** Present for the family and committee: who else sees this person's phone, and whether they're in the directory. */
+  privacy?: { phoneVisibility: PhoneVisibility; listed: boolean };
+  /** The viewer may change those: the person themselves, or the family for people without an account. */
+  canEditPrivacy: boolean;
 }
 
 /** A one-time code that links a new sign-in to a person already listed in a family. */

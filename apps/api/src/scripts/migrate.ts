@@ -70,6 +70,8 @@ async function main() {
   await backfill(UserModel, { nameTokens: { $exists: false } }, ['name'], tokensOf(['name']));
   // People listed before committee approval of additions existed.
   await backfill(MemberModel, { approval: { $exists: false } }, [], () => ({ approval: 'approved' }));
+  // Privacy settings arrived later: keep numbers with the family and committee, and keep people listed.
+  await backfill(MemberModel, { phoneVisibility: { $exists: false } }, [], () => ({ phoneVisibility: 'committee', listed: true }));
 
   const models: AnyModel[] = [
     BranchModel, EventModel, FamilyLinkModel, FamilyModel, InterestModel, MemberMoveModel, InviteModel, MemberModel, NoticeModel, OfficeBearerModel,

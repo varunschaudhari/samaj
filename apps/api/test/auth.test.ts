@@ -17,7 +17,7 @@ beforeEach(async () => {
   branches = await seedBranches();
 });
 
-const signupBody = () => ({ name: 'Sunita Chaudhari', phone: '98220 12345', password: 'correct-horse', branchId: branches.bhusawal, gender: 'female' });
+const signupBody = () => ({ name: 'Sunita Chaudhari', phone: '98220 12345', password: 'correct-horse', branchId: branches.bhusawal, gender: 'female', consent: true });
 
 async function signUp() {
   const res = await api.post('/api/auth/signup').send(signupBody());
@@ -65,6 +65,7 @@ describe('POST /api/auth/signup', () => {
       password: 'validation.passwordMin',
       branchId: 'validation.branchRequired',
       gender: 'validation.gender',
+      consent: 'validation.consentRequired',
     });
   });
 

@@ -15,6 +15,7 @@
     "db:down": "docker compose down",
     "seed": "npm run seed -w @samaj/api",
     "db:migrate": "npm run db:migrate -w @samaj/api",
+    "privacy:purge": "npm run privacy:purge -w @samaj/api",
     "build": "npm run build -w @samaj/api && npm run build -w @samaj/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"

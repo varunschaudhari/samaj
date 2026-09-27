@@ -93,7 +93,22 @@ export function canResetPasswordFor(viewer: Viewer, target: { id: string; role: 
   return isGlobalRole(viewer.role) || hasReach(viewer, 'member:write', targetFamily);
 }
 
-/** Phone numbers and addresses. Your own family always; others only with read-contact in scope. */
+/**
+ * A person's phone number. Their own family and the committee in reach
+ * always; otherwise it depends on the person's choice: other members of
+ * their branch, or every verified member.
+ */
+export function canSeePhone(
+  viewer: Viewer,
+  person: BranchPlaced & { familyId?: Types.ObjectId | string | null; phoneVisibility?: string | null },
+): boolean {
+  if (canSeeContact(viewer, person)) return true;
+  if (!canBrowseDirectory(viewer)) return false;
+  if (person.phoneVisibility === 'members') return true;
+  return person.phoneVisibility === 'branch' && viewer.homePath.includes(String(person.branchId));
+}
+
+/** Addresses, and phones by default. Your own family always; others only with read-contact in scope. */
 export function canSeeContact(viewer: Viewer, record: BranchPlaced & { familyId?: Types.ObjectId | string | null }): boolean {
   if (record.familyId && String(record.familyId) === viewer.familyId) return true;
   return hasReach(viewer, 'member:read-contact', record);

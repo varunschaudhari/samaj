@@ -1,5 +1,5 @@
 import argon2 from 'argon2';
-import { ACCESS_COOKIE, CSRF_HEADER, CSRF_HEADER_VALUE, type FamilyStatus, type GotraId, REFRESH_COOKIE, type Relation, type Role } from '@samaj/shared';
+import { ACCESS_COOKIE, CSRF_HEADER, CSRF_HEADER_VALUE, PRIVACY_NOTICE_VERSION, type FamilyStatus, type GotraId, REFRESH_COOKIE, type Relation, type Role } from '@samaj/shared';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose, { Types } from 'mongoose';
 import request from 'supertest';
@@ -137,6 +137,8 @@ export async function createFamily(branchId: string, fixture: FamilyFixture = {}
       familyId: family._id,
       memberId: members[0]._id,
       passwordHash: await argon2.hash('password-123'),
+      consentVersion: PRIVACY_NOTICE_VERSION,
+      consentAt: new Date(),
     });
     const res = await api.post('/api/auth/login').send({ phone, password: 'password-123' });
     cookie = accessCookie(cookiesFrom(res));

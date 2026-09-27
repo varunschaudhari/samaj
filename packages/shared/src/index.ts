@@ -14,3 +14,4 @@ export * from './schemas/events';
 export * from './schemas/committee';
 export * from './schemas/dashboard';
 export * from './schemas/links';
+export * from './schemas/privacy';

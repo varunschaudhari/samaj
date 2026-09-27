@@ -8,6 +8,7 @@ import { createApp } from './app';
 import { env } from './config/env';
 import { connectDb, disconnectDb } from './config/db';
 import { lifecycle } from './routes';
+import { purgeDue } from './services/privacy.service';
 import { logger } from './utils/logger';
 
 /** WEB_CONCURRENCY > 1 runs that many API processes on this machine, sharing the port. */
@@ -39,6 +40,12 @@ async function main() {
   server.keepAliveTimeout = 65_000;
   server.headersTimeout = 66_000;
   server.requestTimeout = 30_000;
+
+  // Deletions whose grace period has ended are erased within the hour. Safe to
+  // run in several processes at once: each erase is idempotent.
+  const purge = () => purgeDue().catch((err: unknown) => logger.error({ err }, 'Privacy purge failed'));
+  setInterval(purge, 60 * 60_000).unref();
+  void purge();
 
   const shutdown = (signal: string) => {
     logger.info({ signal }, 'Shutting down');

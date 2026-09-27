@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "seed": "tsx src/scripts/seed.ts",
     "db:migrate": "tsx src/scripts/migrate.ts",
+    "privacy:purge": "tsx src/scripts/privacy-purge.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node ../../scripts/vitest.mjs run"
   },

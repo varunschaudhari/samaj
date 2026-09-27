@@ -1,5 +1,5 @@
 import argon2 from 'argon2';
-import type { FamilyStatus, PublicUser, UpdatePreferencesInput, joinSchema, loginSchema, signupSchema } from '@samaj/shared';
+import { type FamilyStatus, PRIVACY_NOTICE_VERSION, type PublicUser, type UpdatePreferencesInput, type joinSchema, type loginSchema, type signupSchema } from '@samaj/shared';
 import { Types } from 'mongoose';
 import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
@@ -44,7 +44,8 @@ interface SessionMeta {
 
 const sessionEnded = () => new AppError(401, 'SESSION_EXPIRED', 'Your session has ended. Sign in again.');
 
-type UserFields = Pick<UserDoc, '_id' | 'name' | 'phone' | 'role' | 'branchId' | 'language' | 'familyId' | 'memberId'>;
+type UserFields = Pick<UserDoc, '_id' | 'name' | 'phone' | 'role' | 'branchId' | 'language' | 'familyId' | 'memberId'> &
+  Partial<Pick<UserDoc, 'consentVersion' | 'deletionDueAt'>>;
 
 export function toPublicUser(user: UserFields, familyStatus: FamilyStatus): PublicUser {
   return {
@@ -57,6 +58,8 @@ export function toPublicUser(user: UserFields, familyStatus: FamilyStatus): Publ
     familyId: String(user.familyId),
     memberId: String(user.memberId),
     familyStatus,
+    needsConsent: user.consentVersion !== PRIVACY_NOTICE_VERSION,
+    deletionDueAt: user.deletionDueAt ? user.deletionDueAt.toISOString() : null,
   };
 }
 
@@ -119,6 +122,8 @@ export async function signup(input: z.output<typeof signupSchema>, meta: Session
     branchAncestors: branch.ancestors,
     place: family.place,
     familyStatus: family.status,
+    consentByUserId: userId,
+    consentAt: new Date(),
   });
 
   let user;
@@ -132,6 +137,8 @@ export async function signup(input: z.output<typeof signupSchema>, meta: Session
       language: input.language,
       familyId: family._id,
       memberId: member._id,
+      consentVersion: PRIVACY_NOTICE_VERSION,
+      consentAt: new Date(),
     });
   } catch (err) {
     await Promise.all([member.deleteOne(), family.deleteOne()]);
@@ -176,6 +183,8 @@ export async function join(input: z.output<typeof joinSchema>, meta: SessionMeta
       language: input.language,
       familyId: family._id,
       memberId: member._id,
+      consentVersion: PRIVACY_NOTICE_VERSION,
+      consentAt: new Date(),
     });
   } catch (err) {
     await MemberModel.updateOne({ _id: member._id }, { $set: { userId: null } });
