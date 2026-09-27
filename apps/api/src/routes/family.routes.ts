@@ -10,6 +10,8 @@ familyRouter.post('/', families.enrol);
 familyRouter.get('/:familyId', families.get);
 // Links, and people moving in or out, waiting for this family.
 familyRouter.get('/:familyId/requests', families.requests);
+// Households linked as parents, children and siblings, by generation.
+familyRouter.get('/:familyId/tree', families.tree);
 familyRouter.put('/:familyId', families.update);
 familyRouter.post('/:familyId/members', families.addMember);
 familyRouter.put('/:familyId/members/:memberId', families.updateMember);

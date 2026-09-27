@@ -4,6 +4,7 @@ import * as approvalsService from '../services/approvals.service';
 import * as familyService from '../services/family.service';
 import * as linksService from '../services/links.service';
 import * as movesService from '../services/moves.service';
+import * as treeService from '../services/tree.service';
 import * as inviteService from '../services/invite.service';
 import type { Viewer } from '../services/viewer';
 import * as matrimonyService from '../services/matrimony.service';
@@ -79,6 +80,10 @@ export async function countPending(req: Request, res: Response) {
     movesService.countPendingMoves(v),
   ]);
   res.json({ pending: families + profiles + members + moves, families, profiles, members, moves });
+}
+
+export async function tree(req: Request, res: Response) {
+  res.json({ tree: await treeService.getTree(viewer(req), param(req, 'familyId')) });
 }
 
 export async function requests(req: Request, res: Response) {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Gender } from '../constants';
 import { objectIdSchema } from './common';
 import { RELATIONS, type Relation } from './family';
 
@@ -118,4 +119,62 @@ export interface PendingMember {
   family: LinkedFamily;
   addedByName: string;
   addedAt: string;
+}
+
+/*
+ * The family tree: households joined by parents / children / siblings
+ * links, laid out by generation. A person's generation is their family
+ * head's generation plus their relation's offset (a son is one below the
+ * head, a father one above).
+ */
+
+/** Generations above (negative) or below the head, by relation to the head. */
+export const RELATION_GENERATION: Record<Relation, number> = {
+  father: -1,
+  mother: -1,
+  head: 0,
+  spouse: 0,
+  brother: 0,
+  sister: 0,
+  other: 0,
+  son: 1,
+  daughter: 1,
+  daughterInLaw: 1,
+  sonInLaw: 1,
+  grandson: 2,
+  granddaughter: 2,
+};
+
+/** How far the tree reaches above and below the family it's drawn for, and how many households it holds. */
+export const TREE_DEPTH = 3;
+export const TREE_MAX_HOUSEHOLDS = 30;
+
+export interface TreePerson {
+  id: string;
+  name: string;
+  relation: Relation;
+  gender: Gender;
+  birthYear: number | null;
+  photoUrl: string | null;
+  isHead: boolean;
+  /** Relative to the head of the family the tree is drawn for: -1 parents, 0 their own, 1 children. */
+  generation: number;
+}
+
+export interface TreeHousehold {
+  family: LinkedFamily;
+  /** The generation of this household's head. */
+  generation: number;
+  /** How it joins the tree; null for the family the tree is drawn for. */
+  via: LinkKind | null;
+  members: TreePerson[];
+}
+
+export interface FamilyTree {
+  rootId: string;
+  households: TreeHousehold[];
+  /** In-laws and relatives of the root family: shown beside the tree, not placed in it. */
+  side: { kind: LinkKind; family: LinkedFamily }[];
+  /** More households were linked than the tree shows. */
+  truncated: boolean;
 }

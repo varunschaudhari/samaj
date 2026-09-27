@@ -1,5 +1,5 @@
 import { type FamilyDetail, type FamilyMember, gotraName } from '@samaj/shared';
-import { Clock, MapPin, Pencil, SearchX, Send, TriangleAlert, UserPlus } from '@/components/ui/icons';
+import { Clock, MapPin, Network, Pencil, SearchX, Send, TriangleAlert, UserPlus } from '@/components/ui/icons';
 import { type ReactNode, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -203,7 +203,15 @@ export function FamilyPage() {
             {placeLabel(data.place, data.branch, language)}
           </span>
         }
-        actions={<FamilyStatusBadge status={data.status} />}
+        actions={
+          <>
+            <FamilyStatusBadge status={data.status} />
+            <Link to={`/families/${data.id}/tree`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              <Icon icon={Network} />
+              {t('tree.open')}
+            </Link>
+          </>
+        }
       />
 
       {isOwn && <OwnStatusNotice family={data} />}

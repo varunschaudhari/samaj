@@ -92,6 +92,7 @@ export const router = createBrowserRouter([
           { path: '/directory', element: <DirectoryPage /> },
           { path: '/family', lazy: page(async () => (await import('@/features/families/FamilyPage')).MyFamilyRedirect) },
           { path: '/families/:familyId', lazy: page(async () => (await import('@/features/families/FamilyPage')).FamilyPage) },
+          { path: '/families/:familyId/tree', lazy: page(async () => (await import('@/features/families/FamilyTreePage')).FamilyTreePage) },
           {
             path: '/matrimony',
             lazy: page(async () => (await import('@/features/matrimony/MatrimonyLayout')).MatrimonyLayout),
