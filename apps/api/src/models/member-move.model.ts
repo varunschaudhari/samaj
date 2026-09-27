@@ -16,6 +16,9 @@ const memberMoveSchema = new Schema(
     toFamilyId: { type: Schema.Types.ObjectId, ref: 'Family', required: true },
     /** Their relation in the new family. */
     relation: { type: String, enum: RELATIONS, required: true },
+    /** Whose child or wife they will be in the new family (see PARENT_CHOICES, PARTNER_CHOICES). */
+    parentId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
+    partnerId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
     /** Their relation in the family they left, to keep them in that family's tree. */
     fromRelation: { type: String, enum: RELATIONS, default: null },
     note: { type: String, default: null },

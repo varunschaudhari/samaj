@@ -915,6 +915,8 @@ export const mr: Record<MessageKey, string> = {
   'member.fatherChoice': 'त्यांचे वडील',
   'member.sheet.formerWifeOf': '{name} यांची पूर्वीची पत्नी',
   'member.sheet.formerHusbandOf': '{name} यांचे पूर्वीचे पती',
+  'moves.tie.partner': '{name} यांच्याशी विवाह',
+  'moves.tie.parent': '{name} यांचे अपत्य',
   'family.title': '{name} यांचे कुटुंब',
   'family.place': 'गाव किंवा शहर',
   'family.gotra': 'गोत्र',

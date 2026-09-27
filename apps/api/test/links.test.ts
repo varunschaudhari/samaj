@@ -253,6 +253,22 @@ describe('moving a person to another family', () => {
     expect(String((await MemberModel.findById(priyaId).lean())?.familyId)).toBe(bride.familyId);
   });
 
+  it('can say whose wife she will be, and sets it when the move is approved', async () => {
+    const { bride, committee, priyaId } = await setup();
+    const groom = await createFamily(branches.amalner, { account: 'member', people: [{ name: 'Anil Wagh' }, { name: 'Rohit Wagh', relation: 'son' }, { name: 'Sagar Wagh', relation: 'son' }] });
+    const [anil, rohit] = groom.memberIds;
+    // Her husband is one of the sons, not the head.
+    const wrong = await api.post('/api/moves').set('Cookie', groom.cookie).send({ memberId: priyaId, relation: 'daughterInLaw', partnerId: anil });
+    expect(wrong.body.error.issues).toEqual([{ path: 'partnerId', message: 'validation.tieChoice' }]);
+    const asked = await api.post('/api/moves').set('Cookie', groom.cookie).send({ memberId: priyaId, relation: 'daughterInLaw', partnerId: rohit });
+    const move = asked.body.move as MemberMoveView;
+    expect(move.tie).toEqual({ kind: 'partner', name: 'Rohit Wagh' });
+    await api.post(`/api/moves/${move.id}/agree`).set('Cookie', bride.cookie);
+    await api.post(`/api/moves/${move.id}/approve`).set('Cookie', committee.cookie);
+    const page = await family(groom.cookie, groom.familyId);
+    expect(page.members.find((m) => m.id === priyaId)?.partnerId).toBe(rohit);
+  });
+
   it("won't move a family head", async () => {
     const { bride, groom } = await setup();
     const headId = bride.memberIds[0];

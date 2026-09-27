@@ -1,10 +1,23 @@
-import { type FamilyDetail, type FamilyMember, LINK_KINDS, type LinkKind, type LinkedFamily, type MemberMoveView, RELATIONS, type Relation } from '@samaj/shared';
+import {
+  type FamilyDetail,
+  type FamilyMember,
+  LINK_KINDS,
+  type LinkKind,
+  type LinkedFamily,
+  type MemberMoveView,
+  PARENT_CHOICES,
+  PARTNER_CHOICES,
+  RELATIONS,
+  type Relation,
+} from '@samaj/shared';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Avatar, Badge, Button, Card, ErrorState, Icon, IconButton, Modal, Select, Skeleton, Textarea, toast } from '@/components/ui';
 import { ArrowRight, Check, HeartHandshake, Network, Plus, Trash2, X } from '@/components/ui/icons';
+import { useMe } from '@/features/auth/api';
 import { placeLabel } from '@/features/branches/api';
 import { type MessageKey, formatDate, useErrorMessage, useLanguageStore, useT } from '@/i18n';
+import { useFamily } from './api';
 import { useAcceptLink, useAgreeMove, useCancelMove, useDeclineMove, useFamilyRequests, useRemoveLink, useRequestLink, useRequestMove } from './links-api';
 
 /** "Family of Anil Wagh · Bhusawal", linking to the family when the viewer may open it. */
@@ -215,11 +228,19 @@ function MoveRequestModal({ family, people, open, onClose }: { family: FamilyDet
   const [memberId, setMemberId] = useState('');
   const [relation, setRelation] = useState<Exclude<Relation, 'head'> | ''>('');
   const [note, setNote] = useState('');
+  const [tieId, setTieId] = useState('');
   const member = people.find((p) => p.id === memberId) ?? null;
+  // Whose wife (or child) they will be in the viewer's own family.
+  const me = useMe();
+  const own = useFamily(open ? me.data?.familyId : undefined);
+  const partnerFrom = relation ? PARTNER_CHOICES[relation] : undefined;
+  const parentFrom = relation ? PARENT_CHOICES[relation] : undefined;
+  const tieOptions = (own.data?.members ?? []).filter((m) => (partnerFrom ?? parentFrom)?.includes(m.relation));
   const close = () => {
     setMemberId('');
     setRelation('');
     setNote('');
+    setTieId('');
     onClose();
   };
   return (
@@ -240,7 +261,14 @@ function MoveRequestModal({ family, people, open, onClose }: { family: FamilyDet
               member &&
               relation &&
               request.mutate(
-                { memberId: member.id, relation, note },
+                {
+                  memberId: member.id,
+                  relation,
+                  note,
+                  // With only one person it could be, it is that one.
+                  ...(partnerFrom && { partnerId: tieId || (tieOptions.length === 1 ? tieOptions[0]?.id : '') }),
+                  ...(parentFrom && { parentId: tieId || (tieOptions.length === 1 ? tieOptions[0]?.id : '') }),
+                },
                 {
                   onSuccess: () => {
                     toast.success(t('moves.sent', { name: member.name, family: family.headName }));
@@ -265,7 +293,14 @@ function MoveRequestModal({ family, people, open, onClose }: { family: FamilyDet
             </option>
           ))}
         </Select>
-        <Select label={t('moves.relation')} value={relation} onChange={(e) => setRelation(e.target.value as Exclude<Relation, 'head'> | '')}>
+        <Select
+          label={t('moves.relation')}
+          value={relation}
+          onChange={(e) => {
+            setRelation(e.target.value as Exclude<Relation, 'head'> | '');
+            setTieId('');
+          }}
+        >
           <option value="">{t('links.choose')}</option>
           {RELATIONS.filter((r) => r !== 'head').map((r) => (
             <option key={r} value={r}>
@@ -273,6 +308,16 @@ function MoveRequestModal({ family, people, open, onClose }: { family: FamilyDet
             </option>
           ))}
         </Select>
+        {tieOptions.length > 1 && (
+          <Select label={t(partnerFrom ? (member?.gender === 'male' ? 'member.partnerChoice.husband' : 'member.partnerChoice.wife') : 'member.parentChoice')} value={tieId} onChange={(e) => setTieId(e.target.value)}>
+            <option value="">{t('links.choose')}</option>
+            {tieOptions.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </Select>
+        )}
         <Textarea label={t('moves.note')} hint={t('moves.noteHint')} value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={300} />
       </div>
     </Modal>
@@ -301,6 +346,7 @@ function MoveLine({ move }: { move: MemberMoveView }) {
         {t('family.title', { name: move.from.headName })}
         <Icon icon={ArrowRight} size="sm" />
         {t('family.title', { name: move.to.headName })} · {t(`relation.${move.relation}`)}
+        {move.tie && ` · ${t(move.tie.kind === 'partner' ? 'moves.tie.partner' : 'moves.tie.parent', { name: move.tie.name })}`}
       </p>
       {move.note && <p className="text-sm text-fg">“{move.note}”</p>}
       {move.declineReason && <p className="text-sm text-danger">{move.declineReason}</p>}

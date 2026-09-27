@@ -1,4 +1,4 @@
-import { BRANCH_SCOPED_ROLES, MAX_FAMILY_LINKS, type MemberMoveView, can, type moveRequestSchema } from '@samaj/shared';
+import { BRANCH_SCOPED_ROLES, MAX_FAMILY_LINKS, type MemberMoveView, PARENT_CHOICES, PARTNER_CHOICES, type Relation, can, type moveRequestSchema } from '@samaj/shared';
 import { type HydratedDocument, Types } from 'mongoose';
 import type { z } from 'zod';
 import { FamilyLinkModel, linkPair } from '../models/family-link.model';
@@ -23,8 +23,23 @@ const OPEN = ['awaitingFamily', 'awaitingCommittee'] as const;
 const moveGone = () => notFound('That request is no longer there.');
 const issue = (message: string, path = 'memberId') => [{ path, message }];
 
+/** The person a move names as their parent or partner in the new family, if they still fit. */
+async function tieIn(familyId: Types.ObjectId, relation: Relation, parentId: unknown, partnerId: unknown) {
+  const [parent, partner] = await Promise.all([
+    parentId ? MemberModel.findOne({ _id: parentId, familyId }, { relation: 1, name: 1 }).lean() : null,
+    partnerId ? MemberModel.findOne({ _id: partnerId, familyId }, { relation: 1, name: 1 }).lean() : null,
+  ]);
+  return {
+    parent: parent && PARENT_CHOICES[relation]?.includes(parent.relation) ? parent : null,
+    partner: partner && PARTNER_CHOICES[relation]?.includes(partner.relation) ? partner : null,
+  };
+}
+
 export async function moveViews(viewer: Viewer, moves: MemberMoveDoc[]): Promise<MemberMoveView[]> {
   const summaries = await familySummaries(viewer, moves.flatMap((m) => [m.fromFamilyId, m.toFamilyId]));
+  const tieIds = moves.flatMap((m) => [m.parentId, m.partnerId].filter(Boolean));
+  const ties = tieIds.length ? await MemberModel.find({ _id: { $in: tieIds } }, { name: 1 }).lean() : [];
+  const nameOf = (id: unknown) => (id ? ties.find((t) => String(t._id) === String(id))?.name : undefined);
   return moves.flatMap((m) => {
     const from = summaries.get(String(m.fromFamilyId));
     const to = summaries.get(String(m.toFamilyId));
@@ -36,6 +51,7 @@ export async function moveViews(viewer: Viewer, moves: MemberMoveDoc[]): Promise
         from,
         to,
         relation: m.relation,
+        tie: nameOf(m.partnerId) ? { kind: 'partner', name: nameOf(m.partnerId) ?? '' } : nameOf(m.parentId) ? { kind: 'parent', name: nameOf(m.parentId) ?? '' } : null,
         note: m.note ?? null,
         status: m.status,
         requestedByName: m.requestedByName,
@@ -63,6 +79,10 @@ export async function requestMove(viewer: Viewer, input: MoveInput): Promise<Mem
   if (member.isHead) {
     throw new AppError(400, 'VALIDATION_FAILED', 'A family head can’t move. Their family chooses a new head first.', issue('validation.moveHead'));
   }
+  // Whose wife or child they will be here: someone in this family whose relation fits.
+  const tied = await tieIn(to._id, input.relation, input.parentId, input.partnerId);
+  if (input.parentId && !tied.parent) throw new AppError(400, 'VALIDATION_FAILED', 'Pick someone from your family.', issue('validation.tieChoice', 'parentId'));
+  if (input.partnerId && !tied.partner) throw new AppError(400, 'VALIDATION_FAILED', 'Pick someone from your family.', issue('validation.tieChoice', 'partnerId'));
   if ((await MemberModel.countDocuments({ familyId: to._id })) >= MAX_FAMILY_MEMBERS) {
     throw new AppError(400, 'VALIDATION_FAILED', `A family can list up to ${MAX_FAMILY_MEMBERS} people.`, issue('validation.familyFull'));
   }
@@ -75,6 +95,8 @@ export async function requestMove(viewer: Viewer, input: MoveInput): Promise<Mem
       fromFamilyId: from._id,
       toFamilyId: to._id,
       relation: input.relation,
+      parentId: tied.parent?._id ?? null,
+      partnerId: tied.partner?._id ?? null,
       note: input.note,
       requestedByUserId: new Types.ObjectId(viewer.id),
       requestedByName: viewer.name,
@@ -144,9 +166,10 @@ export async function approveMove(viewer: Viewer, id: string): Promise<MemberMov
   member.familyStatus = to.status;
   member.approval = 'approved';
   member.addedByName = null;
-  // Ties were to people in the old family; the new family sets its own.
-  member.parentId = null;
-  member.partnerId = null;
+  // Ties were to people in the old family; here, whoever the move named, if they still fit.
+  const tied = await tieIn(to._id, move.relation, move.parentId, move.partnerId);
+  member.parentId = tied.parent?._id ?? null;
+  member.partnerId = tied.partner?._id ?? null;
   member.otherParentId = null;
   member.formerPartner = false;
   member.adopted = false;

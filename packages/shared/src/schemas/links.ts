@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Gender } from '../constants';
 import { objectIdSchema } from './common';
-import { RELATIONS, type Relation } from './family';
+import { PARENT_CHOICES, PARTNER_CHOICES, RELATIONS, type Relation } from './family';
 
 /*
  * How families connect, and how a person moves between them.
@@ -37,17 +37,30 @@ export const linkRequestSchema = z.object({
 });
 export type LinkRequestInput = z.input<typeof linkRequestSchema>;
 
-/** Someone joining this family from another: their relation here, and an optional note for the other family and committee. */
-export const moveRequestSchema = z.object({
-  memberId: objectIdSchema,
-  relation: z.enum(RELATIONS.filter((r) => r !== 'head') as [Exclude<Relation, 'head'>, ...Exclude<Relation, 'head'>[]], { error: 'validation.relation' }),
-  note: z
-    .string()
-    .trim()
-    .max(300, 'validation.tooLong')
-    .nullish()
-    .transform((v) => v || null),
-});
+const optionalId = z
+  .union([z.literal(''), objectIdSchema])
+  .nullish()
+  .transform((v) => v || null);
+
+/**
+ * Someone joining this family from another: their relation here, whose wife
+ * (or child) they will be where the relation leaves it open, and an
+ * optional note for the other family and committee.
+ */
+export const moveRequestSchema = z
+  .object({
+    memberId: objectIdSchema,
+    relation: z.enum(RELATIONS.filter((r) => r !== 'head') as [Exclude<Relation, 'head'>, ...Exclude<Relation, 'head'>[]], { error: 'validation.relation' }),
+    parentId: optionalId,
+    partnerId: optionalId,
+    note: z
+      .string()
+      .trim()
+      .max(300, 'validation.tooLong')
+      .nullish()
+      .transform((v) => v || null),
+  })
+  .transform((v) => ({ ...v, parentId: PARENT_CHOICES[v.relation] ? v.parentId : null, partnerId: PARTNER_CHOICES[v.relation] ? v.partnerId : null }));
 export type MoveRequestInput = z.input<typeof moveRequestSchema>;
 
 /** Someone's parent is listed in another family, one linked to theirs. Null clears it. */
@@ -102,6 +115,8 @@ export interface MemberMoveView {
   from: LinkedFamily;
   to: LinkedFamily;
   relation: Relation;
+  /** Whose wife or child they will be in the new family, when the asking family said. */
+  tie: { kind: 'parent' | 'partner'; name: string } | null;
   note: string | null;
   status: MoveStatus;
   requestedByName: string;

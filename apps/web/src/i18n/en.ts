@@ -917,6 +917,8 @@ export const en = {
   'member.fatherChoice': 'Their father',
   'member.sheet.formerWifeOf': 'Former wife of {name}',
   'member.sheet.formerHusbandOf': 'Former husband of {name}',
+  'moves.tie.partner': 'married to {name}',
+  'moves.tie.parent': 'child of {name}',
   'family.title': 'Family of {name}',
   'family.place': 'Village or town',
   'family.gotra': 'Gotra',
