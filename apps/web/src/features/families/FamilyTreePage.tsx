@@ -264,7 +264,10 @@ export function FamilyTreePage() {
               {t('tree.relPerson', { name: displayName(ego) })}
             </Chip>
           )}
-          <div className="ms-auto flex gap-1">
+          <div className="ms-auto flex items-center gap-1">
+            <Link to="/relation" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+              {t('finder.open')}
+            </Link>
             <IconButton icon={Printer} label={t('tree.print')} onClick={() => window.print()} />
             <IconButton icon={Share} label={t('tree.share')} onClick={() => void share()} />
           </div>

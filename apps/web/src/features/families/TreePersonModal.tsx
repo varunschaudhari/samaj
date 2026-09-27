@@ -170,6 +170,14 @@ export function TreePersonModal({
           </details>
         )}
         <div className="flex flex-wrap gap-2">
+          {!(kin?.viewerIsEgo && ego?.id === person.id) && (
+            <Link
+              to={`/relation?${new URLSearchParams({ b: person.id, bf: person.household.id, bn: person.name }).toString()}`}
+              className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+            >
+              {t('finder.toMe', { name: displayName(person) })}
+            </Link>
+          )}
           {ego?.id !== person.id && (
             <Button variant="secondary" size="sm" onClick={() => onFromHere(person)}>
               {t('tree.fromHere', { name: displayName(person) })}

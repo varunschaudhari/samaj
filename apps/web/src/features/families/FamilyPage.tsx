@@ -358,6 +358,8 @@ export function FamilyPage() {
           onRemove: canEdit ? () => sheetMember && setRemoving(sheetMember) : undefined,
           onShowInTree: () => sheetMember && navigate(`/families/${data.id}/tree?focus=${sheetMember.id}`),
           onParentElsewhere: canEdit ? () => sheetMember && setParentElsewhere(sheetMember) : undefined,
+          onRelation: () =>
+            sheetMember && navigate(`/relation?${new URLSearchParams({ b: sheetMember.id, bf: data.id, bn: sheetMember.name }).toString()}`),
         }}
       />
       <MemberPrivacyModal member={privacyFor} isSelf={privacyFor?.id === me.data?.memberId} onClose={() => setPrivacyFor(null)} />

@@ -91,6 +91,9 @@ function classify(path: Hop[], ego: TreePerson): MessageKey {
       return male(node(1)) ? 'kin.grandsonsWife' : 'kin.granddaughtersHusband';
     case 'PU':
       return pick(them, 'kin.fatherInLaw', 'kin.motherInLaw');
+    case 'DPU':
+      // A son's or daughter's in-laws.
+      return pick(them, 'kin.vyahi', 'kin.vihin');
     case 'PUU':
       return pick(them, 'kin.grandfatherInLaw', 'kin.grandmotherInLaw');
     case 'PUD':
@@ -106,11 +109,9 @@ function classify(path: Hop[], ego: TreePerson): MessageKey {
   }
 }
 
-/** Everyone's relation to `egoId`, as a message key, over the tree's parent and partner joins. People not joined to them are left out. */
-export function kinshipFrom(egoId: string, people: TreePerson[]): Map<string, MessageKey> {
+/** Breadth first from `egoId` over parent and partner joins: how each person was first reached. */
+function walk(egoId: string, people: TreePerson[]) {
   const byId = new Map(people.map((p) => [p.id, p]));
-  const ego = byId.get(egoId);
-  if (!ego) return new Map();
   const hops = new Map<string, Hop[]>();
   const add = (from: string, step: Step, to: TreePerson) => hops.set(from, [...(hops.get(from) ?? []), { step, to }]);
   for (const p of people) {
@@ -125,7 +126,6 @@ export function kinshipFrom(egoId: string, people: TreePerson[]): Map<string, Me
       add(partner.id, 'P', p);
     }
   }
-  // Breadth first, so each relation is named by the shortest way to them.
   const came = new Map<string, { from: string; hop: Hop }>();
   const seen = new Set([egoId]);
   const queue = [egoId];
@@ -138,8 +138,7 @@ export function kinshipFrom(egoId: string, people: TreePerson[]): Map<string, Me
       queue.push(hop.to.id);
     }
   }
-  const out = new Map<string, MessageKey>([[egoId, 'kin.self']]);
-  for (const id of came.keys()) {
+  const pathTo = (id: string): Hop[] => {
     const path: Hop[] = [];
     for (let at = id; at !== egoId; ) {
       const step = came.get(at);
@@ -147,7 +146,29 @@ export function kinshipFrom(egoId: string, people: TreePerson[]): Map<string, Me
       path.unshift(step.hop);
       at = step.from;
     }
-    out.set(id, classify(path, ego));
-  }
+    return path;
+  };
+  return { ego: byId.get(egoId), came, pathTo };
+}
+
+/** Everyone's relation to `egoId`, as a message key, over the tree's parent and partner joins. People not joined to them are left out. */
+export function kinshipFrom(egoId: string, people: TreePerson[]): Map<string, MessageKey> {
+  const { ego, came, pathTo } = walk(egoId, people);
+  if (!ego) return new Map();
+  const out = new Map<string, MessageKey>([[egoId, 'kin.self']]);
+  for (const id of came.keys()) out.set(id, classify(pathTo(id), ego));
   return out;
+}
+
+/** The people between two, each with the step that reaches them (up to a parent, down to a child, across to a partner); null if they aren't joined. */
+export function kinshipPath(egoId: string, targetId: string, people: TreePerson[]): { step: Step; to: TreePerson }[] | null {
+  const { ego, came, pathTo } = walk(egoId, people);
+  if (!ego) return null;
+  if (egoId === targetId) return [];
+  return came.has(targetId) ? pathTo(targetId) : null;
+}
+
+/** The entry for a member in a tree: themselves, or the entry they were merged into (listed in two households). */
+export function findInTree<T extends TreePerson>(people: T[], memberId: string): T | undefined {
+  return people.find((p) => p.id === memberId) ?? people.find((p) => p.alsoListed?.some((a) => a.memberId === memberId));
 }

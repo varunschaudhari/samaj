@@ -37,6 +37,8 @@ export interface MemberActions {
   onShowInTree?: () => void;
   /** Point at their parent in another, linked family. */
   onParentElsewhere?: () => void;
+  /** How this person is related to the viewer. */
+  onRelation?: () => void;
 }
 
 function Action({ icon, label, hint, onClick, danger = false }: { icon: AppIcon; label: string; hint?: string; onClick: () => void; danger?: boolean }) {
@@ -209,10 +211,13 @@ export function MemberSheet({
           </a>
         )}
 
-        {(actions.onEdit || actions.onShowInTree || actions.onPrivacy || member.canInvite || member.canResetPassword || removable) && (
+        {(actions.onEdit || actions.onShowInTree || actions.onRelation || actions.onPrivacy || member.canInvite || member.canResetPassword || removable) && (
           <ul className="-mx-3 flex flex-col">
             {actions.onEdit && <Action icon={Pencil} label={t('member.sheet.edit')} hint={t('member.sheet.editHint')} onClick={run(actions.onEdit)} />}
             {actions.onShowInTree && <Action icon={Network} label={t('member.sheet.showInTree')} hint={t('member.sheet.showInTreeHint')} onClick={run(actions.onShowInTree)} />}
+            {actions.onRelation && !isSelf && (
+              <Action icon={Network} label={t('finder.toMe', { name: member.name })} hint={t('finder.toMeHint')} onClick={run(actions.onRelation)} />
+            )}
             {actions.onParentElsewhere && !CHILD_RELATIONS.includes(member.relation) && (
               <Action icon={Users} label={t('member.sheet.parentElsewhere')} hint={t('member.sheet.parentElsewhereHint')} onClick={run(actions.onParentElsewhere)} />
             )}

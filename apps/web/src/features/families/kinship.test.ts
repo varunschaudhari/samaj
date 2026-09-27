@@ -1,6 +1,6 @@
 import type { TreePerson } from '@samaj/shared';
 import { describe, expect, it } from 'vitest';
-import { kinshipFrom } from './kinship';
+import { findInTree, kinshipFrom, kinshipPath } from './kinship';
 
 const p = (id: string, gender: 'male' | 'female', ties: Partial<TreePerson> = {}): TreePerson => ({
   id,
@@ -94,6 +94,7 @@ describe('kinshipFrom', () => {
     expect(fromAnil.get('Kavya')).toBe('kin.sonsWife');
     expect(fromAnil.get('Aarav')).toBe('kin.grandson');
     expect(fromAnil.get('Neha')).toBe('kin.grandsonsWife');
+    expect(fromAnil.get('Kishor')).toBe('kin.vyahi');
     expect(fromAnil.get('Vijay')).toBe('kin.brothersSon');
     expect(fromAnil.get('Amit')).toBe('kin.sistersSon');
     expect(fromAnil.get('Dilip')).toBe('kin.sistersHusband');
@@ -121,5 +122,13 @@ describe('kinshipFrom', () => {
   it('marks a former husband or wife', () => {
     const kin = kinshipFrom('A', [p('A', 'male'), p('B', 'female', { partnerId: 'A', formerPartner: true })]);
     expect(kin.get('B')).toBe('kin.formerWife');
+  });
+
+  it('gives the way between two people', () => {
+    expect(kinshipPath('Rohit', 'Vijay', people)?.map((h) => `${h.step}:${h.to.id}`)).toEqual(['U:Anil', 'U:Ganpat', 'D:Sunil', 'D:Vijay']);
+    expect(kinshipPath('Rohit', 'Rohit', people)).toEqual([]);
+    expect(kinshipPath('Rohit', 'Stranger', people)).toBeNull();
+    const merged = [...people, p('Amit2', 'male', { alsoListed: [{ memberId: 'old-amit', familyId: 'f', headName: 'x' }] })];
+    expect(findInTree(merged, 'old-amit')?.id).toBe('Amit2');
   });
 });
