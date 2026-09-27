@@ -179,7 +179,13 @@ export function TreeChart({
             <svg width={layout.width} height={layout.height} className="absolute inset-0" aria-hidden="true">
               <g fill="none" stroke="var(--line-strong)" strokeWidth={1.5}>
                 {layout.connectors.map((c, i) => (
-                  <path key={i} d={`M${c.x1},${c.y1} V${c.midY} H${c.x2} V${c.y2}`} strokeDasharray={c.skips ? '1 5' : c.dashed ? '6 4' : undefined} strokeLinecap={c.skips ? 'round' : undefined} />
+                  <path
+                    key={i}
+                    d={`M${c.x1},${c.y1} V${c.midY} H${c.x2} V${c.y2}`}
+                    stroke={c.marriedIn ? 'var(--kumkum)' : undefined}
+                    strokeDasharray={c.skips ? '1 5' : c.dashed ? '6 4' : undefined}
+                    strokeLinecap={c.skips ? 'round' : undefined}
+                  />
                 ))}
                 {layout.couples.map((c, i) => (
                   <path key={`c${i}`} d={`M${c.x1},${c.y} H${c.x2}`} stroke="var(--zari)" strokeWidth={3} />

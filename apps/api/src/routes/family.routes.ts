@@ -16,6 +16,8 @@ familyRouter.put('/:familyId', families.update);
 familyRouter.post('/:familyId/members', families.addMember);
 familyRouter.put('/:familyId/members/:memberId', families.updateMember);
 familyRouter.delete('/:familyId/members/:memberId', families.removeMember);
+// Their parent is listed in another, linked family.
+familyRouter.put('/:familyId/members/:memberId/parent', families.setExternalParent);
 // A one-time code so a listed person can sign in to this family with their own number.
 familyRouter.post('/:familyId/members/:memberId/invite', families.createInvite);
 

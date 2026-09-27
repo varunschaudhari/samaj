@@ -17,12 +17,13 @@ import { BranchModel } from '../models/branch.model';
 import { type FamilyDoc, FamilyModel, HISTORY_LIMIT } from '../models/family.model';
 import { InviteModel } from '../models/invite.model';
 import { type MemberDoc, MemberModel } from '../models/member.model';
+import { SamePersonModel } from '../models/same-person.model';
 import { UserModel } from '../models/user.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { storage } from '../utils/storage';
 import { closeForRemovedMember, syncFamilyGotra, syncMember } from './matrimony.service';
 import { canEditFamily, canEnrolIn, canResetPasswordFor, canReviewFamily, canSeeContact, canSeePhone, canViewFamily, hasReach, isOwnFamily } from './access';
-import { actsForOwnFamily, linksOf, movedInFrom, movesOutOf } from './links.service';
+import { actsForOwnFamily, familySummaries, linksOf, movedInFrom, movesOutOf } from './links.service';
 import { assertPhoneFree } from './phones';
 import type { Viewer } from './viewer';
 
@@ -91,6 +92,15 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     movesOutOf(viewer, [String(family._id)]),
     movedInFrom(viewer, family._id, members.map((m) => m._id)),
   ]);
+  // Parents listed in other families, for those who may see them.
+  const externalIds = members.flatMap((m) => (m.externalParentId ? [m.externalParentId] : []));
+  const externalPeople = externalIds.length ? await MemberModel.find({ _id: { $in: externalIds } }, { name: 1, familyId: 1 }).lean() : [];
+  const externalFamilies = await familySummaries(viewer, externalPeople.map((p) => p.familyId));
+  const externalOf = (id: unknown) => {
+    const p = id ? externalPeople.find((x) => String(x._id) === String(id)) : undefined;
+    const f = p ? externalFamilies.get(String(p.familyId)) : undefined;
+    return p && f && (f.canView || canEdit) ? { id: String(p._id), name: p.name, family: f } : undefined;
+  };
   const accountIds = members.flatMap((m) => (m.userId ? [m.userId] : []));
   const accounts = accountIds.length ? await UserModel.find({ _id: { $in: accountIds } }, { role: 1 }).lean() : [];
   const roleByUser = new Map(accounts.map((u) => [String(u._id), u.role]));
@@ -131,6 +141,7 @@ export async function getFamily(viewer: Viewer, familyId: string): Promise<Famil
     parentId: m.parentId ? String(m.parentId) : null,
     partnerId: m.partnerId ? String(m.partnerId) : null,
     ...(seesPending && { adopted: m.adopted === true }),
+    ...(externalOf(m.externalParentId) && { externalParent: externalOf(m.externalParentId) }),
     ...(maher(m._id) && { movedFrom: maher(m._id) }),
     };
   };
@@ -342,6 +353,11 @@ export async function removeMember(viewer: Viewer, familyId: string, memberId: s
   await InviteModel.deleteOne({ memberId: member._id });
   await member.deleteOne();
   await untie(family._id, member._id);
+  // Nobody elsewhere has them as a parent, or a word on whether they're someone else.
+  await Promise.all([
+    MemberModel.updateMany({ externalParentId: member._id }, { $set: { externalParentId: null } }),
+    SamePersonModel.deleteMany({ $or: [{ a: member._id }, { b: member._id }] }),
+  ]);
   recordHistory(family, viewer, 'updated', `Removed ${member.name}`);
   await family.save();
   return getFamily(viewer, familyId);

@@ -28,6 +28,7 @@ function useHouseholdLabel() {
   const t = useT();
   return (h: TreeHousehold) => {
     if (h.via === null) return t('tree.thisFamily');
+    if (h.via === 'person') return t('tree.household.person', { name: h.through?.name ?? '' });
     if (h.generation === 0) return t('links.kind.siblings');
     const key = `tree.household.${h.generation}`;
     return isMessageKey(key) ? t(key as MessageKey) : t('links.kind.relatives');
@@ -255,7 +256,7 @@ export function FamilyTreePage() {
       <div>{back}</div>
       <PageHeader title={t('tree.title')} description={root ? t('family.title', { name: root.family.headName }) : <Skeleton className="h-4 w-40" />} />
       {body}
-      <TreePersonModal person={opened} people={people} onFocus={focus} onClose={() => setOpened(null)} />
+      <TreePersonModal person={opened} people={people} households={tree.data?.households ?? []} onFocus={focus} onClose={() => setOpened(null)} />
     </div>
   );
 }

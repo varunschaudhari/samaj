@@ -38,6 +38,7 @@ import { MemberFormModal } from './MemberFormModal';
 import { MemberSheet } from './MemberSheet';
 import { MovedOutList } from './MovedOut';
 import { type ElderPair, EldersModal } from './EldersModal';
+import { ExternalParentModal } from './ExternalParentModal';
 import { ReviewPanel } from './ReviewPanel';
 
 /** /family: the signed-in user's own family. */
@@ -213,6 +214,7 @@ export function FamilyPage() {
   const [privacyFor, setPrivacyFor] = useState<FamilyMember | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
   const [elders, setElders] = useState<ElderPair | null>(null);
+  const [parentElsewhere, setParentElsewhere] = useState<FamilyMember | null>(null);
 
   if (family.isPending) return <FamilySkeleton />;
 
@@ -338,6 +340,7 @@ export function FamilyPage() {
       </div>
 
       <EldersModal familyId={data.id} pair={elders} onClose={() => setElders(null)} />
+      <ExternalParentModal familyId={data.id} member={parentElsewhere} links={data.links} onClose={() => setParentElsewhere(null)} />
       <MemberSheet
         member={sheetMember}
         members={data.members}
@@ -352,6 +355,7 @@ export function FamilyPage() {
           },
           onRemove: canEdit ? () => sheetMember && setRemoving(sheetMember) : undefined,
           onShowInTree: () => sheetMember && navigate(`/families/${data.id}/tree?focus=${sheetMember.id}`),
+          onParentElsewhere: canEdit ? () => sheetMember && setParentElsewhere(sheetMember) : undefined,
         }}
       />
       <MemberPrivacyModal member={privacyFor} isSelf={privacyFor?.id === me.data?.memberId} onClose={() => setPrivacyFor(null)} />

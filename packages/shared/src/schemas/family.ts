@@ -35,6 +35,9 @@ export const RELATIONS = [
 ] as const;
 export type Relation = (typeof RELATIONS)[number];
 
+/** The family's own children and grandchildren: their parents are in the family. Anyone else's may be in another one. */
+export const CHILD_RELATIONS: readonly Relation[] = ['son', 'daughter', 'grandson', 'granddaughter', 'greatGrandson', 'greatGranddaughter', 'nephew', 'niece'];
+
 /** Relations someone can be adopted into (दत्तक). Only the family and its committee see that they were. */
 export const ADOPTABLE_RELATIONS: readonly Relation[] = ['son', 'daughter', 'grandson', 'granddaughter', 'greatGrandson', 'greatGranddaughter', 'nephew', 'niece'];
 
@@ -248,6 +251,8 @@ export interface FamilyMember {
   partnerId: string | null;
   /** Adopted into the family. Present for the family and its committee only. */
   adopted?: boolean;
+  /** Their parent, listed in another family (a head's father in his parents' home, a wife's father in her माहेर). */
+  externalParent?: { id: string; name: string; family: LinkedFamily };
 }
 
 /** Someone who was in this family and moved to another, usually after marriage. */

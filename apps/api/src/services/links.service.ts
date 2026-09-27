@@ -1,4 +1,16 @@
-import { type FamilyLinkView, type FamilyRequests, INVERSE_LINK, type LinkKind, type LinkedFamily, MAX_FAMILY_LINKS, type Relation, type linkRequestSchema } from '@samaj/shared';
+import {
+  CHILD_RELATIONS,
+  type FamilyDetail,
+  type FamilyLinkView,
+  type FamilyRequests,
+  INVERSE_LINK,
+  type LinkKind,
+  type LinkedFamily,
+  MAX_FAMILY_LINKS,
+  type Relation,
+  type linkRequestSchema,
+  type samePersonSchema,
+} from '@samaj/shared';
 import { type HydratedDocument, Types } from 'mongoose';
 import type { z } from 'zod';
 import { BranchModel } from '../models/branch.model';
@@ -6,9 +18,10 @@ import { type FamilyLinkDoc, FamilyLinkModel, linkPair } from '../models/family-
 import { type FamilyDoc, FamilyModel } from '../models/family.model';
 import { type MemberDoc, MemberModel } from '../models/member.model';
 import { MemberMoveModel } from '../models/member-move.model';
+import { SamePersonModel, personPair } from '../models/same-person.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { canEditFamily, canViewFamily } from './access';
-import { loadEditable, loadFamily, recordHistory } from './family.service';
+import { getFamily, loadEditable, loadFamily, loadMemberOf, recordHistory } from './family.service';
 import { moveViews } from './moves.service';
 import type { Viewer } from './viewer';
 
@@ -243,4 +256,70 @@ export async function removeLink(viewer: Viewer, id: string): Promise<void> {
     recordHistory(to, viewer, 'unlinked', `Family of ${await headName(from._id)}`);
     await Promise.all([from.save(), to.save()]);
   }
+}
+
+const tieIssue = (message: string) => [{ path: 'memberId', message }];
+
+/**
+ * Someone's parent is listed in another family: a head whose father still
+ * heads the family home, a wife whose father is in her माहेर. The two
+ * families must already be linked, so both have agreed to know each other.
+ */
+export async function setExternalParent(viewer: Viewer, familyId: string, memberId: string, parentId: string | null): Promise<FamilyDetail> {
+  const family = await loadEditable(viewer, familyId);
+  const member = await loadMemberOf(family, memberId);
+  if (parentId === null) {
+    member.externalParentId = null;
+  } else {
+    if (CHILD_RELATIONS.includes(member.relation)) {
+      throw new AppError(400, 'VALIDATION_FAILED', 'Their parents are in this family.', tieIssue('validation.parentInFamily'));
+    }
+    const parent = Types.ObjectId.isValid(parentId) ? await MemberModel.findById(parentId) : null;
+    const theirs = parent ? await FamilyModel.findById(parent.familyId, { history: 0 }).lean() : null;
+    if (!parent || !theirs || !canViewFamily(viewer, theirs)) throw notFound('That person is no longer in the directory.');
+    if (String(parent.familyId) === String(family._id)) {
+      throw new AppError(400, 'VALIDATION_FAILED', 'Pick someone from the other family.', tieIssue('validation.parentOtherFamily'));
+    }
+    const linked = await FamilyLinkModel.exists({ pair: linkPair(family._id, parent.familyId), status: 'accepted' });
+    if (!linked) throw new AppError(409, 'CONFLICT', 'Link the two families first.', tieIssue('validation.parentNotLinked'));
+    member.externalParentId = parent._id;
+    recordHistory(family, viewer, 'updated', `${member.name}'s parent: ${parent.name}, in the family of ${await headName(parent.familyId)}`);
+  }
+  await member.save();
+  if (parentId === null) recordHistory(family, viewer, 'updated', `${member.name}'s parent in another family removed`);
+  await family.save();
+  return getFamily(viewer, familyId);
+}
+
+type SamePersonInput = z.output<typeof samePersonSchema>;
+
+/**
+ * A family says two entries in the tree are one person (or not). Either
+ * person's family may say so; both must be families the viewer can see.
+ */
+export async function markSamePerson(viewer: Viewer, input: SamePersonInput): Promise<void> {
+  const people = await MemberModel.find({ _id: { $in: [input.a, input.b] } }, { familyId: 1, name: 1 }).lean();
+  if (people.length !== 2) throw notFound('That person is no longer in the directory.');
+  // In full: the history of the family that says so is saved below.
+  const families = await FamilyModel.find({ _id: { $in: people.map((p) => p.familyId) } });
+  if (families.length !== 2 || !families.every((f) => canViewFamily(viewer, f))) throw notFound('That person is no longer in the directory.');
+  const editable = families.find((f) => canEditFamily(viewer, f));
+  if (!editable) throw forbidden('Only either person’s family can say this.');
+  await SamePersonModel.findOneAndUpdate(
+    { pair: personPair(input.a, input.b) },
+    { $set: { a: input.a, b: input.b, same: input.same, byUserId: new Types.ObjectId(viewer.id), byName: viewer.name } },
+    { upsert: true },
+  );
+  const [first, second] = people;
+  recordHistory(editable, viewer, 'updated', `${first?.name} and ${second?.name}: ${input.same ? 'the same person' : 'not the same person'}`);
+  await editable.save();
+}
+
+/** Back to the tree's own guess. */
+export async function clearSamePerson(viewer: Viewer, a: string, b: string): Promise<void> {
+  if (!Types.ObjectId.isValid(a) || !Types.ObjectId.isValid(b)) throw notFound('That person is no longer in the directory.');
+  const people = await MemberModel.find({ _id: { $in: [a, b] } }, { familyId: 1 }).lean();
+  const families = await FamilyModel.find({ _id: { $in: people.map((p) => p.familyId) } }, { history: 0 }).lean();
+  if (!families.some((f) => canEditFamily(viewer, f))) throw forbidden('Only either person’s family can change this.');
+  await SamePersonModel.deleteOne({ pair: personPair(a, b) });
 }

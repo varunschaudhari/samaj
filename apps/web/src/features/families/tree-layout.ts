@@ -28,8 +28,12 @@ interface Unit {
 
 export interface ChartLayout {
   people: ChartPerson[];
-  /** Parent to child: down from the parents, across, down to the child. Dashed for adoption, dotted across a generation nobody listed. */
-  connectors: { x1: number; y1: number; midY: number; x2: number; y2: number; dashed: boolean; skips: boolean }[];
+  /**
+   * Parent to child: down from the parents, across, down to the child. Dashed
+   * for adoption, dotted across a generation nobody listed; `marriedIn` from a
+   * wife's (or husband's) parents in their माहेर to where they stand now.
+   */
+  connectors: { x1: number; y1: number; midY: number; x2: number; y2: number; dashed: boolean; skips: boolean; marriedIn?: boolean }[];
   /** Between partners standing side by side. */
   couples: { x1: number; x2: number; y: number }[];
   /** Someone whose parents the family hasn't said yet: a short dashed stub above them. */
@@ -155,6 +159,20 @@ export function layoutTree(tree: FamilyTree): ChartLayout {
         skips: child.generation - u.generation > 1,
       });
     }
+  }
+  for (const p of people.filter(standsBeside)) {
+    const parents = p.parentId ? unitOf.get(p.parentId) : undefined;
+    if (!parents) continue;
+    connectors.push({
+      x1: parents.x + ownWidth(parents) / 2,
+      y1: rowY(parents.generation) + CARD_H,
+      midY: p.y - ROW_GAP / 2,
+      x2: p.x + CARD_W / 2,
+      y2: p.y,
+      dashed: false,
+      skips: p.generation - parents.generation > 1,
+      marriedIn: true,
+    });
   }
   const stubs = roots.flatMap((u) => {
     const p = anchor(u);

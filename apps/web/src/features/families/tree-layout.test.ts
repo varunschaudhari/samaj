@@ -18,7 +18,7 @@ const person = (id: string, relation: TreePerson['relation'], generation: number
   partnerId: null,
   ...ties,
 });
-const treeOf = (members: TreePerson[]): FamilyTree => ({ rootId: 'f1', households: [{ family, generation: 0, via: null, members }], side: [], truncated: false });
+const treeOf = (members: TreePerson[]): FamilyTree => ({ rootId: 'f1', households: [{ family, canEdit: true, generation: 0, via: null, members }], side: [], truncated: false });
 
 describe('layoutTree', () => {
   const tree = treeOf([
@@ -67,6 +67,18 @@ describe('layoutTree', () => {
     // Anil to his two sons, Rohit to Aarav, Sagar to Isha.
     expect(layout.connectors).toHaveLength(4);
     expect(layout.stubs).toEqual([{ x: (at.Dev?.x ?? 0) + CARD_W / 2, y: at.Dev?.y }]);
+  });
+
+  it('draws a line from a wife’s parents in her माहेर to where she stands beside her husband', () => {
+    const joined = layoutTree(
+      treeOf([
+        person('Rohit', 'head', 0),
+        person('Priya', 'spouse', 0, { gender: 'female', partnerId: 'Rohit', parentId: 'Suresh' }),
+        person('Suresh', 'head', -1),
+      ]),
+    );
+    const priya = joined.people.find((p) => p.id === 'Priya');
+    expect(joined.connectors).toEqual([expect.objectContaining({ marriedIn: true, x2: (priya?.x ?? 0) + CARD_W / 2, y2: priya?.y })]);
   });
 
   it('survives a loop in the data', () => {

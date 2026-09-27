@@ -22,6 +22,8 @@ const tree = async (cookie: string, id: string) => (await api.get(`/api/families
 const everyone = (t: FamilyTree) => t.households.flatMap((h) => h.members);
 const byName = (t: FamilyTree) => new Map(everyone(t).map((p) => [p.name, p] as const));
 const idOf = (t: FamilyTree, name: string) => byName(t).get(name)?.id;
+const parentOf = (t: FamilyTree, name: string) => everyone(t).find((p) => p.id === byName(t).get(name)?.parentId)?.name ?? null;
+const count = (t: FamilyTree, name: string) => everyone(t).filter((p) => p.name === name).length;
 
 describe('GET /api/families/:id/tree', () => {
   it('places linked households and their people by generation', async () => {
@@ -149,5 +151,86 @@ describe('GET /api/families/:id/tree', () => {
     const root = await createFamily(branches.amalner);
     const waiting = await createFamily(branches.amalner, { status: 'pending', account: 'member' });
     expect((await api.get(`/api/families/${root.familyId}/tree`).set('Cookie', waiting.cookie)).status).toBe(404);
+  });
+
+  it('lets a family say whose child its head is in the linked home, instead of guessing the head there', async () => {
+    const home = await createFamily(branches.bhusawal, { account: 'member', people: [{ name: 'Sunil Wagh' }, { name: 'Anil Wagh', relation: 'brother' }] });
+    const own = await createFamily(branches.amalner, {
+      account: 'member',
+      people: [{ name: 'Rohit Wagh' }, { name: 'Priya Wagh', relation: 'spouse', gender: 'female' }, { name: 'Om Wagh', relation: 'son' }],
+    });
+    const stranger = await createFamily(branches.pune, { people: [{ name: 'Someone Else' }] });
+    await link(own.familyId, home.familyId, 'parents');
+    const [rohit, , om] = own.memberIds;
+    const set = (memberId: string | undefined, parent: string | null | undefined) =>
+      api.put(`/api/families/${own.familyId}/members/${memberId}/parent`).set('Cookie', own.cookie).send({ memberId: parent });
+
+    // Guessed: the head of the linked home.
+    expect(parentOf(await tree(own.cookie, own.familyId), 'Rohit Wagh')).toBe('Sunil Wagh');
+    expect((await set(rohit, home.memberIds[1])).status).toBe(200);
+    expect(parentOf(await tree(own.cookie, own.familyId), 'Rohit Wagh')).toBe('Anil Wagh');
+    const page = (await api.get(`/api/families/${own.familyId}`).set('Cookie', own.cookie)).body.family as FamilyDetail;
+    expect(page.members.find((m) => m.id === rohit)?.externalParent).toMatchObject({ name: 'Anil Wagh', family: { headName: 'Sunil Wagh' } });
+
+    // Only in a family linked to theirs, and not for the family's own children.
+    const unlinked = await set(rohit, stranger.memberIds[0]);
+    expect(unlinked.status).toBe(409);
+    expect(unlinked.body.error.issues).toEqual([{ path: 'memberId', message: 'validation.parentNotLinked' }]);
+    expect((await set(om, home.memberIds[1])).status).toBe(400);
+    // And only by the family itself.
+    expect((await api.put(`/api/families/${own.familyId}/members/${rohit}/parent`).set('Cookie', home.cookie).send({ memberId: null })).status).toBe(403);
+
+    expect((await set(rohit, null)).status).toBe(200);
+    expect(parentOf(await tree(own.cookie, own.familyId), 'Rohit Wagh')).toBe('Sunil Wagh');
+  });
+
+  it('draws a wife’s माहेर from the move that brought her, and shows her once', async () => {
+    const bride = await createFamily(branches.bhusawal, {
+      account: 'member',
+      people: [{ name: 'Suresh Patil' }, { name: 'Priya Patil', relation: 'daughter', gender: 'female' }, { name: 'Amol Patil', relation: 'son' }],
+    });
+    const groom = await createFamily(branches.amalner, { account: 'member', people: [{ name: 'Rohit Wagh' }] });
+    const committee = await createFamily(branches.district, { account: 'committee' });
+    const move = (await api.post('/api/moves').set('Cookie', groom.cookie).send({ memberId: bride.memberIds[1], relation: 'spouse' })).body.move as { id: string };
+    await api.post(`/api/moves/${move.id}/agree`).set('Cookie', bride.cookie);
+    await api.post(`/api/moves/${move.id}/approve`).set('Cookie', committee.cookie);
+
+    const t = await tree(groom.cookie, groom.familyId);
+    const maher = t.households.find((h) => h.family.id === bride.familyId);
+    expect(maher).toMatchObject({ via: 'person', generation: -1, through: { name: 'Priya Patil' } });
+    expect(parentOf(t, 'Priya Patil')).toBe('Suresh Patil');
+    expect(byName(t).get('Priya Patil')?.partnerId).toBe(groom.memberIds[0]);
+    expect(parentOf(t, 'Amol Patil')).toBe('Suresh Patil');
+    expect(count(t, 'Priya Patil')).toBe(1);
+    // Drawn in the tree, so not listed again beside it.
+    expect(t.side).toEqual([]);
+  });
+
+  it('follows the family’s word on who is the same person', async () => {
+    const own = await createFamily(branches.amalner, { account: 'member', people: [{ name: 'Rohit Wagh' }, { name: 'Amit Wagh', relation: 'brother' }, { name: 'Sunil Wagh', relation: 'brother' }] });
+    const amit = await createFamily(branches.amalner, { people: [{ name: 'Amit Wagh' }] });
+    const sunil = await createFamily(branches.amalner, { people: [{ name: 'Sunilkumar Wagh' }] });
+    const visitor = await createFamily(branches.amalner, { account: 'member' });
+    await link(own.familyId, amit.familyId, 'siblings');
+    await link(own.familyId, sunil.familyId, 'siblings');
+    const say = (cookie: string, a: string | undefined, b: string | undefined, same: boolean) => api.put('/api/people/same').set('Cookie', cookie).send({ a, b, same });
+
+    // Guessed: Amit is one person, Sunil and Sunilkumar two.
+    let t = await tree(own.cookie, own.familyId);
+    expect(count(t, 'Amit Wagh')).toBe(1);
+    expect(byName(t).get('Amit Wagh')?.alsoListed).toEqual([{ memberId: own.memberIds[1], familyId: own.familyId, headName: 'Rohit Wagh' }]);
+    expect(everyone(t).map((p) => p.name)).toEqual(expect.arrayContaining(['Sunil Wagh', 'Sunilkumar Wagh']));
+
+    expect((await say(visitor.cookie, own.memberIds[1], amit.memberIds[0], false)).status).toBe(403);
+    expect((await say(own.cookie, own.memberIds[1], amit.memberIds[0], false)).status).toBe(204);
+    expect((await say(own.cookie, own.memberIds[2], sunil.memberIds[0], true)).status).toBe(204);
+    t = await tree(own.cookie, own.familyId);
+    expect(count(t, 'Amit Wagh')).toBe(2);
+    expect(everyone(t).map((p) => p.name)).not.toContain('Sunil Wagh');
+    expect(byName(t).get('Sunilkumar Wagh')?.parentId).toBeNull();
+
+    // Back to the guess.
+    expect((await api.delete(`/api/people/same/${own.memberIds[1]}/${amit.memberIds[0]}`).set('Cookie', own.cookie)).status).toBe(204);
+    expect(count(await tree(own.cookie, own.familyId), 'Amit Wagh')).toBe(1);
   });
 });

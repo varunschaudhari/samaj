@@ -1,4 +1,4 @@
-import { declineSchema, linkRequestSchema, moveRequestSchema, rejectMemberSchema } from '@samaj/shared';
+import { declineSchema, linkRequestSchema, moveRequestSchema, rejectMemberSchema, samePersonSchema } from '@samaj/shared';
 import { type Request, Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import * as approvals from '../services/approvals.service';
@@ -24,6 +24,18 @@ linkRouter.post('/:id/accept', async (req, res) => {
 });
 linkRouter.delete('/:id', async (req, res) => {
   await links.removeLink(viewer(req), id(req));
+  res.status(204).end();
+});
+
+/** A family's word on two entries in the tree: the same person, or not. */
+export const peopleRouter = Router();
+peopleRouter.use(requireAuth);
+peopleRouter.put('/same', async (req, res) => {
+  await links.markSamePerson(viewer(req), samePersonSchema.parse(req.body));
+  res.status(204).end();
+});
+peopleRouter.delete('/same/:a/:b', async (req, res) => {
+  await links.clearSamePerson(viewer(req), String(req.params.a ?? ''), String(req.params.b ?? ''));
   res.status(204).end();
 });
 

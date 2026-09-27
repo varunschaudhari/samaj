@@ -1,4 +1,4 @@
-import { type FamilyMember, formatPhone } from '@samaj/shared';
+import { CHILD_RELATIONS, type FamilyMember, formatPhone } from '@samaj/shared';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Avatar, Badge, Icon, Modal, buttonVariants } from '@/components/ui';
@@ -34,6 +34,8 @@ export interface MemberActions {
   onResetPassword?: () => void;
   onRemove?: () => void;
   onShowInTree?: () => void;
+  /** Point at their parent in another, linked family. */
+  onParentElsewhere?: () => void;
 }
 
 function Action({ icon, label, hint, onClick, danger = false }: { icon: AppIcon; label: string; hint?: string; onClick: () => void; danger?: boolean }) {
@@ -135,6 +137,20 @@ export function MemberSheet({
           {member.occupation && <Fact icon={Briefcase}>{member.occupation}</Fact>}
           {member.education && <Fact icon={GraduationCap}>{member.education}</Fact>}
           {parent && <Fact icon={Users}>{t('member.sheet.childOf', { name: parent.name })}</Fact>}
+          {member.externalParent && (
+            <Fact icon={Users}>
+              <span>
+                {t('member.sheet.childOf', { name: member.externalParent.name })} ·{' '}
+                {member.externalParent.family.canView ? (
+                  <Link to={`/families/${member.externalParent.family.id}`} onClick={onClose} className="font-semibold text-primary hover:underline">
+                    {t('family.title', { name: member.externalParent.family.headName })}
+                  </Link>
+                ) : (
+                  t('family.title', { name: member.externalParent.family.headName })
+                )}
+              </span>
+            </Fact>
+          )}
           {partner && <Fact icon={HeartHandshake}>{t(member.gender === 'male' ? 'member.sheet.husbandOf' : 'member.sheet.wifeOf', { name: partner.name })}</Fact>}
           {member.movedFrom && (
             <Fact icon={House}>
@@ -167,6 +183,9 @@ export function MemberSheet({
           <ul className="-mx-3 flex flex-col">
             {actions.onEdit && <Action icon={Pencil} label={t('member.sheet.edit')} hint={t('member.sheet.editHint')} onClick={run(actions.onEdit)} />}
             {actions.onShowInTree && <Action icon={Network} label={t('member.sheet.showInTree')} hint={t('member.sheet.showInTreeHint')} onClick={run(actions.onShowInTree)} />}
+            {actions.onParentElsewhere && !CHILD_RELATIONS.includes(member.relation) && (
+              <Action icon={Users} label={t('member.sheet.parentElsewhere')} hint={t('member.sheet.parentElsewhereHint')} onClick={run(actions.onParentElsewhere)} />
+            )}
             {actions.onPrivacy && member.canEditPrivacy && (
               <Action icon={ShieldCheck} label={t('member.sheet.privacy')} hint={t('member.sheet.privacyHint')} onClick={run(actions.onPrivacy)} />
             )}

@@ -60,6 +60,8 @@ const memberSchema = new Schema(
     partnerId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
     /** Adopted into the family. Only the family and its committee see it. */
     adopted: { type: Boolean, default: false },
+    /** Their parent, listed in another family linked to this one (a head's father, a wife's father in her माहेर). */
+    externalParentId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
   },
   { timestamps: true },
 );

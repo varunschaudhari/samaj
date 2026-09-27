@@ -1,8 +1,11 @@
+import type { TreeHousehold } from '@samaj/shared';
+import { useState } from 'react';
 import { Link } from 'react-router';
-import { Avatar, Badge, Modal, buttonVariants } from '@/components/ui';
+import { Avatar, Badge, Button, Chip, Modal, buttonVariants, toast } from '@/components/ui';
 import { placeLabel } from '@/features/branches/api';
-import { useLanguageStore, useT } from '@/i18n';
+import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
+import { useSamePerson } from './api';
 import { useDisplayName } from './life';
 import { usePersonLine } from './TreeChart';
 import type { ChartPerson } from './tree-layout';
@@ -11,11 +14,13 @@ import type { ChartPerson } from './tree-layout';
 export function TreePersonModal({
   person,
   people,
+  households,
   onFocus,
   onClose,
 }: {
   person: ChartPerson | null;
   people: ChartPerson[];
+  households: TreeHousehold[];
   onFocus: (p: ChartPerson) => void;
   onClose: () => void;
 }) {
@@ -23,7 +28,28 @@ export function TreePersonModal({
   const language = useLanguageStore((s) => s.language);
   const displayName = useDisplayName();
   const line = usePersonLine();
+  const errorMessage = useErrorMessage();
+  const same = useSamePerson();
+  const [twin, setTwin] = useState<string | null>(null);
   if (!person) return <Modal open={false} onClose={onClose} title="" />;
+
+  // Either person's family may say whether two entries are one person.
+  const edits = (familyId: string) => households.some((h) => h.family.id === familyId && h.canEdit);
+  const twins = people.filter(
+    (p) => p.household.id !== person.household.id && p.gender === person.gender && p.generation === person.generation && (edits(person.household.id) || edits(p.household.id)),
+  );
+  const say = (b: string, isSame: boolean) =>
+    same.mutate(
+      { a: person.id, b, same: isSame },
+      {
+        onSuccess: () => {
+          toast.success(t(isSame ? 'tree.sameSaved' : 'tree.notSameSaved'));
+          setTwin(null);
+          onClose();
+        },
+        onError: (err) => toast.error(errorMessage(err)),
+      },
+    );
 
   const parent = people.find((p) => p.id === person.parentId);
   const partners = people.filter((p) => p.id === person.partnerId || p.partnerId === person.id);
@@ -80,6 +106,25 @@ export function TreePersonModal({
               </dd>
             </div>
           )}
+          {person.alsoListed && person.alsoListed.length > 0 && (
+            <div>
+              <dt className="text-xs font-semibold text-fg-muted">{t('tree.alsoListed')}</dt>
+              <dd>
+                <ul className="flex flex-col gap-1">
+                  {person.alsoListed.map((a) => (
+                    <li key={a.memberId} className="flex flex-wrap items-center gap-x-3">
+                      <span className="text-fg">{t('family.title', { name: a.headName })}</span>
+                      {(edits(person.household.id) || edits(a.familyId)) && (
+                        <Button variant="ghost" size="sm" loading={same.isPending} onClick={() => say(a.memberId, false)}>
+                          {t('tree.notSame')}
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </dd>
+            </div>
+          )}
           {person.movedTo && (
             <div>
               <dt className="text-xs font-semibold text-fg-muted">{t('tree.movedTo')}</dt>
@@ -87,6 +132,24 @@ export function TreePersonModal({
             </div>
           )}
         </dl>
+        {twins.length > 0 && (
+          <details className="rounded-md border border-line p-3 text-sm">
+            <summary className="cursor-pointer font-semibold text-fg">{t('tree.sameAs')}</summary>
+            <div className="mt-2 flex flex-col gap-2">
+              <p className="text-fg-muted">{t('tree.sameAsHint')}</p>
+              <div className="flex flex-wrap gap-2" role="group" aria-label={t('tree.samePick')}>
+                {twins.map((p) => (
+                  <Chip key={p.id} selected={twin === p.id} onClick={() => setTwin(p.id)} className="px-3">
+                    {p.name} · {t('family.title', { name: p.household.headName })}
+                  </Chip>
+                ))}
+              </div>
+              <Button size="sm" className="self-start" disabled={!twin} loading={same.isPending} onClick={() => twin && say(twin, true)}>
+                {t('tree.sameSave')}
+              </Button>
+            </div>
+          </details>
+        )}
         <div className="flex flex-wrap gap-2">
           <Link to={`/families/${person.household.id}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
             {t('tree.openFamily')}

@@ -50,6 +50,16 @@ export const moveRequestSchema = z.object({
 });
 export type MoveRequestInput = z.input<typeof moveRequestSchema>;
 
+/** Someone's parent is listed in another family, one linked to theirs. Null clears it. */
+export const externalParentSchema = z.object({ memberId: objectIdSchema.nullable() });
+export type ExternalParentInput = z.input<typeof externalParentSchema>;
+
+/** Two entries the tree should show as one person, or never merge. */
+export const samePersonSchema = z
+  .object({ a: objectIdSchema, b: objectIdSchema, same: z.boolean() })
+  .refine((v) => v.a !== v.b, { path: ['b'], message: 'validation.samePersonSelf' });
+export type SamePersonInput = z.input<typeof samePersonSchema>;
+
 export const declineSchema = z.object({
   reason: z
     .string()
@@ -180,14 +190,20 @@ export interface TreePerson {
   partnerId: string | null;
   /** Adopted. Present only where the viewer sees the family's own details. */
   adopted?: boolean;
+  /** The same person, listed in other households here: shown once, as this entry. */
+  alsoListed?: { memberId: string; familyId: string; headName: string }[];
 }
 
 export interface TreeHousehold {
   family: LinkedFamily;
+  /** The viewer may edit this family: say who is whose parent, or that two entries are one person. */
+  canEdit: boolean;
+  /** For via 'person': whose parents' family this is (a wife's माहेर, a head's parents). */
+  through?: { id: string; name: string };
   /** The generation of this household's head. */
   generation: number;
-  /** How it joins the tree; null for the family the tree is drawn for. */
-  via: LinkKind | null;
+  /** How it joins the tree: a family link, 'person' (someone's parents live there), or null for the family the tree is drawn for. */
+  via: LinkKind | 'person' | null;
   members: TreePerson[];
 }
 

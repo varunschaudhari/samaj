@@ -1,4 +1,4 @@
-import { enrolFamilySchema, familyUpdateSchema, memberCreateSchema, memberInputSchema, pendingQuerySchema, rejectFamilySchema } from '@samaj/shared';
+import { enrolFamilySchema, externalParentSchema, familyUpdateSchema, memberCreateSchema, memberInputSchema, pendingQuerySchema, rejectFamilySchema } from '@samaj/shared';
 import type { Request, Response } from 'express';
 import * as approvalsService from '../services/approvals.service';
 import * as familyService from '../services/family.service';
@@ -45,6 +45,11 @@ export async function updateMember(req: Request, res: Response) {
 
 export async function removeMember(req: Request, res: Response) {
   res.json({ family: await familyService.removeMember(viewer(req), param(req, 'familyId'), param(req, 'memberId')) });
+}
+
+export async function setExternalParent(req: Request, res: Response) {
+  const { memberId } = externalParentSchema.parse(req.body);
+  res.json({ family: await linksService.setExternalParent(viewer(req), param(req, 'familyId'), param(req, 'memberId'), memberId) });
 }
 
 export async function createInvite(req: Request, res: Response) {

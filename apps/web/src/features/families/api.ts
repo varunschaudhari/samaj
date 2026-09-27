@@ -30,6 +30,30 @@ function useFamilyMutation<TVars>(familyId: string, run: (vars: TVars) => Promis
   });
 }
 
+/** Their parent is listed in another, linked family; null clears it. */
+export function useSetExternalParent(familyId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ memberId, parentId }: { memberId: string; parentId: string | null }) =>
+      api.put<{ family: FamilyDetail }>(`/families/${familyId}/members/${memberId}/parent`, { memberId: parentId }),
+    onSuccess: ({ family }) => {
+      queryClient.setQueryData(familyKey(familyId), family);
+      // Trees drawn around any family may join through this person.
+      void queryClient.invalidateQueries({ queryKey: ['family'], predicate: (q) => q.queryKey[2] === 'tree' });
+    },
+  });
+}
+
+/** A family's word on two entries in a tree: the same person or not, or (same: null) back to the tree's guess. */
+export function useSamePerson() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ a, b, same }: { a: string; b: string; same: boolean | null }) =>
+      same === null ? api.delete<void>(`/people/same/${a}/${b}`) : api.put<void>('/people/same', { a, b, same }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['family'], predicate: (q) => q.queryKey[2] === 'tree' }),
+  });
+}
+
 export function useUpdateFamily(familyId: string) {
   return useFamilyMutation(familyId, (input: FamilyUpdateInput) => api.put(`/families/${familyId}`, input));
 }
