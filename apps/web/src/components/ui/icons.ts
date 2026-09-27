@@ -73,6 +73,8 @@ export { MagnifyingGlassPlus as ZoomIn } from '@phosphor-icons/react/dist/csr/Ma
 export { MagnifyingGlassMinus as ZoomOut } from '@phosphor-icons/react/dist/csr/MagnifyingGlassMinus';
 export { CornersIn } from '@phosphor-icons/react/dist/csr/CornersIn';
 export { Rows } from '@phosphor-icons/react/dist/csr/Rows';
+export { Printer } from '@phosphor-icons/react/dist/csr/Printer';
+export { ShareNetwork as Share } from '@phosphor-icons/react/dist/csr/ShareNetwork';
 export { Funnel } from '@phosphor-icons/react/dist/csr/Funnel';
 export { SortAscending } from '@phosphor-icons/react/dist/csr/SortAscending';
 export { CaretUpDown } from '@phosphor-icons/react/dist/csr/CaretUpDown';

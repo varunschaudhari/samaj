@@ -3,14 +3,16 @@ import { useQuery } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Avatar, Badge, Card, Chip, EmptyState, ErrorState, Icon, Skeleton, buttonVariants } from '@/components/ui';
-import { ArrowLeft, Network, Rows, SearchX } from '@/components/ui/icons';
+import { Avatar, Badge, Card, Chip, EmptyState, ErrorState, Icon, IconButton, Skeleton, buttonVariants, toast } from '@/components/ui';
+import { ArrowLeft, Network, Printer, Rows, SearchX, Share, X } from '@/components/ui/icons';
 import { placeLabel } from '@/features/branches/api';
 import { type MessageKey, isMessageKey, useLanguageStore, useT } from '@/i18n';
 import { ApiError, api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useDisplayName } from './life';
-import { TreeChart, useGenerationLabel, usePersonLine } from './TreeChart';
+import { useMe } from '@/features/auth/api';
+import { kinshipFrom } from './kinship';
+import { type Kin, TreeChart, useGenerationLabel, usePersonLine } from './TreeChart';
 import { TreePersonModal } from './TreePersonModal';
 import { TreeSearch } from './TreeSearch';
 import { type ChartPerson, findPeople } from './tree-layout';
@@ -45,7 +47,7 @@ const savedView = (): View => {
   }
 };
 
-function PersonChip({ person, focused, matched, onOpen }: { person: ChartPerson; focused: boolean; matched: boolean; onOpen: (p: ChartPerson) => void }) {
+function PersonChip({ person, kin, focused, matched, onOpen }: { person: ChartPerson; kin: Kin; focused: boolean; matched: boolean; onOpen: (p: ChartPerson) => void }) {
   const displayName = useDisplayName();
   const line = usePersonLine();
   return (
@@ -65,7 +67,7 @@ function PersonChip({ person, focused, matched, onOpen }: { person: ChartPerson;
         <Avatar name={person.name} src={person.photoUrl} size="sm" className={cn(person.deceased && 'grayscale')} />
         <span className="flex min-w-0 flex-col leading-tight">
           <span className={cn('truncate text-sm text-fg', person.isHead && 'font-semibold')}>{displayName(person)}</span>
-          <span className="truncate text-xs text-fg-muted">{line(person)}</span>
+          <span className="truncate text-xs text-fg-muted">{line(person, kin)}</span>
         </span>
       </button>
     </li>
@@ -95,7 +97,21 @@ function HouseholdGroup({ household, people, children }: { household: TreeHouseh
 }
 
 /** Generations top to bottom; in each, the households that have people in it. */
-function TreeList({ tree, people, focusId, matches, onOpen }: { tree: FamilyTree; people: ChartPerson[]; focusId: string | null; matches: Set<string>; onOpen: (p: ChartPerson) => void }) {
+function TreeList({
+  tree,
+  people,
+  kin,
+  focusId,
+  matches,
+  onOpen,
+}: {
+  tree: FamilyTree;
+  people: ChartPerson[];
+  kin: Kin;
+  focusId: string | null;
+  matches: Set<string>;
+  onOpen: (p: ChartPerson) => void;
+}) {
   const generationLabel = useGenerationLabel();
   const t = useT();
   const generations = [...new Set(people.map((p) => p.generation))].sort((a, b) => a - b);
@@ -118,7 +134,7 @@ function TreeList({ tree, people, focusId, matches, onOpen }: { tree: FamilyTree
               const here = people.filter((p) => p.household.id === h.family.id && p.generation === g);
               return here.length > 0 ? (
                 <HouseholdGroup key={h.family.id} household={h} people={here}>
-                  {(p) => <PersonChip key={p.id} person={p} focused={p.id === focusId} matched={matches.has(p.id)} onOpen={onOpen} />}
+                  {(p) => <PersonChip key={p.id} person={p} kin={kin} focused={p.id === focusId} matched={matches.has(p.id)} onOpen={onOpen} />}
                 </HouseholdGroup>
               ) : null;
             })}
@@ -152,12 +168,39 @@ export function FamilyTreePage() {
   const [view, setView] = useState<View>(savedView);
   const [query, setQuery] = useState('');
   const [opened, setOpened] = useState<ChartPerson | null>(null);
+  const me = useMe();
+  // Whose point of view relations are shown from: the viewer, someone picked, or as each family lists them.
+  const [from, setFrom] = useState<string | 'me' | 'listed'>('me');
 
   const people = useMemo<ChartPerson[]>(
     () => tree.data?.households.flatMap((h) => h.members.map((m) => ({ ...m, household: h.family, rootHousehold: h.via === null, x: 0, y: 0 }))) ?? [],
     [tree.data],
   );
   const found = useMemo(() => findPeople(people, query), [people, query]);
+  const myId = people.some((p) => p.id === me.data?.memberId) ? (me.data?.memberId ?? null) : null;
+  const egoId = from === 'listed' ? null : from === 'me' ? myId : from;
+  const ego = people.find((p) => p.id === egoId);
+  const kin = useMemo<Kin>(() => (egoId ? { map: kinshipFrom(egoId, people), viewerIsEgo: egoId === myId } : null), [egoId, people, myId]);
+  const displayName = useDisplayName();
+
+  const share = async () => {
+    const url = `${window.location.origin}/families/${familyId}/tree`;
+    const title = t('tree.shareTitle', { name: tree.data?.households.find((h) => h.via === null)?.family.headName ?? '' });
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, url });
+      } catch {
+        // Closed without sharing.
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(t('tree.linkCopied'));
+    } catch {
+      toast.info(url);
+    }
+  };
   const matches = useMemo(() => new Set(found.map((p) => p.id)), [found]);
 
   const choose = (v: View) => {
@@ -201,7 +244,7 @@ export function FamilyTreePage() {
             <p className="text-sm text-fg">{t('tree.grow')}</p>
           </Card>
         )}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center print:hidden">
           <TreeSearch query={query} onQuery={setQuery} matches={found} onPick={focus} />
           <div className="flex gap-2" role="group" aria-label={t('tree.viewLabel')}>
             <Chip selected={view === 'chart'} icon={Network} onClick={() => choose('chart')}>
@@ -212,10 +255,30 @@ export function FamilyTreePage() {
             </Chip>
           </div>
         </div>
+        <div className="flex flex-wrap items-center gap-2 print:hidden" role="group" aria-label={t('tree.relFrom')}>
+          <span className="text-sm font-semibold text-fg-muted">{t('tree.relFrom')}</span>
+          <Chip selected={egoId === null} onClick={() => setFrom('listed')} className="px-3">
+            {t('tree.relListed')}
+          </Chip>
+          {myId && (
+            <Chip selected={egoId === myId} onClick={() => setFrom('me')} className="px-3">
+              {t('tree.relMe')}
+            </Chip>
+          )}
+          {ego && egoId !== myId && (
+            <Chip selected onClick={() => setFrom(myId ? 'me' : 'listed')} icon={X} className="px-3">
+              {t('tree.relPerson', { name: displayName(ego) })}
+            </Chip>
+          )}
+          <div className="ms-auto flex gap-1">
+            <IconButton icon={Printer} label={t('tree.print')} onClick={() => window.print()} />
+            <IconButton icon={Share} label={t('tree.share')} onClick={() => void share()} />
+          </div>
+        </div>
         {view === 'chart' ? (
-          <TreeChart tree={tree.data} focusId={focusId} matches={matches} onOpen={setOpened} />
+          <TreeChart tree={tree.data} kin={kin} focusId={focusId} matches={matches} onOpen={setOpened} />
         ) : (
-          <TreeList tree={tree.data} people={people} focusId={focusId} matches={matches} onOpen={setOpened} />
+          <TreeList tree={tree.data} people={people} kin={kin} focusId={focusId} matches={matches} onOpen={setOpened} />
         )}
         {truncated && <p className="text-center text-sm text-fg-muted">{t('tree.truncated')}</p>}
         {side.length > 0 && (
@@ -253,10 +316,22 @@ export function FamilyTreePage() {
   const root = tree.data?.households.find((h) => h.via === null);
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
-      <div>{back}</div>
+      <div className="print:hidden">{back}</div>
       <PageHeader title={t('tree.title')} description={root ? t('family.title', { name: root.family.headName }) : <Skeleton className="h-4 w-40" />} />
       {body}
-      <TreePersonModal person={opened} people={people} households={tree.data?.households ?? []} onFocus={focus} onClose={() => setOpened(null)} />
+      <TreePersonModal
+        person={opened}
+        people={people}
+        households={tree.data?.households ?? []}
+        kin={kin}
+        ego={ego ?? null}
+        onFocus={focus}
+        onFromHere={(p) => {
+          setFrom(p.id === myId ? 'me' : p.id);
+          setOpened(null);
+        }}
+        onClose={() => setOpened(null)}
+      />
     </div>
   );
 }

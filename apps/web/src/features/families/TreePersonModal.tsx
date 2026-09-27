@@ -7,7 +7,7 @@ import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useSamePerson } from './api';
 import { useDisplayName } from './life';
-import { usePersonLine } from './TreeChart';
+import { type Kin, usePersonLine, useRelationLabel } from './TreeChart';
 import type { ChartPerson } from './tree-layout';
 
 /** One person from the tree: who they are to whom, and the way to their family. */
@@ -15,19 +15,28 @@ export function TreePersonModal({
   person,
   people,
   households,
+  kin,
+  ego,
   onFocus,
+  onFromHere,
   onClose,
 }: {
   person: ChartPerson | null;
   people: ChartPerson[];
   households: TreeHousehold[];
+  kin: Kin;
+  /** Whose point of view relations are shown from, if anyone's. */
+  ego: ChartPerson | null;
   onFocus: (p: ChartPerson) => void;
+  /** Show everyone's relation to this person. */
+  onFromHere: (p: ChartPerson) => void;
   onClose: () => void;
 }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
   const displayName = useDisplayName();
   const line = usePersonLine();
+  const relation = useRelationLabel();
   const errorMessage = useErrorMessage();
   const same = useSamePerson();
   const [twin, setTwin] = useState<string | null>(null);
@@ -65,7 +74,7 @@ export function TreePersonModal({
     ));
 
   return (
-    <Modal open onClose={onClose} title={displayName(person)} description={line(person)}>
+    <Modal open onClose={onClose} title={displayName(person)} description={line(person, kin)}>
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-4">
           <Avatar name={person.name} src={person.photoUrl} size="xl" className={cn(person.deceased && 'grayscale')} />
@@ -76,6 +85,16 @@ export function TreePersonModal({
           </div>
         </div>
         <dl className="flex flex-col gap-3 text-sm">
+          {kin && ego && ego.id !== person.id && kin.map.has(person.id) && (
+            <div>
+              <dt className="text-xs font-semibold text-fg-muted">{kin.viewerIsEgo ? t('tree.toYou') : t('tree.toPerson', { name: displayName(ego) })}</dt>
+              <dd className="font-semibold text-fg">{relation(person, kin)}</dd>
+            </div>
+          )}
+          <div>
+            <dt className="text-xs font-semibold text-fg-muted">{t('tree.asListed')}</dt>
+            <dd className="text-fg">{person.isHead ? t('family.headBadge') : t(`relation.${person.relation}`)}</dd>
+          </div>
           <div>
             <dt className="text-xs font-semibold text-fg-muted">{t('tree.household')}</dt>
             <dd className="text-fg">
@@ -151,6 +170,11 @@ export function TreePersonModal({
           </details>
         )}
         <div className="flex flex-wrap gap-2">
+          {ego?.id !== person.id && (
+            <Button variant="secondary" size="sm" onClick={() => onFromHere(person)}>
+              {t('tree.fromHere', { name: displayName(person) })}
+            </Button>
+          )}
           <Link to={`/families/${person.household.id}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
             {t('tree.openFamily')}
           </Link>

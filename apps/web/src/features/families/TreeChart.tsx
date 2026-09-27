@@ -1,8 +1,9 @@
 import type { FamilyTree } from '@samaj/shared';
 import { type PointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Avatar, Icon, IconButton } from '@/components/ui';
 import { CornersIn, House, ZoomIn, ZoomOut } from '@/components/ui/icons';
-import { type MessageKey, isMessageKey, useT } from '@/i18n';
+import { type MessageKey, formatNumber, isMessageKey, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useDisplayName, useLifeLabel } from './life';
 import { CARD_H, CARD_W, type ChartPerson, layoutTree } from './tree-layout';
@@ -11,7 +12,12 @@ const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 1.6;
 /** Fitting a big tree on screen never starts smaller than this; "Fit" goes further on request. */
 const READABLE_ZOOM = 0.8;
+/** A4 landscape, less the margins, at 96 dpi. */
+const PRINT_WIDTH = 1040;
 const clamp = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100));
+
+/** Everyone's relation to one person, from kinshipFrom; `viewerIsEgo` when that person is the one looking. */
+export type Kin = { map: Map<string, MessageKey>; viewerIsEgo: boolean } | null;
 
 /** "Grandparents", "Children"… relative to the head of the family the tree is drawn for. */
 export function useGenerationLabel() {
@@ -23,23 +29,30 @@ export function useGenerationLabel() {
   };
 }
 
+/** Who someone is: to the chosen person when there is one ("Your काका"), otherwise as their family lists them. */
+export function useRelationLabel() {
+  const t = useT();
+  return (p: ChartPerson, kin: Kin) => {
+    const key = kin?.map.get(p.id);
+    if (key === 'kin.self') return kin?.viewerIsEgo ? t('member.sheet.you') : t('kin.self');
+    // Joined to them some longer way: say so, rather than a relation to someone else.
+    if (key) return t(key);
+    return p.isHead ? t('family.headBadge') : t(`relation.${p.relation}`);
+  };
+}
+
 /** "Son · adopted · Age 12", as short as it can be on a card. */
 export function usePersonLine() {
   const t = useT();
   const life = useLifeLabel();
-  return (p: ChartPerson) =>
-    [
-      p.isHead ? t('family.headBadge') : t(`relation.${p.relation}`),
-      p.adopted ? t('member.adopted') : null,
-      p.formerPartner ? t('member.formerBadge') : null,
-      life(p),
-      p.movedTo ? t('tree.married') : null,
-    ]
+  const relation = useRelationLabel();
+  return (p: ChartPerson, kin: Kin = null) =>
+    [relation(p, kin), p.adopted ? t('member.adopted') : null, p.formerPartner ? t('member.formerBadge') : null, life(p), p.movedTo ? t('tree.married') : null]
       .filter(Boolean)
       .join(' · ');
 }
 
-function PersonCard({ person, focused, matched, onOpen }: { person: ChartPerson; focused: boolean; matched: boolean; onOpen: (p: ChartPerson) => void }) {
+function PersonCard({ person, kin, focused, matched, onOpen }: { person: ChartPerson; kin: Kin; focused: boolean; matched: boolean; onOpen: (p: ChartPerson) => void }) {
   const t = useT();
   const displayName = useDisplayName();
   const line = usePersonLine();
@@ -49,10 +62,10 @@ function PersonCard({ person, focused, matched, onOpen }: { person: ChartPerson;
       type="button"
       data-person={person.id}
       onClick={() => onOpen(person)}
-      aria-label={`${displayName(person)}, ${line(person)}, ${family}`}
+      aria-label={`${displayName(person)}, ${line(person, kin)}, ${family}`}
       style={{ left: person.x, top: person.y, width: CARD_W, height: CARD_H }}
       className={cn(
-        'absolute flex items-center gap-2 rounded-md border px-2 text-left shadow-card transition-shadow duration-150 hover:shadow-raised',
+        'absolute flex items-center gap-2 rounded-md border px-2 text-left shadow-card transition-shadow duration-150 hover:shadow-raised print:shadow-none',
         person.deceased ? 'bg-surface-muted' : 'bg-surface',
         person.movedTo ? 'border-dashed border-line-strong' : person.isHead && person.rootHousehold ? 'border-primary' : 'border-line',
         matched && 'ring-2 ring-zari',
@@ -62,7 +75,7 @@ function PersonCard({ person, focused, matched, onOpen }: { person: ChartPerson;
       <Avatar name={person.name} src={person.photoUrl} size="md" className={cn(person.deceased && 'grayscale')} />
       <span className="flex min-w-0 flex-1 flex-col leading-tight">
         <span className="line-clamp-2 text-sm font-semibold break-words text-fg">{displayName(person)}</span>
-        <span className="truncate text-xs text-fg-muted">{line(person)}</span>
+        <span className="truncate text-xs text-fg-muted">{line(person, kin)}</span>
       </span>
       {person.isHead && <Icon icon={House} size="sm" weight="fill" className="shrink-0 text-primary" />}
     </button>
@@ -72,22 +85,29 @@ function PersonCard({ person, focused, matched, onOpen }: { person: ChartPerson;
 /**
  * The tree as a chart: generations top to bottom, lines from parents to
  * children, partners side by side. Scrolls both ways, drags with a mouse,
- * zooms, and centres on the person asked for (or the family's head).
+ * zooms, folds branches away, prints on one landscape page, and centres on
+ * the person asked for (or the family's head).
  */
 export function TreeChart({
   tree,
+  kin,
   focusId,
   matches,
   onOpen,
 }: {
   tree: FamilyTree;
+  kin: Kin;
   focusId: string | null;
   matches: Set<string>;
   onOpen: (p: ChartPerson) => void;
 }) {
   const t = useT();
+  const language = useLanguageStore((s) => s.language);
   const generationLabel = useGenerationLabel();
-  const layout = useMemo(() => layoutTree(tree), [tree]);
+  const displayName = useDisplayName();
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  const layout = useMemo(() => layoutTree(tree, collapsed), [tree, collapsed]);
+  const everyone = useMemo(() => new Map(tree.households.flatMap((h) => h.members.map((m) => [m.id, m] as const))), [tree]);
   const scroller = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
@@ -130,23 +150,60 @@ export function TreeChart({
     return el && layout.width > 0 ? clamp(Math.min(1, (el.clientWidth - 8) / layout.width)) : 1;
   }, [layout.width]);
 
-  // First view: as large as fits but readable (a wide tree scrolls instead), on the person asked for or the family's head.
+  // First view of each tree: as large as fits but readable (a wide tree scrolls instead), on the person asked for or the family's head.
+  const latest = useRef({ layout, fitZoom, centreOf });
+  latest.current = { layout, fitZoom, centreOf };
   const focusAtStart = useRef(focusId);
+  const glided = useRef(focusId);
   useLayoutEffect(() => {
-    const head = layout.people.find((p) => p.rootHousehold && p.isHead);
-    zoomTo(Math.max(fitZoom(), READABLE_ZOOM), centreOf(focusAtStart.current) ?? centreOf(head?.id) ?? { x: layout.width / 2, y: 0 });
+    const { layout: now, fitZoom: fit, centreOf: centre } = latest.current;
+    const head = now.people.find((p) => p.rootHousehold && p.isHead);
+    zoomTo(Math.max(fit(), READABLE_ZOOM), centre(focusAtStart.current) ?? centre(head?.id) ?? { x: now.width / 2, y: 0 });
     // Opened on someone (from their card): make sure the chart itself is on screen.
     if (focusAtStart.current) scroller.current?.scrollIntoView({ block: 'nearest' });
-  }, [layout, fitZoom, zoomTo, centreOf]);
-  // Someone picked later: glide to them.
+  }, [tree, zoomTo]);
+
+  // Someone picked later: open the branches hiding them, then glide to them.
   useEffect(() => {
-    if (focusId === focusAtStart.current) return;
-    focusAtStart.current = null;
+    if (!focusId || focusId === glided.current) return;
     const point = centreOf(focusId);
-    if (!point) return;
+    if (!point) {
+      const open = new Set(collapsed);
+      for (let at = everyone.get(focusId), i = 0; at && i < 64; i++) {
+        if (at.partnerId) open.delete(at.partnerId);
+        if (at.parentId) open.delete(at.parentId);
+        at = at.parentId ? everyone.get(at.parentId) : undefined;
+      }
+      if (open.size !== collapsed.size) setCollapsed(open);
+      return;
+    }
+    glided.current = focusId;
     scroller.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     scrollToPoint(point, zoomNow.current, true);
-  }, [focusId, centreOf, scrollToPoint]);
+  }, [focusId, centreOf, scrollToPoint, collapsed, everyone]);
+
+  // The browser's own print (or the Print button): the whole tree on one landscape page.
+  useEffect(() => {
+    let before = 1;
+    const onBefore = () => {
+      before = zoomNow.current;
+      flushSync(() => setZoom(Math.max(0.2, Math.min(1, PRINT_WIDTH / Math.max(1, latest.current.layout.width)))));
+    };
+    const onAfter = () => setZoom(before);
+    window.addEventListener('beforeprint', onBefore);
+    window.addEventListener('afterprint', onAfter);
+    return () => {
+      window.removeEventListener('beforeprint', onBefore);
+      window.removeEventListener('afterprint', onAfter);
+    };
+  }, []);
+
+  const toggle = (id: string) =>
+    setCollapsed((now) => {
+      const next = new Set(now);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
 
   // Drag the background to move around (touch screens scroll natively).
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
@@ -168,7 +225,7 @@ export function TreeChart({
   return (
     <div>
       <div className="relative">
-        <div className="absolute right-2 bottom-2 z-10 flex gap-1 rounded-md border border-line bg-surface p-1 shadow-raised">
+        <div className="absolute right-2 bottom-2 z-10 flex gap-1 rounded-md border border-line bg-surface p-1 shadow-raised print:hidden">
           <IconButton icon={ZoomOut} label={t('tree.zoomOut')} onClick={() => zoomTo(clamp(zoom - 0.15), viewCentre())} disabled={zoom <= MIN_ZOOM} />
           <IconButton icon={ZoomIn} label={t('tree.zoomIn')} onClick={() => zoomTo(clamp(zoom + 0.15), viewCentre())} disabled={zoom >= MAX_ZOOM} />
           <IconButton icon={CornersIn} label={t('tree.fit')} onClick={() => zoomTo(fitZoom(), { x: layout.width / 2, y: layout.height / 2 })} />
@@ -181,7 +238,7 @@ export function TreeChart({
           onPointerCancel={endDrag}
           // No taller than the tree, so a small family isn't a big empty box; clear of the phone's bottom bar when scrolled to.
           style={{ maxHeight: Math.max(240, layout.height * zoom + 2) }}
-          className="h-[70dvh] scroll-mb-24 cursor-grab overflow-auto overscroll-contain rounded-md border border-line bg-canvas active:cursor-grabbing md:scroll-mb-4"
+          className="h-[70dvh] scroll-mb-24 cursor-grab overflow-auto overscroll-contain rounded-md border border-line bg-canvas active:cursor-grabbing md:scroll-mb-4 print:h-auto print:max-h-none! print:overflow-visible print:border-0"
         >
           <div className="relative" style={{ width: layout.width, height: layout.height, zoom }}>
             <svg width={layout.width} height={layout.height} className="absolute inset-0" aria-hidden="true">
@@ -216,12 +273,32 @@ export function TreeChart({
               </div>
             ))}
             {layout.people.map((p) => (
-              <PersonCard key={p.id} person={p} focused={p.id === focusId} matched={matches.has(p.id)} onOpen={onOpen} />
+              <PersonCard key={p.id} person={p} kin={kin} focused={p.id === focusId} matched={matches.has(p.id)} onOpen={onOpen} />
             ))}
+            {layout.toggles.map((g) => {
+              const name = displayName(everyone.get(g.id) ?? { name: '', deceased: false });
+              return (
+                <button
+                  key={`t${g.id}`}
+                  type="button"
+                  onClick={() => toggle(g.id)}
+                  aria-expanded={!g.collapsed}
+                  aria-label={g.collapsed ? t('tree.expand', { count: formatNumber(g.hidden, language), name }) : t('tree.collapse', { name })}
+                  title={g.collapsed ? t('tree.expand', { count: formatNumber(g.hidden, language), name }) : t('tree.collapse', { name })}
+                  style={{ left: g.x, top: g.y }}
+                  className={cn(
+                    'absolute flex h-6 min-w-6 -translate-x-1/2 items-center justify-center rounded-full border border-line-strong bg-surface px-1.5 text-xs font-semibold text-fg-muted hover:text-fg print:hidden',
+                    g.collapsed && 'border-primary text-primary',
+                  )}
+                >
+                  {g.collapsed ? `+${formatNumber(g.hidden, language)}` : '−'}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
-      <p className="mt-2 text-xs text-fg-muted">{t('tree.chartHint')}</p>
+      <p className="mt-2 text-xs text-fg-muted print:hidden">{t('tree.chartHint')}</p>
     </div>
   );
 }

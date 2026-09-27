@@ -168,3 +168,11 @@
     }
   }
 }
+
+/* Printing (the family tree's Print button, or the browser's): one landscape page, no app chrome. */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+}

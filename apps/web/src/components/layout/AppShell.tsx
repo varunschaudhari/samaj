@@ -51,7 +51,7 @@ export function AppShell() {
   const signOut = () => logout.mutate(undefined, { onSettled: () => toast.info(t('auth.loggedOut')) });
 
   return (
-    <div className="min-h-dvh bg-canvas md:grid md:grid-cols-[15rem_1fr]">
+    <div className="min-h-dvh bg-canvas md:grid md:grid-cols-[15rem_1fr] print:block print:bg-transparent">
       {loadingPage && (
         <div role="progressbar" aria-label={t('common.loading')} className="fixed inset-x-0 top-0 z-50 h-1 overflow-hidden bg-zari-soft">
           <div className="h-full w-1/3 animate-page-load rounded-full bg-zari" />
@@ -65,7 +65,7 @@ export function AppShell() {
       </a>
 
       {/* Sidebar, md and up */}
-      <aside className="sticky top-0 hidden h-dvh flex-col gap-6 overflow-y-auto border-r border-line bg-surface px-3 py-5 md:flex">
+      <aside className="sticky top-0 hidden h-dvh flex-col gap-6 overflow-y-auto border-r border-line bg-surface px-3 py-5 md:flex print:hidden">
         <BrandMark className="px-3" />
         <nav aria-label={t('nav.primary')} className="flex flex-col gap-1">
           {items.map((item) => (
@@ -99,7 +99,7 @@ export function AppShell() {
 
       <div className="flex min-w-0 flex-col">
         {/* Top bar, phones */}
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-line bg-surface/95 py-2 pr-2 pl-4 backdrop-blur md:hidden">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-line bg-surface/95 py-2 pr-2 pl-4 backdrop-blur md:hidden print:hidden">
           <BrandMark />
           <div className="flex items-center gap-1">
             <LanguageSwitch />
@@ -123,14 +123,14 @@ export function AppShell() {
             {t('offline.banner')}
           </p>
         )}
-        <main id="main" tabIndex={-1} className="flex-1 px-4 pt-5 pb-28 focus:outline-none sm:px-6 md:px-8 md:pt-8 md:pb-12">
+        <main id="main" tabIndex={-1} className="flex-1 px-4 pt-5 pb-28 focus:outline-none sm:px-6 md:px-8 md:pt-8 md:pb-12 print:p-0">
           <Outlet />
         </main>
 
         {/* Bottom tab bar, phones */}
         <nav
           aria-label={t('nav.primary')}
-          className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+          className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden print:hidden"
         >
           {tabBarItems(role).map((item) => (
             <NavLink

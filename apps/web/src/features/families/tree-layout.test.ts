@@ -104,6 +104,14 @@ describe('layoutTree', () => {
     expect(twice.couples.map((c) => c.former)).toEqual([false, true]);
   });
 
+  it('hides a branch below a couple, counting who is hidden', () => {
+    const folded = layoutTree(tree, new Set(['Rohit']));
+    expect(folded.people.map((p) => p.id)).not.toContain('Aarav');
+    expect(folded.toggles.find((g) => g.id === 'Rohit')).toMatchObject({ collapsed: true, hidden: 1 });
+    expect(folded.toggles.find((g) => g.id === 'Anil')).toMatchObject({ collapsed: false, hidden: 5 });
+    expect(layoutTree(tree, new Set(['Anil'])).people.map((p) => p.id).sort()).toEqual(['Anil', 'Dev', 'Sunita']);
+  });
+
   it('survives a loop in the data', () => {
     const loop = layoutTree(treeOf([person('A', 'son', 1, { parentId: 'B' }), person('B', 'son', 1, { parentId: 'A' })]));
     expect(loop.people).toHaveLength(2);

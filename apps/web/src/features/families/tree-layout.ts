@@ -39,6 +39,8 @@ export interface ChartLayout {
   /** Someone whose parents the family hasn't said yet: a short dashed stub above them. */
   stubs: { x: number; y: number }[];
   rows: { generation: number; y: number }[];
+  /** Under each couple with children: show or hide everyone below them. */
+  toggles: { id: string; x: number; y: number; collapsed: boolean; hidden: number }[];
   width: number;
   height: number;
 }
@@ -52,11 +54,11 @@ const byAge = (a: ChartPerson, b: ChartPerson) => (a.birthYear ?? 9999) - (b.bir
  * partnerId), so this only arranges what it is given, and survives loops in
  * it.
  */
-export function layoutTree(tree: FamilyTree): ChartLayout {
+export function layoutTree(tree: FamilyTree, collapsed: ReadonlySet<string> = new Set()): ChartLayout {
   const people: ChartPerson[] = tree.households.flatMap((h) =>
     h.members.map((m) => ({ ...m, household: h.family, rootHousehold: h.via === null, x: 0, y: 0 })),
   );
-  if (people.length === 0) return { people, connectors: [], couples: [], stubs: [], rows: [], width: 0, height: 0 };
+  if (people.length === 0) return { people, connectors: [], couples: [], stubs: [], rows: [], toggles: [], width: 0, height: 0 };
   const byId = new Map(people.map((p) => [p.id, p]));
   const generations = [...new Set(people.map((p) => p.generation))].sort((a, b) => a - b);
   const minGeneration = generations[0] ?? 0;
@@ -116,26 +118,39 @@ export function layoutTree(tree: FamilyTree): ChartLayout {
   // The family the tree is drawn for comes first in its generation.
   roots.sort((a, b) => a.generation - b.generation || Number(anchor(b).rootHousehold) - Number(anchor(a).rootHousehold) || byAge(anchor(a), anchor(b)));
 
+  // Everyone below a couple, for the count on a hidden branch.
+  const below = new Map<Unit, number>();
+  const count = (u: Unit): number => {
+    const n = u.children.reduce((sum, c) => sum + c.people.length + count(c), 0);
+    below.set(u, n);
+    return n;
+  };
+  roots.forEach(count);
+  // A hidden branch keeps its couple, not what's below.
+  const kids = (u: Unit) => (collapsed.has(anchor(u).id) ? [] : u.children);
+
   const ownWidth = (u: Unit) => u.people.length * CARD_W + (u.people.length - 1) * COUPLE_GAP;
   const span = new Map<Unit, number>();
-  const childrenWidth = (u: Unit) => u.children.reduce((sum, c) => sum + (span.get(c) ?? 0), 0) + SIBLING_GAP * Math.max(0, u.children.length - 1);
+  const childrenWidth = (u: Unit) => kids(u).reduce((sum, c) => sum + (span.get(c) ?? 0), 0) + SIBLING_GAP * Math.max(0, kids(u).length - 1);
   const measure = (u: Unit): number => {
-    u.children.forEach(measure);
+    kids(u).forEach(measure);
     const width = Math.max(ownWidth(u), childrenWidth(u));
     span.set(u, width);
     return width;
   };
   roots.forEach(measure);
 
+  const shown = new Set<Unit>();
   const place = (u: Unit, left: number) => {
+    shown.add(u);
     const width = span.get(u) ?? ownWidth(u);
     let x = left + (width - childrenWidth(u)) / 2;
-    for (const c of u.children) {
+    for (const c of kids(u)) {
       place(c, x);
       x += (span.get(c) ?? 0) + SIBLING_GAP;
     }
-    const first = u.children[0];
-    const last = u.children.at(-1);
+    const first = kids(u)[0];
+    const last = kids(u).at(-1);
     // Centre the couple over the first and last child.
     const centre = first && last ? (anchor(first).x + anchor(last).x + CARD_W) / 2 : left + width / 2;
     u.x = Math.min(Math.max(centre - ownWidth(u) / 2, left), left + width - ownWidth(u));
@@ -152,7 +167,8 @@ export function layoutTree(tree: FamilyTree): ChartLayout {
 
   const connectors: ChartLayout['connectors'] = [];
   const couples: ChartLayout['couples'] = [];
-  for (const u of units) {
+  const visible = units.filter((u) => shown.has(u));
+  for (const u of visible) {
     const y = rowY(u.generation);
     const first = anchor(u);
     u.people.slice(1).forEach((p, i) => {
@@ -163,7 +179,7 @@ export function layoutTree(tree: FamilyTree): ChartLayout {
             `M${first.x + (CARD_W * 3) / 4},${y} V${y - 10} H${p.x + CARD_W / 2} V${y}`;
       couples.push({ path, former: p.formerPartner });
     });
-    for (const c of u.children) {
+    for (const c of kids(u)) {
       const child = anchor(c);
       const other = otherParent(u, child);
       connectors.push({
@@ -177,9 +193,10 @@ export function layoutTree(tree: FamilyTree): ChartLayout {
       });
     }
   }
-  for (const p of people.filter(standsBeside)) {
+  const onChart = visible.flatMap((u) => u.people);
+  for (const p of onChart.filter(standsBeside)) {
     const parents = p.parentId ? unitOf.get(p.parentId) : undefined;
-    if (!parents) continue;
+    if (!parents || !shown.has(parents)) continue;
     connectors.push({
       x1: parents.x + ownWidth(parents) / 2,
       y1: rowY(parents.generation) + CARD_H,
@@ -196,12 +213,17 @@ export function layoutTree(tree: FamilyTree): ChartLayout {
     return PARENT_CHOICES[p.relation] && !p.parentId ? [{ x: p.x + CARD_W / 2, y: p.y }] : [];
   });
 
+  const toggles = visible
+    .filter((u) => u.children.length > 0)
+    .map((u) => ({ id: anchor(u).id, x: u.x + ownWidth(u) / 2, y: rowY(u.generation) + CARD_H + 8, collapsed: collapsed.has(anchor(u).id), hidden: below.get(u) ?? 0 }));
+
   return {
-    people,
+    people: onChart,
     connectors,
     couples,
     stubs,
-    rows: generations.map((g) => ({ generation: g, y: rowY(g) })),
+    toggles,
+    rows: [...new Set(onChart.map((p) => p.generation))].sort((a, b) => a - b).map((g) => ({ generation: g, y: rowY(g) })),
     width: left - ROOT_GAP + PAD,
     height: rowY(generations.at(-1) ?? 0) + CARD_H + PAD,
   };
