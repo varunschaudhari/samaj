@@ -84,18 +84,47 @@ export function draftErrors(d: InvitationDraft): Record<string, string> {
   return Object.fromEntries(parsed.error.issues.map((i) => [i.path.join('.'), i.message]));
 }
 
+/** The form's parts, shown one per step when creating and all together when editing. */
+export type FormSection = 'occasion' | 'functions' | 'patrika';
+export const FORM_SECTIONS: FormSection[] = ['occasion', 'functions', 'patrika'];
+
+/** Which part of the form an error belongs to, from its path ("functions.0.name"). */
+export const SECTION_OF: Record<string, FormSection> = {
+  kind: 'occasion',
+  theme: 'occasion',
+  forNames: 'occasion',
+  functions: 'functions',
+  honorees: 'patrika',
+  kripa: 'patrika',
+  blessings: 'patrika',
+  inviters: 'patrika',
+  memorialMemberId: 'patrika',
+  message: 'patrika',
+};
+export const sectionErrors = (errors: Record<string, string>, section: FormSection) => Object.keys(errors).filter((path) => SECTION_OF[path.split('.')[0] ?? ''] === section);
+
 /**
  * What the occasion is, whose it is, each function with its time and
  * place, and a message: everything on the card.
  */
-export function InvitationForm({ draft, onChange, errors }: { draft: InvitationDraft; onChange: (d: InvitationDraft) => void; errors: Record<string, string> }) {
+export function InvitationForm({
+  draft,
+  onChange,
+  errors,
+  sections = FORM_SECTIONS,
+}: {
+  draft: InvitationDraft;
+  onChange: (d: InvitationDraft) => void;
+  errors: Record<string, string>;
+  sections?: FormSection[];
+}) {
   const t = useT();
   const set = (patch: Partial<InvitationDraft>) => onChange({ ...draft, ...patch });
   const setFunction = (i: number, patch: Partial<FunctionDraft>) => set({ functions: draft.functions.map((f, j) => (j === i ? { ...f, ...patch } : f)) });
   const err = (path: string) => fieldError(t, errors[path]);
 
-  return (
-    <div className="flex flex-col gap-5">
+  const occasion = (
+    <>
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-1 text-sm font-semibold text-fg">{t('invite.form.kind')}</legend>
         {[
@@ -114,63 +143,77 @@ export function InvitationForm({ draft, onChange, errors }: { draft: InvitationD
           </div>
         ))}
       </fieldset>
-
       <ThemePicker kind={draft.kind} value={draft.theme} onChange={(theme) => set({ theme })} />
-
       <Input label={t('invite.form.forNames')} labelSuffix={t('common.optional')} hint={t('invite.form.forNamesHint')} value={draft.forNames} onChange={(e) => set({ forNames: e.target.value })} error={err('forNames')} />
+    </>
+  );
 
-      <fieldset className="flex flex-col gap-3">
-        <legend className="mb-1 text-sm font-semibold text-fg">{t('invite.form.functions')}</legend>
-        <p className="-mt-2 text-sm text-fg-muted">{t('invite.form.functionsHint')}</p>
-        <TemplatePicker draft={draft} onChange={onChange} />
-        {draft.functions.map((f, i) => (
-          <div key={f.id ?? i} className="flex flex-col gap-3 rounded-md border border-line p-3">
-            <div className="flex items-end gap-2">
-              <Input label={t('invite.form.functionName')} value={f.name} onChange={(e) => setFunction(i, { name: e.target.value })} error={err(`functions.${i}.name`)} fieldClassName="flex-1" />
-              {draft.functions.length > 1 && (
-                <Button variant="ghost" size="sm" leadingIcon={Trash2} aria-label={t('invite.form.removeFunction')} onClick={() => set({ functions: draft.functions.filter((_, j) => j !== i) })} />
-              )}
-            </div>
-            {FUNCTION_NAMES[draft.kind].length > 0 && (
-              <div className="-mt-1 flex flex-wrap gap-1.5">
-                {FUNCTION_NAMES[draft.kind].map((name) => (
-                  <Chip key={name} selected={f.name === name} onClick={() => setFunction(i, { name })} className="min-h-9 px-3 text-xs">
-                    {name}
-                  </Chip>
-                ))}
-              </div>
+  const functions = (
+    <fieldset className="flex flex-col gap-3">
+      <legend className="mb-1 text-sm font-semibold text-fg">{t('invite.form.functions')}</legend>
+      <p className="-mt-2 text-sm text-fg-muted">{t('invite.form.functionsHint')}</p>
+      <TemplatePicker draft={draft} onChange={onChange} />
+      {draft.functions.map((f, i) => (
+        <div key={f.id ?? i} className="flex flex-col gap-3 rounded-md border border-line bg-surface p-3 shadow-card">
+          <div className="flex items-end gap-2">
+            <span className="mb-2.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-zari-soft text-sm font-semibold text-zari-fg tabular-nums" aria-hidden="true">
+              {i + 1}
+            </span>
+            <Input label={t('invite.form.functionName')} value={f.name} onChange={(e) => setFunction(i, { name: e.target.value })} error={err(`functions.${i}.name`)} fieldClassName="flex-1" />
+            {draft.functions.length > 1 && (
+              <Button variant="ghost" size="sm" leadingIcon={Trash2} aria-label={t('invite.form.removeFunction')} onClick={() => set({ functions: draft.functions.filter((_, j) => j !== i) })} />
             )}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input type="datetime-local" label={t('invite.form.starts')} value={f.startsLocal} onChange={(e) => setFunction(i, { startsLocal: e.target.value })} error={err(`functions.${i}.startsAt`)} />
-              <Input type="datetime-local" label={t('invite.form.ends')} labelSuffix={t('common.optional')} value={f.endsLocal} onChange={(e) => setFunction(i, { endsLocal: e.target.value })} error={err(`functions.${i}.endsAt`)} />
-            </div>
-            {HAS_MUHURAT.includes(draft.kind) && (
-              <Input
-                type="datetime-local"
-                label={t('invite.form.muhurat')}
-                labelSuffix={t('common.optional')}
-                hint={t('invite.form.muhuratHint')}
-                value={f.muhuratLocal}
-                onChange={(e) => setFunction(i, { muhuratLocal: e.target.value })}
-                error={err(`functions.${i}.muhuratAt`)}
-              />
-            )}
-            <Input label={t('invite.form.venue')} value={f.venue} onChange={(e) => setFunction(i, { venue: e.target.value })} error={err(`functions.${i}.venue`)} />
-            <Input label={t('invite.form.mapUrl')} labelSuffix={t('common.optional')} inputMode="url" value={f.mapUrl} onChange={(e) => setFunction(i, { mapUrl: e.target.value })} error={err(`functions.${i}.mapUrl`)} />
           </div>
-        ))}
-        {errors.functions && <p className="text-sm text-danger">{err('functions')}</p>}
-        {draft.functions.length < MAX_INVITATION_FUNCTIONS && (
-          <Button variant="secondary" size="sm" leadingIcon={Plus} className="self-start" onClick={() => set({ functions: [...draft.functions, { ...emptyFunction(), venue: draft.functions.at(-1)?.venue ?? '' }] })}>
-            {t('invite.form.addFunction')}
-          </Button>
-        )}
-      </fieldset>
+          {FUNCTION_NAMES[draft.kind].length > 0 && (
+            <div className="-mt-1 flex flex-wrap gap-1.5">
+              {FUNCTION_NAMES[draft.kind].map((name) => (
+                <Chip key={name} selected={f.name === name} onClick={() => setFunction(i, { name })} className="min-h-9 px-3 text-xs">
+                  {name}
+                </Chip>
+              ))}
+            </div>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input type="datetime-local" label={t('invite.form.starts')} value={f.startsLocal} onChange={(e) => setFunction(i, { startsLocal: e.target.value })} error={err(`functions.${i}.startsAt`)} />
+            <Input type="datetime-local" label={t('invite.form.ends')} labelSuffix={t('common.optional')} value={f.endsLocal} onChange={(e) => setFunction(i, { endsLocal: e.target.value })} error={err(`functions.${i}.endsAt`)} />
+          </div>
+          {HAS_MUHURAT.includes(draft.kind) && (
+            <Input
+              type="datetime-local"
+              label={t('invite.form.muhurat')}
+              labelSuffix={t('common.optional')}
+              hint={t('invite.form.muhuratHint')}
+              value={f.muhuratLocal}
+              onChange={(e) => setFunction(i, { muhuratLocal: e.target.value })}
+              error={err(`functions.${i}.muhuratAt`)}
+            />
+          )}
+          <Input label={t('invite.form.venue')} value={f.venue} onChange={(e) => setFunction(i, { venue: e.target.value })} error={err(`functions.${i}.venue`)} />
+          <Input label={t('invite.form.mapUrl')} labelSuffix={t('common.optional')} inputMode="url" value={f.mapUrl} onChange={(e) => setFunction(i, { mapUrl: e.target.value })} error={err(`functions.${i}.mapUrl`)} />
+        </div>
+      ))}
+      {errors.functions && <p className="text-sm text-danger">{err('functions')}</p>}
+      {draft.functions.length < MAX_INVITATION_FUNCTIONS && (
+        <Button variant="secondary" size="sm" leadingIcon={Plus} className="self-start" onClick={() => set({ functions: [...draft.functions, { ...emptyFunction(), venue: draft.functions.at(-1)?.venue ?? '' }] })}>
+          {t('invite.form.addFunction')}
+        </Button>
+      )}
+    </fieldset>
+  );
 
+  const patrika = (
+    <>
       <PatrikaDetails draft={draft} onChange={onChange} errors={errors} />
-
       <WordingChips draft={draft} onChange={onChange} />
       <Textarea label={t('invite.form.message')} labelSuffix={t('common.optional')} hint={t('invite.form.messageHint')} rows={3} maxLength={1000} value={draft.message} onChange={(e) => set({ message: e.target.value })} error={err('message')} />
+    </>
+  );
+
+  return (
+    <div className="flex flex-col gap-5">
+      {sections.includes('occasion') && occasion}
+      {sections.includes('functions') && functions}
+      {sections.includes('patrika') && patrika}
     </div>
   );
 }
