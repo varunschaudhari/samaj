@@ -148,6 +148,8 @@ export const VALIDATION_KEYS = [
   'validation.tooManyFunctions',
   'validation.guestsNeeded',
   'validation.tooManyGuests',
+  'validation.muhurat',
+  'validation.tooManyNames',
   'validation.replyName',
   // Produced by the API rather than a schema, but translated the same way.
   'validation.phoneTaken',
@@ -161,6 +163,7 @@ export const VALIDATION_KEYS = [
   'validation.dailyInvitations',
   'validation.invitationCancelled',
   'validation.invitationClosed',
+  'validation.memorialMember',
   'validation.patrikaSize',
   'validation.patrikaType',
   'validation.linkRepliesFull',

@@ -3,6 +3,7 @@ import {
   type LinkReplyReceipt,
   MAX_LINK_REPLIES,
   PATRIKA_MAX_BYTES,
+  type PatrikaText,
   type PatrikaView,
   type PublicInvitation,
   type GuestVia,
@@ -44,6 +45,42 @@ const CLOSES_AFTER = 12 * 60 * 60 * 1000;
 const gone = () => notFound('That invitation is no longer there.');
 const issue = (message: string, path = 'guestFamilyIds') => [{ path, message }];
 
+type FunctionDoc = InvitationDoc['functions'][number];
+const functionView = (f: FunctionDoc) => ({
+  id: f.fid,
+  name: f.name,
+  startsAt: f.startsAt.toISOString(),
+  endsAt: f.endsAt?.toISOString() ?? null,
+  venue: f.venue,
+  mapUrl: f.mapUrl ?? null,
+  muhuratAt: f.muhuratAt?.toISOString() ?? null,
+});
+
+/** The names a patrika prints, and the one remembered with their years and photo. */
+async function patrikaTextOf(inv: Pick<InvitationDoc, 'honorees' | 'kripa' | 'blessings' | 'inviters' | 'memorialMemberId'>): Promise<PatrikaText> {
+  const m = inv.memorialMemberId ? await MemberModel.findById(inv.memorialMemberId, { name: 1, birthYear: 1, deathYear: 1, photoKey: 1, photoVersion: 1 }).lean() : null;
+  return {
+    honorees: (inv.honorees ?? []).map((h) => ({ name: h.name, detail: h.detail ?? null })),
+    kripa: [...(inv.kripa ?? [])],
+    blessings: [...(inv.blessings ?? [])],
+    inviters: [...(inv.inviters ?? [])],
+    memorial: m
+      ? { memberId: String(m._id), name: m.name, years: m.birthYear || m.deathYear ? `${m.birthYear ?? '…'} – ${m.deathYear ?? '…'}` : null, photoVersion: m.photoKey ? (m.photoVersion ?? 0) : null }
+      : null,
+  };
+}
+
+/** Only someone from the host's own family can be the one remembered. */
+async function memorialOf(host: Types.ObjectId, memberId: string | null) {
+  if (!memberId) return null;
+  const member = await MemberModel.findOne({ _id: new Types.ObjectId(memberId), familyId: host }, { _id: 1 }).lean();
+  if (!member) throw new AppError(400, 'VALIDATION_FAILED', 'That person isn’t in your family.', issue('validation.memorialMember', 'memorialMemberId'));
+  return member._id;
+}
+
+/** The patrika fields as stored, from the form. */
+const patrikaFields = (input: InvitationInput) => ({ honorees: input.honorees, kripa: input.kripa, blessings: input.blessings, inviters: input.inviters });
+
 const patrikaOf = (inv: Pick<InvitationDoc, 'patrikaKey' | 'patrikaVersion'>): PatrikaView | null =>
   inv.patrikaKey ? { kind: inv.patrikaKey.endsWith('.pdf') ? 'pdf' : 'image', version: inv.patrikaVersion ?? 0 } : null;
 
@@ -66,6 +103,7 @@ function toFunctions(input: InvitationInput, previous: readonly { fid: string }[
       endsAt: f.endsAt ? new Date(f.endsAt) : null,
       venue: f.venue,
       mapUrl: f.mapUrl,
+      muhuratAt: f.muhuratAt ? new Date(f.muhuratAt) : null,
     }))
     .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   const firstAt = functions[0]?.startsAt ?? new Date();
@@ -130,6 +168,8 @@ export async function createInvitation(viewer: Viewer, input: CreateInput): Prom
     kind: input.kind,
     forNames: input.forNames,
     message: input.message,
+    ...patrikaFields(input),
+    memorialMemberId: await memorialOf(host, input.memorialMemberId),
     functions,
     firstAt,
     lastAt,
@@ -191,7 +231,8 @@ export async function getInvitation(viewer: Viewer, id: string): Promise<Invitat
     ...base,
     message: invitation.message ?? null,
     sentByName: invitation.sentByName,
-    functions: invitation.functions.map((f) => ({ id: f.fid, name: f.name, startsAt: f.startsAt.toISOString(), endsAt: f.endsAt?.toISOString() ?? null, venue: f.venue, mapUrl: f.mapUrl ?? null })),
+    functions: invitation.functions.map(functionView),
+    ...(await patrikaTextOf(invitation)),
     isHost: host,
     patrika: patrikaOf(invitation),
   };
@@ -220,6 +261,8 @@ export async function updateInvitation(viewer: Viewer, id: string, input: Invita
   invitation.kind = input.kind;
   invitation.forNames = input.forNames;
   invitation.message = input.message;
+  invitation.set(patrikaFields(input));
+  invitation.memorialMemberId = await memorialOf(invitation.familyId, input.memorialMemberId);
   invitation.set('functions', functions);
   invitation.firstAt = firstAt;
   invitation.lastAt = lastAt;
@@ -289,7 +332,8 @@ export async function publicInvitation(token: string): Promise<PublicInvitation>
     forNames: invitation.forNames ?? null,
     message: invitation.message ?? null,
     hostName: head?.name ?? invitation.sentByName,
-    functions: invitation.functions.map((f) => ({ id: f.fid, name: f.name, startsAt: f.startsAt.toISOString(), endsAt: f.endsAt?.toISOString() ?? null, venue: f.venue, mapUrl: f.mapUrl ?? null })),
+    functions: invitation.functions.map(functionView),
+    ...(await patrikaTextOf(invitation)),
     cancelled: Boolean(invitation.cancelledAt),
     closed: isClosed(invitation),
     patrika: patrikaOf(invitation),
@@ -438,4 +482,24 @@ export async function getPatrika(viewer: Viewer, id: string) {
 /** The patrika for anyone with the link. */
 export async function getSharedPatrika(token: string) {
   return patrikaFile(await loadShared(token));
+}
+
+async function memorialPhoto(inv: Pick<InvitationDoc, 'memorialMemberId'>) {
+  const missing = () => notFound('No photo here.');
+  const m = inv.memorialMemberId ? await MemberModel.findById(inv.memorialMemberId, { photoKey: 1 }).lean() : null;
+  if (!m?.photoKey) throw missing();
+  const data = await storage.read(m.photoKey);
+  if (!data) throw missing();
+  return { data, contentType: CONTENT_TYPES[m.photoKey.split('.').pop() ?? ''] ?? 'application/octet-stream' };
+}
+
+/** The remembered person's photo, for the host and invited families: it is part of the card they were sent. */
+export async function getMemorialPhoto(viewer: Viewer, id: string) {
+  const invitation = await load(id);
+  if (!isHostOf(viewer, invitation) && !(await InvitationGuestModel.exists({ invitationId: invitation._id, familyId: new Types.ObjectId(viewer.familyId) }))) throw gone();
+  return memorialPhoto(invitation);
+}
+
+export async function getSharedMemorialPhoto(token: string) {
+  return memorialPhoto(await loadShared(token));
 }

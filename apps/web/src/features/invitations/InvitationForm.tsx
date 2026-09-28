@@ -4,7 +4,8 @@ import { Plus, Trash2 } from '@/components/ui/icons';
 import { fromLocalInput, toLocalInput } from '@/features/community/events-api';
 import { fieldError } from '@/features/auth/form-errors';
 import { useT } from '@/i18n';
-import { CELEBRATIONS, FUNCTION_NAMES, REMEMBRANCES } from './kinds';
+import { CELEBRATIONS, FUNCTION_NAMES, REMEMBRANCES, isRemembrance } from './kinds';
+import { PatrikaDetails } from './PatrikaDetails';
 
 export interface FunctionDraft {
   id?: string;
@@ -13,6 +14,7 @@ export interface FunctionDraft {
   endsLocal: string;
   venue: string;
   mapUrl: string;
+  muhuratLocal: string;
 }
 
 export interface InvitationDraft {
@@ -20,9 +22,19 @@ export interface InvitationDraft {
   forNames: string;
   message: string;
   functions: FunctionDraft[];
+  honorees: { name: string; detail: string }[];
+  /** One name per line, as typed. */
+  kripa: string;
+  blessings: string;
+  inviters: string;
+  memorialMemberId: string | null;
 }
 
-export const emptyFunction = (): FunctionDraft => ({ name: '', startsLocal: '', endsLocal: '', venue: '', mapUrl: '' });
+export const emptyFunction = (): FunctionDraft => ({ name: '', startsLocal: '', endsLocal: '', venue: '', mapUrl: '', muhuratLocal: '' });
+const lines = (names: string[]) => names.join('\n');
+const names = (text: string) => text.split('\n').map((l) => l.trim()).filter(Boolean);
+/** Occasions whose functions have a शुभमुहूर्त. */
+export const HAS_MUHURAT: InvitationKind[] = ['wedding', 'engagement', 'munj', 'housewarming', 'naming'];
 
 export const draftFrom = (inv?: InvitationDetail): InvitationDraft =>
   inv
@@ -30,16 +42,34 @@ export const draftFrom = (inv?: InvitationDetail): InvitationDraft =>
         kind: inv.kind,
         forNames: inv.forNames ?? '',
         message: inv.message ?? '',
-        functions: inv.functions.map((f) => ({ id: f.id, name: f.name, startsLocal: toLocalInput(f.startsAt), endsLocal: toLocalInput(f.endsAt), venue: f.venue, mapUrl: f.mapUrl ?? '' })),
+        functions: inv.functions.map((f) => ({ id: f.id, name: f.name, startsLocal: toLocalInput(f.startsAt), endsLocal: toLocalInput(f.endsAt), venue: f.venue, mapUrl: f.mapUrl ?? '', muhuratLocal: toLocalInput(f.muhuratAt) })),
+        honorees: inv.honorees.map((h) => ({ name: h.name, detail: h.detail ?? '' })),
+        kripa: lines(inv.kripa),
+        blessings: lines(inv.blessings),
+        inviters: lines(inv.inviters),
+        memorialMemberId: inv.memorial?.memberId ?? null,
       }
-    : { kind: 'wedding', forNames: '', message: '', functions: [emptyFunction()] };
+    : { kind: 'wedding', forNames: '', message: '', functions: [emptyFunction()], honorees: [], kripa: '', blessings: '', inviters: '', memorialMemberId: null };
 
 /** The draft as the API wants it; datetime-local values become ISO times. */
 export const draftToInput = (d: InvitationDraft): InvitationInput => ({
   kind: d.kind,
   forNames: d.forNames,
   message: d.message,
-  functions: d.functions.map((f) => ({ ...(f.id && { id: f.id }), name: f.name, startsAt: fromLocalInput(f.startsLocal) ?? '', endsAt: fromLocalInput(f.endsLocal), venue: f.venue, mapUrl: f.mapUrl })),
+  functions: d.functions.map((f) => ({
+    ...(f.id && { id: f.id }),
+    name: f.name,
+    startsAt: fromLocalInput(f.startsLocal) ?? '',
+    endsAt: fromLocalInput(f.endsLocal),
+    venue: f.venue,
+    mapUrl: f.mapUrl,
+    muhuratAt: HAS_MUHURAT.includes(d.kind) ? fromLocalInput(f.muhuratLocal) : null,
+  })),
+  honorees: d.honorees.filter((h) => h.name.trim()),
+  kripa: isRemembrance(d.kind) ? [] : names(d.kripa),
+  blessings: isRemembrance(d.kind) ? [] : names(d.blessings),
+  inviters: names(d.inviters),
+  memorialMemberId: isRemembrance(d.kind) ? d.memorialMemberId : null,
 });
 
 /** Field errors from the shared rules, keyed "functions.0.name". */
@@ -106,6 +136,17 @@ export function InvitationForm({ draft, onChange, errors }: { draft: InvitationD
               <Input type="datetime-local" label={t('invite.form.starts')} value={f.startsLocal} onChange={(e) => setFunction(i, { startsLocal: e.target.value })} error={err(`functions.${i}.startsAt`)} />
               <Input type="datetime-local" label={t('invite.form.ends')} labelSuffix={t('common.optional')} value={f.endsLocal} onChange={(e) => setFunction(i, { endsLocal: e.target.value })} error={err(`functions.${i}.endsAt`)} />
             </div>
+            {HAS_MUHURAT.includes(draft.kind) && (
+              <Input
+                type="datetime-local"
+                label={t('invite.form.muhurat')}
+                labelSuffix={t('common.optional')}
+                hint={t('invite.form.muhuratHint')}
+                value={f.muhuratLocal}
+                onChange={(e) => setFunction(i, { muhuratLocal: e.target.value })}
+                error={err(`functions.${i}.muhuratAt`)}
+              />
+            )}
             <Input label={t('invite.form.venue')} value={f.venue} onChange={(e) => setFunction(i, { venue: e.target.value })} error={err(`functions.${i}.venue`)} />
             <Input label={t('invite.form.mapUrl')} labelSuffix={t('common.optional')} inputMode="url" value={f.mapUrl} onChange={(e) => setFunction(i, { mapUrl: e.target.value })} error={err(`functions.${i}.mapUrl`)} />
           </div>
@@ -117,6 +158,8 @@ export function InvitationForm({ draft, onChange, errors }: { draft: InvitationD
           </Button>
         )}
       </fieldset>
+
+      <PatrikaDetails draft={draft} onChange={onChange} errors={errors} />
 
       <Textarea label={t('invite.form.message')} labelSuffix={t('common.optional')} hint={t('invite.form.messageHint')} rows={3} maxLength={1000} value={draft.message} onChange={(e) => set({ message: e.target.value })} error={err('message')} />
     </div>

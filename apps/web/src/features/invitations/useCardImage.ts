@@ -1,12 +1,12 @@
-import type { InvitationFunction, InvitationKind } from '@samaj/shared';
+import type { InvitationFunction, InvitationKind, PatrikaText } from '@samaj/shared';
 import { useState } from 'react';
 import { toast } from '@/components/ui';
 import { formatEventTime } from '@/features/community/events-api';
 import { useLanguageStore, useT } from '@/i18n';
 import { drawCardImage, shareOrDownload } from './cardImage';
-import { isRemembrance } from './kinds';
+import { isRemembrance, muhuratText } from './kinds';
 
-interface CardSource {
+interface CardSource extends Omit<PatrikaText, 'memorial'> {
   kind: InvitationKind;
   forNames: string | null;
   message: string | null;
@@ -29,9 +29,21 @@ export function useCardImage(card: CardSource, link: string) {
         top: quiet ? t('invite.card.inMemory') : t('invite.card.ganesh'),
         kind,
         forNames: card.forNames,
+        honorees: card.honorees,
+        with: t('invite.card.with'),
         invites: quiet ? t('invite.card.remembranceInvite', { name: card.hostName }) : t('invite.card.invitesYou', { name: card.hostName }),
-        functions: card.functions.map((f) => ({ name: f.name, when: formatEventTime(f.startsAt, f.endsAt, language), venue: f.venue })),
+        functions: card.functions.map((f) => ({
+          name: f.name,
+          when: formatEventTime(f.startsAt, f.endsAt, language),
+          venue: f.venue,
+          muhurat: f.muhuratAt ? t('invite.card.muhurat', { time: muhuratText(f.muhuratAt, f.startsAt, language) }) : null,
+        })),
         message: card.message,
+        lists: [
+          { label: t('invite.card.kripa'), names: card.kripa },
+          { label: t('invite.card.blessings'), names: card.blessings },
+          { label: t(quiet ? 'invite.card.grieving' : 'invite.card.inviters'), names: card.inviters },
+        ],
         footer: t('invite.image.footer', { link }),
         quiet,
       });

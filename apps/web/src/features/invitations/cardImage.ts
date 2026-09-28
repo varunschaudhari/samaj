@@ -10,9 +10,15 @@ export interface CardImageText {
   top: string;
   kind: string;
   forNames: string | null;
+  /** In place of forNames when the family filled them in: the name, and whose child and from where. */
+  honorees: { name: string; detail: string | null }[];
+  /** Between two honorees: "&", "आणि". */
+  with: string;
   invites: string;
-  functions: { name: string; when: string; venue: string }[];
+  functions: { name: string; when: string; venue: string; muhurat: string | null }[];
   message: string | null;
+  /** कृपाछत्र, आशीर्वाद, निमंत्रक: a heading and its names. */
+  lists: { label: string; names: string[] }[];
   /** The link, or the app's name, at the foot. */
   footer: string;
   quiet: boolean;
@@ -93,7 +99,13 @@ export async function drawCardImage(card: CardImageText): Promise<Blob> {
     };
     text({ font: `600 30px ${BODY}`, color: card.quiet ? COLORS.muted : COLORS.kumkum, text: card.top, lineHeight: 44, gapBefore: 16 });
     text({ font: `600 40px ${DISPLAY}`, color: card.quiet ? COLORS.fg : COLORS.primary, text: card.kind, lineHeight: 56, gapBefore: 24 });
-    if (card.forNames) text({ font: `700 76px ${DISPLAY}`, color: COLORS.fg, text: card.forNames, lineHeight: 96, gapBefore: 12 });
+    if (card.honorees.length) {
+      card.honorees.forEach((h, i) => {
+        if (i > 0) text({ font: `400 36px ${DISPLAY}`, color: COLORS.muted, text: card.with, lineHeight: 52, gapBefore: 4 });
+        text({ font: `700 64px ${DISPLAY}`, color: COLORS.fg, text: h.name, lineHeight: 84, gapBefore: 8 });
+        if (h.detail) text({ font: `400 28px ${BODY}`, color: COLORS.muted, text: h.detail, lineHeight: 40, gapBefore: 0, width: INNER - 160 });
+      });
+    } else if (card.forNames) text({ font: `700 76px ${DISPLAY}`, color: COLORS.fg, text: card.forNames, lineHeight: 96, gapBefore: 12 });
     text({ font: `400 30px ${BODY}`, color: COLORS.muted, text: card.invites, lineHeight: 44, gapBefore: 20, width: INNER - 160 });
     if (!card.quiet) {
       y += 36;
@@ -106,7 +118,8 @@ export async function drawCardImage(card: CardImageText): Promise<Blob> {
       ctx.font = `600 30px ${BODY}`;
       const whenLines = wrap(ctx, f.when, INNER - 112).length;
       const venueLines = wrap(ctx, f.venue, INNER - 112).length;
-      const h = 40 + 52 + (whenLines + venueLines) * 42 + 28;
+      const muhuratLines = f.muhurat ? wrap(ctx, f.muhurat, INNER - 112).length : 0;
+      const h = 40 + 52 + (whenLines + venueLines + muhuratLines) * 42 + 28;
       if (draw) {
         ctx.fillStyle = '#ffffff';
         ctx.strokeStyle = COLORS.line;
@@ -119,10 +132,15 @@ export async function drawCardImage(card: CardImageText): Promise<Blob> {
       y = top + 20;
       text({ font: `600 40px ${DISPLAY}`, color: COLORS.fg, text: f.name, lineHeight: 56, gapBefore: 12, align: 'left', width: INNER - 112 });
       text({ font: `400 30px ${BODY}`, color: COLORS.fg, text: `🗓  ${f.when}`, lineHeight: 42, gapBefore: 6, align: 'left', width: INNER - 112 });
+      if (f.muhurat) text({ font: `600 30px ${BODY}`, color: COLORS.kumkum, text: `🪷  ${f.muhurat}`, lineHeight: 42, gapBefore: 0, align: 'left', width: INNER - 112 });
       text({ font: `400 30px ${BODY}`, color: COLORS.fg, text: `📍  ${f.venue}`, lineHeight: 42, gapBefore: 0, align: 'left', width: INNER - 112 });
       y = top + h + 20;
     }
     if (card.message) text({ font: `400 32px ${BODY}`, color: COLORS.fg, text: card.message, lineHeight: 48, gapBefore: 16, width: INNER - 120 });
+    for (const list of card.lists.filter((l) => l.names.length)) {
+      text({ font: `600 24px ${BODY}`, color: COLORS.muted, text: list.label.toUpperCase(), lineHeight: 36, gapBefore: 28 });
+      for (const name of list.names) text({ font: `400 30px ${BODY}`, color: COLORS.fg, text: name, lineHeight: 42, gapBefore: 0 });
+    }
     text({ font: `400 24px ${BODY}`, color: COLORS.muted, text: card.footer, lineHeight: 36, gapBefore: 40 });
     return y + PAD + 24;
   };

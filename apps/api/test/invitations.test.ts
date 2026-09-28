@@ -242,4 +242,40 @@ describe('invitations', () => {
     expect(gone.patrika).toBeNull();
     expect((await api.get(`/api/public/invitations/${token}/patrika`)).status).toBe(404);
   });
+
+  it('carries the patrika’s names and muhurat, and remembers someone from the host’s own family', async () => {
+    const { host, parents } = await setup();
+    const functions = wedding([]).functions.map((f, i) => (i === 1 ? { ...f, muhuratAt: at(11, 11).replace(':00:00', ':34:00') } : f));
+    const inv = (
+      await api
+        .post('/api/invitations')
+        .set('Cookie', host.cookie)
+        .send({
+          ...wedding([parents.familyId]),
+          functions,
+          honorees: [{ name: 'चि. रोहित', detail: 'श्री. अनिल वाघ यांचे चिरंजीव, अमळनेर' }, { name: 'चि.सौ.कां. काव्या' }],
+          kripa: ['कै. रामराव वाघ', ''],
+          blessings: ['श्री. गणपत वाघ'],
+          inviters: ['श्री. अनिल वाघ', 'सौ. सुनिता वाघ'],
+        })
+    ).body.invitation as InvitationDetail;
+    expect(inv.honorees).toEqual([{ name: 'चि. रोहित', detail: 'श्री. अनिल वाघ यांचे चिरंजीव, अमळनेर' }, { name: 'चि.सौ.कां. काव्या', detail: null }]);
+    expect(inv.kripa).toEqual(['कै. रामराव वाघ']);
+    expect(inv.functions[1]?.muhuratAt).toBe(new Date(functions[1]!.muhuratAt!).toISOString());
+    // Guests and the link see the same names.
+    const guest = (await api.get(`/api/invitations/${inv.id}`).set('Cookie', parents.cookie)).body.invitation as InvitationDetail;
+    expect(guest.inviters).toEqual(['श्री. अनिल वाघ', 'सौ. सुनिता वाघ']);
+
+    // A muhurat days away from its function is a slip.
+    const far = await api.put(`/api/invitations/${inv.id}`).set('Cookie', host.cookie).send({ ...wedding([]), functions: [{ ...functions[0], muhuratAt: at(20) }] });
+    expect(far.body.error.issues).toContainEqual({ path: 'functions.0.muhuratAt', message: 'validation.muhurat' });
+
+    // Remembrance: only someone from the host's own family.
+    const shraddha = (memorialMemberId: string) => ({ kind: 'shraddha', forNames: 'कै. रामराव वाघ', functions: [{ name: 'श्राद्ध', startsAt: at(5), venue: 'Home' }], memorialMemberId, guestFamilyIds: [parents.familyId] });
+    const other = await api.post('/api/invitations').set('Cookie', host.cookie).send(shraddha(parents.memberIds[0]!));
+    expect(other.body.error.issues).toContainEqual({ path: 'memorialMemberId', message: 'validation.memorialMember' });
+    const own = (await api.post('/api/invitations').set('Cookie', host.cookie).send(shraddha(host.memberIds[0]!))).body.invitation as InvitationDetail;
+    expect(own.memorial).toMatchObject({ memberId: host.memberIds[0], name: 'Anil Wagh', photoVersion: null });
+    expect((await api.get(`/api/invitations/${own.id}/memorial-photo`).set('Cookie', parents.cookie)).status).toBe(404);
+  });
 });

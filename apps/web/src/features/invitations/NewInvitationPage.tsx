@@ -28,6 +28,9 @@ export function NewInvitationPage() {
   const [tried, setTried] = useState(false);
   const errors = tried ? draftErrors(draft) : {};
   const count = pickCount(picks);
+  const preview = draftToInput(draft);
+  // The one remembered, from the family, for the preview's photo and years.
+  const memorial = family.data?.members.find((m) => m.id === draft.memorialMemberId);
 
   const back = (
     <Link to="/invitations" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
@@ -90,7 +93,12 @@ export function NewInvitationPage() {
               forNames: draft.forNames.trim() || null,
               message: draft.message.trim() || null,
               hostName: family.data?.headName ?? '',
-              functions: draftToInput(draft).functions.map((f) => ({ name: f.name, startsAt: f.startsAt || null, endsAt: f.endsAt ?? null, venue: f.venue, mapUrl: f.mapUrl ?? null })),
+              functions: preview.functions.map((f) => ({ name: f.name, startsAt: f.startsAt || null, endsAt: f.endsAt ?? null, venue: f.venue, mapUrl: f.mapUrl ?? null, muhuratAt: f.muhuratAt ?? null })),
+              honorees: preview.honorees?.map((h) => ({ name: h.name, detail: h.detail ?? null })),
+              kripa: preview.kripa,
+              blessings: preview.blessings,
+              inviters: preview.inviters,
+              memorial: memorial && { years: memorial.deathYear ? `${memorial.birthYear ?? '…'} – ${memorial.deathYear}` : null, photoSrc: memorial.photoUrl },
             }}
           />
         </aside>

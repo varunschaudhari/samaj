@@ -14,7 +14,7 @@ import { publicLink, useAddGuests, useRemoveLinkReply, useAnswerInvitation, useA
 import { GuestPicker, type GuestPicks, emptyPicks, pickCount, picksToInput } from './GuestPicker';
 import { InvitationCard } from './InvitationCard';
 import { InvitationForm, draftErrors, draftFrom, draftToInput } from './InvitationForm';
-import { isRemembrance, shareText } from './kinds';
+import { cardFrom, isRemembrance, shareText } from './kinds';
 import { PatrikaEditor, PatrikaShown } from './Patrika';
 import { ShareLinkPanel } from './ShareLinkPanel';
 import { useCardImage } from './useCardImage';
@@ -392,10 +392,7 @@ export function InvitationPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <div className="print:hidden">{back}</div>
-      <InvitationCard
-        cancelled={inv.cancelled}
-        data={{ kind: inv.kind, forNames: inv.forNames, message: inv.message, hostName: inv.host.headName, functions: inv.functions }}
-      />
+      <InvitationCard cancelled={inv.cancelled} data={cardFrom(inv, inv.host.headName, `/api/invitations/${inv.id}`)} />
       {inv.patrika && <PatrikaShown patrika={inv.patrika} src={`/api/invitations/${inv.id}/patrika`} />}
       {inv.isHost ? (
         <HostPanel invitation={inv} />

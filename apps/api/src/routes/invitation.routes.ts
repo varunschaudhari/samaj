@@ -71,6 +71,10 @@ invitationRouter.get('/:id/patrika', async (req, res) => {
   sendPatrika(res, await invitations.getPatrika(viewer(req), param(req, 'id')), 'private');
 });
 
+invitationRouter.get('/:id/memorial-photo', async (req, res) => {
+  sendPatrika(res, await invitations.getMemorialPhoto(viewer(req), param(req, 'id')), 'private');
+});
+
 /**
  * The URL carries a version, so a new upload gets a new URL and this can be
  * cached. A PDF opens sandboxed: no scripts, no reaching the app.
@@ -88,6 +92,9 @@ publicInvitationRouter.get('/:token', async (req, res) => {
 });
 publicInvitationRouter.get('/:token/patrika', async (req, res) => {
   sendPatrika(res, await invitations.getSharedPatrika(param(req, 'token')), 'private');
+});
+publicInvitationRouter.get('/:token/memorial-photo', async (req, res) => {
+  sendPatrika(res, await invitations.getSharedMemorialPhoto(param(req, 'token')), 'private');
 });
 publicInvitationRouter.post('/:token/reply', linkReplyLimiter, async (req, res) => {
   res.json({ reply: await invitations.replyByLink(param(req, 'token'), linkReplySchema.parse(req.body)) });

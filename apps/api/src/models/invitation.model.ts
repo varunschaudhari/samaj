@@ -10,9 +10,12 @@ const functionSchema = new Schema(
     endsAt: { type: Date, default: null },
     venue: { type: String, required: true, trim: true },
     mapUrl: { type: String, default: null },
+    muhuratAt: { type: Date, default: null },
   },
   { _id: false },
 );
+
+const honoreeSchema = new Schema({ name: { type: String, required: true, trim: true }, detail: { type: String, default: null } }, { _id: false });
 
 /** A family's invitation: a wedding with its functions, a मुंज, a दशक्रिया. */
 const invitationSchema = new Schema(
@@ -22,6 +25,13 @@ const invitationSchema = new Schema(
     forNames: { type: String, default: null, trim: true },
     message: { type: String, default: null },
     functions: { type: [functionSchema], default: [] },
+    /** As a patrika prints them: whose occasion, the elders invoked and blessing, and who invites. */
+    honorees: { type: [honoreeSchema], default: [] },
+    kripa: { type: [String], default: [] },
+    blessings: { type: [String], default: [] },
+    inviters: { type: [String], default: [] },
+    /** For a remembrance: the family member remembered. */
+    memorialMemberId: { type: Schema.Types.ObjectId, ref: 'Member', default: null },
     /** The first function's start and the last one's end (or start): for ordering and closing. */
     firstAt: { type: Date, required: true },
     lastAt: { type: Date, required: true },

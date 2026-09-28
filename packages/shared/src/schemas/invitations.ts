@@ -74,16 +74,46 @@ export const invitationFunctionSchema = z
     endsAt: isoDate.nullish().transform((v) => v ?? null),
     venue: z.string().trim().min(2, 'validation.venue').max(200, 'validation.tooLong'),
     mapUrl: mapUrlSchema,
+    /** शुभमुहूर्त: the auspicious moment itself, often not when the function starts. */
+    muhuratAt: isoDate.nullish().transform((v) => v ?? null),
   })
   .superRefine((f, ctx) => {
     if (f.endsAt && new Date(f.endsAt) <= new Date(f.startsAt)) ctx.addIssue({ code: 'custom', path: ['endsAt'], message: 'validation.eventEnd' });
+    // Within a day of the function: a muhurat on the wrong date is a typing slip.
+    if (f.muhuratAt && Math.abs(new Date(f.muhuratAt).getTime() - new Date(f.startsAt).getTime()) > 86_400_000) {
+      ctx.addIssue({ code: 'custom', path: ['muhuratAt'], message: 'validation.muhurat' });
+    }
   });
+
+/** Names listed on the patrika: कृपाछत्र, आशीर्वाद, निमंत्रक. */
+export const MAX_PATRIKA_NAMES = 12;
+const nameList = z
+  .array(z.string().trim().max(80, 'validation.tooLong'))
+  .max(MAX_PATRIKA_NAMES, 'validation.tooManyNames')
+  .default([])
+  .transform((names) => names.filter(Boolean));
+
+/** Whose occasion, as a patrika prints it: the name, and whose child they are and from where. */
+export const honoreeSchema = z.object({
+  name: z.string().trim().min(2, 'validation.nameMin').max(80, 'validation.nameMax'),
+  detail: optionalText(160),
+});
 
 export const invitationInputSchema = z.object({
   kind: z.enum(INVITATION_KINDS, { error: 'validation.choose' }),
   /** Whose occasion: "Rohit & Kavya", "Aarav", "Late Ramrao Wagh". */
   forNames: optionalText(120),
   message: optionalText(1000),
+  /** The bride and groom, the child, the one remembered: up to two, shown in place of forNames. */
+  honorees: z.array(honoreeSchema).max(2).default([]),
+  /** Elders who have passed away, whose grace the family invokes (कृपाछत्र). */
+  kripa: nameList,
+  /** Living elders whose blessings the family asks (आशीर्वाद). */
+  blessings: nameList,
+  /** Who invites (निमंत्रक). */
+  inviters: nameList,
+  /** For a remembrance: the family member remembered, whose photo the card shows. */
+  memorialMemberId: objectIdSchema.nullish().transform((v) => v ?? null),
   functions: z.array(invitationFunctionSchema).min(1, 'validation.functionsNeeded').max(MAX_INVITATION_FUNCTIONS, 'validation.tooManyFunctions'),
 });
 export type InvitationInput = z.input<typeof invitationInputSchema>;
@@ -141,6 +171,22 @@ export interface InvitationFunction {
   endsAt: string | null;
   venue: string;
   mapUrl: string | null;
+  muhuratAt: string | null;
+}
+
+export interface Honoree {
+  name: string;
+  detail: string | null;
+}
+
+/** Everything a printed patrika carries beyond the functions. */
+export interface PatrikaText {
+  honorees: Honoree[];
+  kripa: string[];
+  blessings: string[];
+  inviters: string[];
+  /** The one remembered: their name, years and, when they have one, photo version. */
+  memorial: { memberId: string; name: string; years: string | null; photoVersion: number | null } | null;
 }
 
 export interface InvitationAnswer {
@@ -188,7 +234,7 @@ export interface LinkReplyView {
   respondedAt: string;
 }
 
-export interface InvitationDetail extends InvitationSummary {
+export interface InvitationDetail extends InvitationSummary, PatrikaText {
   message: string | null;
   sentByName: string;
   functions: InvitationFunction[];
@@ -205,7 +251,7 @@ export interface InvitationDetail extends InvitationSummary {
 }
 
 /** What the link shows: the card, and nothing about who else was invited. */
-export interface PublicInvitation {
+export interface PublicInvitation extends PatrikaText {
   kind: InvitationKind;
   forNames: string | null;
   message: string | null;

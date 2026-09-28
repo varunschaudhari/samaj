@@ -1,4 +1,4 @@
-import { type InvitationDetail, type InvitationKind, REMEMBRANCE_KINDS } from '@samaj/shared';
+import { type InvitationDetail, type InvitationFunction, type InvitationKind, type PatrikaText, REMEMBRANCE_KINDS } from '@samaj/shared';
 import { formatEventTime } from '@/features/community/events-api';
 import type { Language } from '@samaj/shared';
 
@@ -35,4 +35,29 @@ export function shareText(inv: InvitationDetail, labels: { kind: string; from: s
     '',
     `${labels.open} ${url}`,
   ].join('\n');
+}
+
+/** The muhurat's time, with the day only when it differs from the function's: "11:34 am". */
+export function muhuratText(muhuratAt: string, startsAt: string, language: Language) {
+  const m = new Date(muhuratAt);
+  const loc = language === 'mr' ? 'mr-IN' : 'en-IN';
+  const time = new Intl.DateTimeFormat(loc, { hour: 'numeric', minute: '2-digit' }).format(m);
+  if (m.toDateString() === new Date(startsAt).toDateString()) return time;
+  return `${new Intl.DateTimeFormat(loc, { weekday: 'short', day: 'numeric', month: 'short' }).format(m)} · ${time}`;
+}
+
+/** The card's content from an invitation as the API gives it; `base` is where its photos are served. */
+export function cardFrom(inv: PatrikaText & { kind: InvitationKind; forNames: string | null; message: string | null; functions: InvitationFunction[] }, hostName: string, base: string) {
+  return {
+    kind: inv.kind,
+    forNames: inv.forNames,
+    message: inv.message,
+    hostName,
+    functions: inv.functions,
+    honorees: inv.honorees,
+    kripa: inv.kripa,
+    blessings: inv.blessings,
+    inviters: inv.inviters,
+    memorial: inv.memorial ? { years: inv.memorial.years, photoSrc: inv.memorial.photoVersion !== null ? `${base}/memorial-photo?v=${inv.memorial.photoVersion}` : null } : null,
+  };
 }
