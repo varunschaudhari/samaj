@@ -108,6 +108,7 @@ export const router = createBrowserRouter([
           { path: '/relation', lazy: page(async () => (await import('@/features/families/RelationPage')).RelationPage) },
           { path: '/invitations', lazy: page(async () => (await import('@/features/invitations/InvitationsPage')).InvitationsPage) },
           { path: '/invitations/new', lazy: page(async () => (await import('@/features/invitations/NewInvitationPage')).NewInvitationPage) },
+          { path: '/invitations/branch', lazy: guarded('notice:publish', async () => (await import('@/features/invitations/BranchRequestsPage')).BranchRequestsPage) },
           { path: '/invitations/:id', lazy: page(async () => (await import('@/features/invitations/InvitationPage')).InvitationPage) },
           {
             path: '/matrimony',

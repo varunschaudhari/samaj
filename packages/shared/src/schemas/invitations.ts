@@ -259,6 +259,8 @@ export interface InvitationDetail extends InvitationSummary, PatrikaText {
   shareToken?: string | null;
   linkReplies?: LinkReplyView[];
   patrika: PatrikaView | null;
+  /** For the host: asking the branch committee to share it with the whole branch, and what they decided. */
+  branchShare?: BranchShareView | null;
 }
 
 /** What the link shows: the card, and nothing about who else was invited. */
@@ -309,6 +311,39 @@ export interface InvitationAudience {
   /** How many more families this family can invite today. */
   leftToday: number;
 }
+
+export const BRANCH_SHARE_STATUSES = ['pending', 'shared', 'declined'] as const;
+export type BranchShareStatus = (typeof BRANCH_SHARE_STATUSES)[number];
+
+export interface BranchShareView {
+  status: BranchShareStatus;
+  branch: { id: string; name: string; nameMr: string };
+  requestedByName: string;
+  requestedAt: string;
+  decidedByName: string | null;
+  decidedAt: string | null;
+  /** Why the committee declined. */
+  reason: string | null;
+  noticeId: string | null;
+}
+
+/** A family's request for the committee: the invitation as guests see it, and its link for the notice. */
+export interface BranchShareRequest extends InvitationSummary, PatrikaText {
+  message: string | null;
+  functions: InvitationFunction[];
+  shareToken: string;
+  requestedByName: string;
+  requestedAt: string;
+}
+
+/** The committee posts it as a notice to the family's branch, in words they have checked. */
+export const approveBranchShareSchema = z.object({
+  title: z.string().trim().min(3, 'validation.noticeTitle').max(120, 'validation.tooLong'),
+  body: z.string().trim().min(1, 'validation.noticeBody').max(3000, 'validation.tooLong'),
+});
+export const declineBranchShareSchema = z.object({
+  reason: z.string().trim().min(3, 'validation.declineReason').max(300, 'validation.tooLong'),
+});
 
 /** A function coming up soon that the family is going to, or hosting: for "Tomorrow: हळद at 5 pm" on Home. */
 export interface UpcomingFunction {

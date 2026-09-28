@@ -1,11 +1,14 @@
 import {
   type AudienceFamily,
+  type BranchShareRequest,
+  type BranchShareView,
   type AudienceGroup,
   DAILY_INVITATION_GUESTS,
   type EarlierGuestList,
   type LinkReplyReceipt,
   MAX_LINK_REPLIES,
   PATRIKA_MAX_BYTES,
+  REMEMBRANCE_KINDS,
   type PatrikaText,
   type PatrikaView,
   type PublicInvitation,
@@ -19,6 +22,9 @@ import {
   type LinkedFamily,
   type MyInvitations,
   type addGuestsSchema,
+  type approveBranchShareSchema,
+  can,
+  type declineBranchShareSchema,
   type createInvitationSchema,
   type invitationInputSchema,
   type invitationRsvpSchema,
@@ -29,10 +35,12 @@ import { Types } from 'mongoose';
 import type { z } from 'zod';
 import { FamilyModel } from '../models/family.model';
 import { type InvitationDoc, InvitationGuestModel, InvitationLinkReplyModel, InvitationModel, InvitationMuteModel } from '../models/invitation.model';
+import { BranchModel } from '../models/branch.model';
 import { MemberModel } from '../models/member.model';
+import { NoticeModel } from '../models/notice.model';
 import { AppError, forbidden, notFound } from '../utils/app-error';
 import { storage } from '../utils/storage';
-import { canViewFamily } from './access';
+import { canViewFamily, hasReach } from './access';
 import { CONTENT_TYPES, imageType, loadFamily } from './family.service';
 import { familySummaries, linksOf } from './links.service';
 import { getTree } from './tree.service';
@@ -290,6 +298,7 @@ export async function getInvitation(viewer: Viewer, id: string): Promise<Invitat
       return family ? [{ family, via: g.via, answers: answersOf(g.answers), stay: g.stay ?? 0, respondedByName: g.respondedByName ?? null, respondedAt: g.respondedAt?.toISOString() ?? null }] : [];
     });
     detail.shareToken = invitation.shareToken ?? null;
+    detail.branchShare = await branchShareOf(invitation.branchShare);
     detail.linkReplies = linkReplies.map((r) => ({ id: String(r._id), name: r.name, place: r.place ?? null, answers: answersOf(r.answers), stay: r.stay ?? 0, respondedAt: r.updatedAt.toISOString() }));
     // Families and link replies count the same in the headcount.
     detail.tally = invitation.functions.map((f) => {
@@ -581,4 +590,120 @@ export async function getMemorialPhoto(viewer: Viewer, id: string) {
 
 export async function getSharedMemorialPhoto(token: string) {
   return memorialPhoto(await loadShared(token));
+}
+
+type ShareDoc = NonNullable<InvitationDoc['branchShare']>;
+
+async function branchShareOf(share: ShareDoc | null | undefined): Promise<BranchShareView | null> {
+  if (!share) return null;
+  const branch = await BranchModel.findById(share.branchId, { name: 1, nameMr: 1 }).lean();
+  return {
+    status: share.status,
+    branch: { id: String(share.branchId), name: branch?.name ?? '', nameMr: branch?.nameMr ?? '' },
+    requestedByName: share.requestedByName,
+    requestedAt: share.requestedAt.toISOString(),
+    decidedByName: share.decidedByName ?? null,
+    decidedAt: share.decidedAt?.toISOString() ?? null,
+    reason: share.reason ?? null,
+    noticeId: share.noticeId ? String(share.noticeId) : null,
+  };
+}
+
+/**
+ * The host asks their branch committee to share the invitation with the
+ * whole branch: a दशक्रिया the branch should know of, a reception open to
+ * all. It makes the invitation's link, so the branch can open the card.
+ */
+export async function requestBranchShare(viewer: Viewer, id: string): Promise<InvitationDetail> {
+  assertHost(viewer);
+  const invitation = await loadHosted(viewer, id);
+  if (isClosed(invitation)) throw closedError();
+  if (invitation.branchShare && invitation.branchShare.status !== 'declined') {
+    throw new AppError(409, 'CONFLICT', 'The committee already has this.', issue('validation.branchShareAsked', 'invitation'));
+  }
+  const family = await loadFamily(viewer.familyId);
+  if (!invitation.shareToken) invitation.shareToken = randomBytes(12).toString('base64url');
+  invitation.set('branchShare', {
+    status: 'pending',
+    branchId: family.branchId,
+    branchAncestors: family.branchAncestors,
+    requestedByName: viewer.name,
+    requestedAt: new Date(),
+  });
+  await invitation.save();
+  return getInvitation(viewer, id);
+}
+
+/** The host takes back a request the committee hasn't decided. */
+export async function withdrawBranchShare(viewer: Viewer, id: string): Promise<InvitationDetail> {
+  const invitation = await loadHosted(viewer, id);
+  if (invitation.branchShare?.status === 'pending') {
+    invitation.set('branchShare', null);
+    await invitation.save();
+  }
+  return getInvitation(viewer, id);
+}
+
+const inReach = (viewer: Viewer, share: Pick<ShareDoc, 'branchId' | 'branchAncestors'>) =>
+  hasReach(viewer, 'notice:publish', { branchId: share.branchId, branchAncestors: share.branchAncestors });
+
+/** Requests waiting for this committee member: families in their branch and the branches under it. */
+export async function branchShareRequests(viewer: Viewer): Promise<BranchShareRequest[]> {
+  if (!can(viewer.role, 'notice:publish')) throw forbidden('Only the committee can share invitations with a branch.');
+  const pending = (await InvitationModel.find({ 'branchShare.status': 'pending', cancelledAt: null }).sort({ 'branchShare.requestedAt': 1 }).limit(200).lean()).filter(
+    (inv) => inv.branchShare && inReach(viewer, inv.branchShare) && !isClosed(inv),
+  );
+  const summaries = await familySummaries(viewer, pending.map((p) => p.familyId));
+  const out: BranchShareRequest[] = [];
+  for (const inv of pending) {
+    const base = summaryOf(inv, summaries.get(String(inv.familyId)));
+    if (!base || !inv.branchShare || !inv.shareToken) continue;
+    out.push({
+      ...base,
+      ...(await patrikaTextOf(inv)),
+      message: inv.message ?? null,
+      functions: inv.functions.map(functionView),
+      shareToken: inv.shareToken,
+      requestedByName: inv.branchShare.requestedByName,
+      requestedAt: inv.branchShare.requestedAt.toISOString(),
+    });
+  }
+  return out;
+}
+
+async function loadRequest(viewer: Viewer, id: string) {
+  const invitation = await load(id);
+  const share = invitation.branchShare;
+  if (!share || share.status !== 'pending' || !inReach(viewer, share)) throw notFound('That request is no longer waiting.');
+  return { invitation, share };
+}
+
+/**
+ * The committee shares it: a notice to the family's branch, in the words they
+ * checked, with the invitation's link so everyone there can open the card and
+ * reply. A remembrance is posted as a condolence.
+ */
+export async function approveBranchShare(viewer: Viewer, id: string, input: z.output<typeof approveBranchShareSchema>): Promise<BranchShareView> {
+  const { invitation, share } = await loadRequest(viewer, id);
+  if (isClosed(invitation)) throw closedError();
+  if (!invitation.shareToken) throw new AppError(409, 'CONFLICT', 'The family stopped the invitation link.', issue('validation.branchShareNoLink', 'invitation'));
+  const notice = await NoticeModel.create({
+    title: input.title,
+    body: input.body,
+    kind: REMEMBRANCE_KINDS.includes(invitation.kind) ? 'condolence' : 'celebration',
+    branchId: share.branchId,
+    branchAncestors: share.branchAncestors,
+    authorUserId: new Types.ObjectId(viewer.id),
+    authorName: viewer.name,
+  });
+  invitation.set({ 'branchShare.status': 'shared', 'branchShare.decidedByName': viewer.name, 'branchShare.decidedAt': new Date(), 'branchShare.noticeId': notice._id });
+  await invitation.save();
+  return (await branchShareOf(invitation.branchShare)) as BranchShareView;
+}
+
+export async function declineBranchShare(viewer: Viewer, id: string, input: z.output<typeof declineBranchShareSchema>): Promise<BranchShareView> {
+  const { invitation } = await loadRequest(viewer, id);
+  invitation.set({ 'branchShare.status': 'declined', 'branchShare.decidedByName': viewer.name, 'branchShare.decidedAt': new Date(), 'branchShare.reason': input.reason });
+  await invitation.save();
+  return (await branchShareOf(invitation.branchShare)) as BranchShareView;
 }

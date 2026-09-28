@@ -1,4 +1,4 @@
-import { PATRIKA_TYPES, addGuestsSchema, createInvitationSchema, invitationInputSchema, invitationRsvpSchema, linkReplySchema } from '@samaj/shared';
+import { PATRIKA_TYPES, addGuestsSchema, approveBranchShareSchema, declineBranchShareSchema, createInvitationSchema, invitationInputSchema, invitationRsvpSchema, linkReplySchema } from '@samaj/shared';
 import express, { type Request, type Response, Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { linkReplyLimiter } from '../middleware/rate-limit';
@@ -23,6 +23,16 @@ invitationRouter.get('/audience', async (req, res) => {
 });
 invitationRouter.post('/', async (req, res) => {
   res.status(201).json({ invitation: await invitations.createInvitation(viewer(req), createInvitationSchema.parse(req.body)) });
+});
+// For the committee: families asking to share an invitation with the whole branch.
+invitationRouter.get('/branch-requests', async (req, res) => {
+  res.json({ requests: await invitations.branchShareRequests(viewer(req)) });
+});
+invitationRouter.post('/:id/branch-share/approve', async (req, res) => {
+  res.json({ branchShare: await invitations.approveBranchShare(viewer(req), param(req, 'id'), approveBranchShareSchema.parse(req.body)) });
+});
+invitationRouter.post('/:id/branch-share/decline', async (req, res) => {
+  res.json({ branchShare: await invitations.declineBranchShare(viewer(req), param(req, 'id'), declineBranchShareSchema.parse(req.body)) });
 });
 // Stop seeing a family's invitations, or see them again.
 invitationRouter.put('/hidden/:familyId', async (req, res) => {
@@ -59,6 +69,13 @@ invitationRouter.delete('/:id/link-replies/:replyId', async (req, res) => {
   res.json({ invitation: await invitations.removeLinkReply(viewer(req), param(req, 'id'), param(req, 'replyId')) });
 });
 
+// The host asks the branch committee to share it with the whole branch, or takes the request back.
+invitationRouter.put('/:id/branch-share', async (req, res) => {
+  res.json({ invitation: await invitations.requestBranchShare(viewer(req), param(req, 'id')) });
+});
+invitationRouter.delete('/:id/branch-share', async (req, res) => {
+  res.json({ invitation: await invitations.withdrawBranchShare(viewer(req), param(req, 'id')) });
+});
 // The family's printed patrika: raw bytes, a photo or a PDF. The limit is above the real cap so the service can return a field error.
 invitationRouter.put('/:id/patrika', express.raw({ type: [...PATRIKA_TYPES], limit: '6mb' }), async (req, res) => {
   const data = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);

@@ -1,12 +1,13 @@
-import type { InvitationSummary } from '@samaj/shared';
+import { type InvitationSummary, can } from '@samaj/shared';
 import { Link } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge, Button, Card, EmptyState, ErrorState, Icon, Skeleton, buttonVariants, toast } from '@/components/ui';
-import { ChevronRight, Mail, Plus } from '@/components/ui/icons';
+import { ChevronRight, Mail, Megaphone, Plus } from '@/components/ui/icons';
 import { placeLabel } from '@/features/branches/api';
 import { formatDate, formatNumber, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
-import { useHideFamily, useMyInvitations } from './api';
+import { useBranchRequests, useHideFamily, useMyInvitations } from './api';
+import { useMe } from '@/features/auth/api';
 import { isRemembrance } from './kinds';
 
 function InvitationRow({ inv, hosting }: { inv: InvitationSummary; hosting: boolean }) {
@@ -53,6 +54,9 @@ export function InvitationsPage() {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
   const mine = useMyInvitations();
+  const me = useMe();
+  const committee = Boolean(me.data && can(me.data.role, 'notice:publish'));
+  const requests = useBranchRequests(committee);
   const hide = useHideFamily();
 
   const newButton = mine.data?.canHost && (
@@ -65,6 +69,13 @@ export function InvitationsPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <PageHeader title={t('invite.page.title')} description={t('invite.page.description')} actions={newButton || undefined} />
+      {(requests.data?.length ?? 0) > 0 && (
+        <Link to="/invitations/branch" className="flex items-center gap-3 rounded-md border border-primary/40 bg-primary-soft px-4 py-3 hover:border-primary">
+          <Icon icon={Megaphone} className="text-primary" weight="duotone" />
+          <span className="flex-1 font-semibold text-fg">{t('invite.branch.requestsLink', { count: formatNumber(requests.data?.length ?? 0, language) })}</span>
+          <Icon icon={ChevronRight} className="text-fg-muted" />
+        </Link>
+      )}
       {mine.isPending ? (
         <Skeleton className="h-60 w-full rounded-lg" />
       ) : mine.isError ? (

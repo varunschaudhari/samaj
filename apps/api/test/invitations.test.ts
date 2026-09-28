@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { FamilyLinkModel, linkPair } from '../src/models/family-link.model';
 import { InvitationGuestModel, InvitationModel } from '../src/models/invitation.model';
+import { NoticeModel } from '../src/models/notice.model';
 import { api, clearDb, createFamily, seedBranches, startDb, stopDb } from './helpers';
 
 beforeAll(startDb);
@@ -346,5 +347,48 @@ describe('invitations', () => {
     expect((await upcoming(host.cookie)).map((u) => [u.name, u.hosting])).toEqual([['मुंज', true]]);
     await api.post(`/api/invitations/${inv.id}/cancel`).set('Cookie', host.cookie);
     expect(await upcoming(parents.cookie)).toEqual([]);
+  });
+  it('asks the branch committee to share it, which posts a notice to the branch with the link', async () => {
+    const { host, parents } = await setup();
+    const committee = await createFamily(branches.district, { account: 'committee', people: [{ name: 'Branch Secretary' }] });
+    const pune = await createFamily(branches.pune, { account: 'committee', people: [{ name: 'Pune Secretary' }] });
+    const inv = (
+      await api
+        .post('/api/invitations')
+        .set('Cookie', host.cookie)
+        .send({ kind: 'dashakriya', forNames: 'कै. रामराव वाघ', functions: [{ name: 'दशक्रिया विधी', startsAt: at(3), venue: 'Amalner ghat' }], guestFamilyIds: [parents.familyId] })
+    ).body.invitation as InvitationDetail;
+
+    // Only the host asks, and asking makes the link.
+    expect((await api.put(`/api/invitations/${inv.id}/branch-share`).set('Cookie', parents.cookie)).status).toBe(403);
+    const asked = (await api.put(`/api/invitations/${inv.id}/branch-share`).set('Cookie', host.cookie)).body.invitation as InvitationDetail;
+    expect(asked.branchShare).toMatchObject({ status: 'pending', requestedByName: 'Anil Wagh', branch: { name: 'Amalner' } });
+    expect(asked.shareToken).toBeTruthy();
+    expect((await api.put(`/api/invitations/${inv.id}/branch-share`).set('Cookie', host.cookie)).status).toBe(409);
+
+    // The committee above the family's branch sees it; another branch's doesn't; members can't list.
+    const list = async (cookie: string) => (await api.get('/api/invitations/branch-requests').set('Cookie', cookie)).body.requests as { id: string; shareToken: string }[];
+    expect((await list(committee.cookie)).map((r) => r.id)).toEqual([inv.id]);
+    expect(await list(pune.cookie)).toEqual([]);
+    expect((await api.get('/api/invitations/branch-requests').set('Cookie', parents.cookie)).status).toBe(403);
+    expect((await api.post(`/api/invitations/${inv.id}/branch-share/approve`).set('Cookie', pune.cookie).send({ title: 'x x x', body: 'y' })).status).toBe(404);
+
+    const approved = await api.post(`/api/invitations/${inv.id}/branch-share/approve`).set('Cookie', committee.cookie).send({ title: 'भावपूर्ण श्रद्धांजली: कै. रामराव वाघ', body: `दशक्रिया विधी … /i/${asked.shareToken}` });
+    expect(approved.body.branchShare).toMatchObject({ status: 'shared', decidedByName: 'Branch Secretary' });
+    const notice = await NoticeModel.findById(approved.body.branchShare.noticeId).lean();
+    expect(notice).toMatchObject({ kind: 'condolence', title: 'भावपूर्ण श्रद्धांजली: कै. रामराव वाघ' });
+    expect(String(notice?.branchId)).toBe(branches.amalner);
+    expect(await list(committee.cookie)).toEqual([]);
+
+    // Declined, with a reason the host sees; then they may ask again.
+    const second = (await api.post('/api/invitations').set('Cookie', host.cookie).send(wedding([parents.familyId]))).body.invitation as InvitationDetail;
+    await api.put(`/api/invitations/${second.id}/branch-share`).set('Cookie', host.cookie);
+    expect((await api.post(`/api/invitations/${second.id}/branch-share/decline`).set('Cookie', committee.cookie).send({ reason: 'x' })).body.error.issues).toContainEqual({ path: 'reason', message: 'validation.declineReason' });
+    await api.post(`/api/invitations/${second.id}/branch-share/decline`).set('Cookie', committee.cookie).send({ reason: 'Weddings go to guests, not the whole branch.' });
+    const seen = (await api.get(`/api/invitations/${second.id}`).set('Cookie', host.cookie)).body.invitation as InvitationDetail;
+    expect(seen.branchShare).toMatchObject({ status: 'declined', reason: 'Weddings go to guests, not the whole branch.' });
+    expect((await api.put(`/api/invitations/${second.id}/branch-share`).set('Cookie', host.cookie)).body.invitation.branchShare.status).toBe('pending');
+    // Guests never see the request.
+    expect(((await api.get(`/api/invitations/${second.id}`).set('Cookie', parents.cookie)).body.invitation as InvitationDetail).branchShare).toBeUndefined();
   });
 });

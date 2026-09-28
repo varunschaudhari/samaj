@@ -25,7 +25,7 @@ export const FUNCTION_NAMES: Record<InvitationKind, string[]> = {
 };
 
 /** The text for WhatsApp: occasion, whose, each function with its time and place, and the link. */
-export function shareText(inv: InvitationDetail, labels: { kind: string; from: string; open: string }, language: Language, url: string) {
+export function shareText(inv: Pick<InvitationDetail, 'forNames' | 'functions' | 'message'>, labels: { kind: string; from: string; open: string }, language: Language, url: string) {
   return [
     `*${labels.kind}${inv.forNames ? `: ${inv.forNames}` : ''}*`,
     labels.from,

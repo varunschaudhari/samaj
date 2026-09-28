@@ -30,7 +30,7 @@ import { useDashboard } from '@/features/dashboard/api';
 import { useReviewCounts } from '@/features/families/api';
 import { useFamilyRequests } from '@/features/families/links-api';
 import { VerificationNotice } from '@/features/families/VerificationNotice';
-import { useMyInvitations } from '@/features/invitations/api';
+import { useBranchRequests, useMyInvitations } from '@/features/invitations/api';
 import { type MessageKey, formatDate, formatNumber, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 
@@ -147,20 +147,24 @@ function WorkCard({ user }: { user: PublicUser }) {
   const language = useLanguageStore((s) => s.language);
   const dashboard = useDashboard();
   const counts = useReviewCounts(true);
+  const shares = useBranchRequests(can(user.role, 'notice:publish'));
   const d = dashboard.data;
   const c = counts.data;
   const reviewHref = isGlobalRole(user.role) ? '/admin/review' : '/review';
   const n = (v: number) => (v > 999 ? '999+' : formatNumber(v, language));
 
-  const queues: { tab: string; label: MessageKey; icon: AppIcon; count: number }[] = c
+  const queues: { tab: string; label: MessageKey; icon: AppIcon; count: number; href?: string }[] = c
     ? [
         { tab: 'families', label: 'home.work.families', icon: ClipboardCheck, count: c.families },
         { tab: 'people', label: 'home.work.people', icon: UserPlus, count: c.members },
         { tab: 'moves', label: 'home.work.moves', icon: ArrowRight, count: c.moves },
         { tab: 'profiles', label: 'home.work.profiles', icon: HeartHandshake, count: c.profiles },
+        // Families asking to share an invitation with the branch: decided on their own page.
+        { tab: 'invitations', label: 'home.work.branchShares', icon: Megaphone, count: shares.data?.length ?? 0, href: '/invitations/branch' },
       ]
     : [];
   const waiting = queues.filter((q) => q.count > 0);
+  const pendingTotal = (c?.pending ?? 0) + (shares.data?.length ?? 0);
   const figures: { label: MessageKey; value: number; icon: AppIcon; tone: string }[] = d
     ? [
         { label: 'home.work.verifiedFamilies', value: d.families.verified, icon: UsersRound, tone: 'bg-primary-soft text-primary' },
@@ -188,7 +192,7 @@ function WorkCard({ user }: { user: PublicUser }) {
         <div className="flex flex-col gap-2">
           <h3 className="flex items-center justify-between gap-2 text-sm font-semibold text-fg">
             {t('home.work.attention')}
-            {c && c.pending > 0 && <span className="rounded-full bg-kumkum px-2 py-0.5 text-xs font-semibold text-on-primary tabular-nums">{n(c.pending)}</span>}
+            {pendingTotal > 0 && <span className="rounded-full bg-kumkum px-2 py-0.5 text-xs font-semibold text-on-primary tabular-nums">{n(pendingTotal)}</span>}
           </h3>
           {counts.isPending ? (
             <div className="flex flex-col gap-2" aria-busy="true">
@@ -207,7 +211,7 @@ function WorkCard({ user }: { user: PublicUser }) {
             <ul className="flex flex-col divide-y divide-line overflow-hidden rounded-md border border-line">
               {waiting.map((q) => (
                 <li key={q.tab}>
-                  <Link to={`${reviewHref}?tab=${q.tab}`} className="flex min-h-touch items-center gap-3 px-3 py-2.5 transition-colors duration-150 hover:bg-surface-muted">
+                  <Link to={q.href ?? `${reviewHref}?tab=${q.tab}`} className="flex min-h-touch items-center gap-3 px-3 py-2.5 transition-colors duration-150 hover:bg-surface-muted">
                     <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-kumkum-soft text-kumkum">
                       <Icon icon={q.icon} size="sm" />
                     </span>

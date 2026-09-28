@@ -1,4 +1,4 @@
-import { GUEST_VIAS, INVITATION_KINDS, RSVP_ANSWERS } from '@samaj/shared';
+import { BRANCH_SHARE_STATUSES, GUEST_VIAS, INVITATION_KINDS, RSVP_ANSWERS } from '@samaj/shared';
 import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
 
 const functionSchema = new Schema(
@@ -11,6 +11,23 @@ const functionSchema = new Schema(
     venue: { type: String, required: true, trim: true },
     mapUrl: { type: String, default: null },
     muhuratAt: { type: Date, default: null },
+  },
+  { _id: false },
+);
+
+/** Asking the branch committee to share an invitation with the whole branch, and their decision. */
+const branchShareSchema = new Schema(
+  {
+    status: { type: String, enum: BRANCH_SHARE_STATUSES, required: true },
+    /** The host family's branch when asked: whose committee decides. */
+    branchId: { type: Schema.Types.ObjectId, ref: 'Branch', required: true },
+    branchAncestors: { type: [Schema.Types.ObjectId], default: [] },
+    requestedByName: { type: String, required: true },
+    requestedAt: { type: Date, required: true },
+    decidedByName: { type: String, default: null },
+    decidedAt: { type: Date, default: null },
+    reason: { type: String, default: null },
+    noticeId: { type: Schema.Types.ObjectId, ref: 'Notice', default: null },
   },
   { _id: false },
 );
@@ -45,10 +62,12 @@ const invitationSchema = new Schema(
     /** The family's own printed patrika: a storage key ending in .jpg, .png, .webp or .pdf. */
     patrikaKey: { type: String, default: null },
     patrikaVersion: { type: Number, default: 0 },
+    branchShare: { type: branchShareSchema, default: null },
   },
   { timestamps: true },
 );
 invitationSchema.index({ familyId: 1, lastAt: -1 });
+invitationSchema.index({ 'branchShare.status': 1, 'branchShare.requestedAt': 1 });
 invitationSchema.index({ shareToken: 1 }, { unique: true, partialFilterExpression: { shareToken: { $type: 'string' } } });
 
 const answerSchema = new Schema(

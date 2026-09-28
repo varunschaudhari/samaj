@@ -1,4 +1,4 @@
-import type { CreateInvitationInput, InvitationAudience, InvitationDetail, InvitationInput, InvitationRsvpInput, LinkReplyInput, LinkReplyReceipt, MyInvitations, PublicInvitation } from '@samaj/shared';
+import type { BranchShareRequest, BranchShareView, CreateInvitationInput, InvitationAudience, InvitationDetail, InvitationInput, InvitationRsvpInput, LinkReplyInput, LinkReplyReceipt, MyInvitations, PublicInvitation } from '@samaj/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
@@ -91,3 +91,38 @@ export const publicLink = (token: string, language: string) => `${window.locatio
 export const useSetPatrika = (id: string) =>
   useInvitationMutation(async (file: File) => (await api.upload<{ invitation: InvitationDetail }>(`/invitations/${id}/patrika`, file)).invitation);
 export const useRemovePatrika = (id: string) => useInvitationMutation(async () => (await api.delete<{ invitation: InvitationDetail }>(`/invitations/${id}/patrika`)).invitation);
+
+/** The host asks the branch committee to share it with the whole branch, or takes the request back. */
+export const useRequestBranchShare = (id: string) =>
+  useInvitationMutation(async (ask: boolean) =>
+    (ask ? await api.put<{ invitation: InvitationDetail }>(`/invitations/${id}/branch-share`) : await api.delete<{ invitation: InvitationDetail }>(`/invitations/${id}/branch-share`)).invitation,
+  );
+
+const branchRequestsKey = [...invitationsKey, 'branch-requests'] as const;
+
+/** For the committee: families asking to share an invitation with their branch. */
+export function useBranchRequests(enabled: boolean) {
+  return useQuery({
+    queryKey: branchRequestsKey,
+    queryFn: async ({ signal }) => (await api.get<{ requests: BranchShareRequest[] }>('/invitations/branch-requests', undefined, signal)).requests,
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+/** Approve (posting the notice, in words the committee checked) or decline with a reason. */
+export function useDecideBranchShare() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (d: { id: string; approve: { title: string; body: string } } | { id: string; decline: { reason: string } }) =>
+      (
+        'approve' in d
+          ? await api.post<{ branchShare: BranchShareView }>(`/invitations/${d.id}/branch-share/approve`, d.approve)
+          : await api.post<{ branchShare: BranchShareView }>(`/invitations/${d.id}/branch-share/decline`, d.decline)
+      ).branchShare,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: branchRequestsKey });
+      void queryClient.invalidateQueries({ queryKey: ['notices'] });
+    },
+  });
+}

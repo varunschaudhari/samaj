@@ -16,6 +16,7 @@ import { InvitationCard } from './InvitationCard';
 import { InvitationForm, draftErrors, draftFrom, draftToInput } from './InvitationForm';
 import { cardFrom, isRemembrance, shareText } from './kinds';
 import { PatrikaEditor, PatrikaShown } from './Patrika';
+import { BranchSharePanel } from './BranchSharePanel';
 import { CalendarButton } from './CalendarButton';
 import { ShareLinkPanel } from './ShareLinkPanel';
 import { useCardImage } from './useCardImage';
@@ -213,6 +214,7 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
 
       <ShareLinkPanel invitation={invitation} />
       <PatrikaEditor invitationId={invitation.id} patrika={invitation.patrika} />
+      <BranchSharePanel invitation={invitation} />
 
       <Card as="section" aria-labelledby="tally" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
