@@ -49,7 +49,17 @@ export function NewInvitationPage() {
 
   const send = () => {
     setTried(true);
-    if (Object.keys(draftErrors(draft)).length > 0 || count === 0) return;
+    const invalid = Object.keys(draftErrors(draft)).length > 0;
+    if (invalid || count === 0) {
+      // The problem is often far up the page: say so, and take them to it.
+      toast.error(t(invalid ? 'invite.form.fixFirst' : 'validation.guestsNeeded'));
+      requestAnimationFrame(() => {
+        const target = invalid ? document.querySelector<HTMLElement>('[aria-invalid="true"]') : document.getElementById('invite-guests');
+        target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (invalid) target?.focus({ preventScroll: true });
+      });
+      return;
+    }
     create.mutate(
       { ...draftToInput(draft), ...picksToInput(picks) },
       {

@@ -1537,6 +1537,7 @@ export const en = {
   'validation.declineReason': 'Say why, so the family knows.',
   'validation.branchShareAsked': 'The committee already has this request.',
   'validation.branchShareNoLink': 'The family stopped the invitation\'s link. Ask them to make it again.',
+  'invite.form.fixFirst': 'Some details are missing. Fix the fields marked in red, then send.',
   'family.title': 'Family of {name}',
   'family.place': 'Village or town',
   'family.gotra': 'Gotra',

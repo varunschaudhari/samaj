@@ -1535,6 +1535,7 @@ export const mr: Record<MessageKey, string> = {
   'validation.declineReason': 'कारण लिहा, म्हणजे कुटुंबाला कळेल.',
   'validation.branchShareAsked': 'ही विनंती आधीच समितीकडे आहे.',
   'validation.branchShareNoLink': 'कुटुंबाने निमंत्रणाची लिंक बंद केली आहे. त्यांना ती पुन्हा तयार करण्यास सांगा.',
+  'invite.form.fixFirst': 'काही माहिती राहिली आहे. लाल रंगात दाखवलेली माहिती भरा आणि मग पाठवा.',
   'family.title': '{name} यांचे कुटुंब',
   'family.place': 'गाव किंवा शहर',
   'family.gotra': 'गोत्र',
