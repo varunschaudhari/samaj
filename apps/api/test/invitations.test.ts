@@ -407,4 +407,36 @@ describe('invitations', () => {
     expect(shraddha.theme).toBe('quiet');
     expect((await api.post('/api/invitations').set('Cookie', host.cookie).send(wedding([parents.familyId], { theme: 'neon' }))).status).toBe(400);
   });
+  it('invites single people by name, and a later household invitation takes over', async () => {
+    const { host, parents, friend } = await setup();
+    const big = await createFamily(branches.pune, { account: 'member', people: [{ name: 'Vasant Bagul' }, { name: 'Ramesh Bagul' }, { name: 'Suresh Bagul' }] });
+    const [, ramesh, suresh] = big.memberIds;
+
+    // Nobody at all is refused; a person alone is enough.
+    expect((await api.post('/api/invitations').set('Cookie', host.cookie).send(wedding([]))).body.error.issues).toContainEqual({ path: 'guestFamilyIds', message: 'validation.guestsNeeded' });
+    const inv = (await api.post('/api/invitations').set('Cookie', host.cookie).send(wedding([parents.familyId], { personIds: [ramesh] }))).body.invitation as InvitationDetail;
+    expect(inv.guests?.map((g) => [g.family.headName, g.via, g.people])).toEqual([
+      ['Ganpat Wagh', 'picked', []],
+      ['Vasant Bagul', 'person', ['Ramesh Bagul']],
+    ]);
+
+    // The family sees it addressed to him.
+    const theirs = (await api.get(`/api/invitations/${inv.id}`).set('Cookie', big.cookie)).body.invitation as InvitationDetail;
+    expect(theirs.mine?.people).toEqual(['Ramesh Bagul']);
+    expect(((await api.get('/api/invitations').set('Cookie', big.cookie)).body as MyInvitations).invited[0]?.forPeople).toEqual(['Ramesh Bagul']);
+
+    // Another person from the same family joins the same invitation; then the whole household.
+    let seen = (await api.post(`/api/invitations/${inv.id}/guests`).set('Cookie', host.cookie).send({ personIds: [suresh, friend.memberIds[0]] })).body.invitation as InvitationDetail;
+    expect(seen.guests?.find((g) => g.family.id === big.familyId)?.people).toEqual(['Ramesh Bagul', 'Suresh Bagul']);
+    expect(seen.guests?.find((g) => g.family.id === friend.familyId)?.people).toEqual(['Vijay Karale']);
+    seen = (await api.post(`/api/invitations/${inv.id}/guests`).set('Cookie', host.cookie).send({ guestFamilyIds: [big.familyId] })).body.invitation as InvitationDetail;
+    expect(seen.guests?.find((g) => g.family.id === big.familyId)).toMatchObject({ people: [], via: 'picked' });
+    expect(seen.invitedCount).toBe(3);
+
+    // Only real, living people of families the host may invite.
+    expect((await api.post(`/api/invitations/${inv.id}/guests`).set('Cookie', host.cookie).send({ personIds: [new Types.ObjectId().toHexString()] })).body.error.issues).toContainEqual({
+      path: 'personIds',
+      message: 'validation.guestNotAllowed',
+    });
+  });
 });

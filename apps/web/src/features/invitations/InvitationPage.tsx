@@ -28,10 +28,12 @@ function RsvpPanel({ invitation }: { invitation: InvitationDetail }) {
   const errorMessage = useErrorMessage();
   const answer = useAnswerInvitation(invitation.id);
   const quiet = isRemembrance(invitation.kind);
-  const [answers, setAnswers] = useState(() => startAnswers(invitation.functions, invitation.mine?.answers));
+  // Invited by name: the headcount starts at the people named.
+  const named = invitation.mine?.people.length || undefined;
+  const [answers, setAnswers] = useState(() => startAnswers(invitation.functions, invitation.mine?.answers, named));
   const [stay, setStay] = useState(invitation.mine?.stay ?? 0);
   useEffect(() => {
-    setAnswers(startAnswers(invitation.functions, invitation.mine?.answers));
+    setAnswers(startAnswers(invitation.functions, invitation.mine?.answers, named));
     setStay(invitation.mine?.stay ?? 0);
   }, [invitation.id, invitation.mine?.respondedAt]);
 
@@ -41,7 +43,7 @@ function RsvpPanel({ invitation }: { invitation: InvitationDetail }) {
   return (
     <Card as="section" aria-labelledby="rsvp" className="flex flex-col gap-4 print:hidden">
       <h2 id="rsvp" className="font-display text-lg font-semibold text-fg">
-        {t(quiet ? 'invite.rsvp.titleRemembrance' : 'invite.rsvp.title')}
+        {t(named ? (quiet ? 'invite.rsvp.titleRemembrancePerson' : 'invite.public.title') : quiet ? 'invite.rsvp.titleRemembrance' : 'invite.rsvp.title')}
       </h2>
       {invitation.changedSinceAnswer && (
         <p role="status" className="rounded-md border border-warning bg-warning-soft px-3 py-2 text-sm font-semibold text-warning">
@@ -104,7 +106,7 @@ function downloadCsv(inv: InvitationDetail, t: ReturnType<typeof useT>, language
       return `${t(labels[a.answer])} (${a.people}${a.children ? `, ${t('invite.host.childrenShort', { count: String(a.children) })}` : ''})`;
     });
   const rows = (inv.guests ?? []).map((g) => [
-    t('family.title', { name: g.family.headName }),
+    g.people.length ? `${g.people.join(', ')} (${t('family.title', { name: g.family.headName })})` : t('family.title', { name: g.family.headName }),
     placeLabel(g.family.place, g.family.branch, language),
     t(`invite.host.via.${g.via}`),
     ...cellsOf(g.answers),
@@ -255,10 +257,13 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
                   <Link to={`/families/${g.family.id}`} className="font-semibold text-fg hover:underline">
                     {t('family.title', { name: g.family.headName })}
                   </Link>
-                  <Badge>{t(`invite.host.via.${g.via}`)}</Badge>
+                  <Badge tone={g.via === 'person' ? 'kumkum' : 'neutral'}>{t(`invite.host.via.${g.via}`)}</Badge>
                   {g.stay > 0 && <Badge tone="info">{t('invite.host.stayBadge', { count: n(g.stay) })}</Badge>}
                 </span>
-                <span className="text-xs text-fg-muted">{placeLabel(g.family.place, g.family.branch, language)}</span>
+                <span className="text-xs text-fg-muted">
+                  {g.people.length > 0 && <span className="font-semibold text-fg">{t('invite.host.forPeople', { names: g.people.join(', ') })} · </span>}
+                  {placeLabel(g.family.place, g.family.branch, language)}
+                </span>
               </div>
               {g.respondedAt ? (
                 <AnswerPills kind={invitation.kind} functions={invitation.functions} answers={g.answers} />
@@ -439,7 +444,7 @@ export function InvitationPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <div className="print:hidden">{back}</div>
-      <InvitationCard cancelled={inv.cancelled} data={cardFrom(inv, inv.host.headName, `/api/invitations/${inv.id}`)} />
+      <InvitationCard cancelled={inv.cancelled} data={{ ...cardFrom(inv, inv.host.headName, `/api/invitations/${inv.id}`), addressee: inv.mine?.people.join(', ') || null }} />
       {inv.patrika && <PatrikaShown patrika={inv.patrika} src={`/api/invitations/${inv.id}/patrika`} />}
       {inv.isHost ? (
         <HostPanel invitation={inv} />

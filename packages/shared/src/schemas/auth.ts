@@ -165,6 +165,7 @@ export const VALIDATION_KEYS = [
   'validation.dailyInvitations',
   'validation.invitationCancelled',
   'validation.invitationClosed',
+  'validation.tooManyPeople',
   'validation.branchShareAsked',
   'validation.branchShareNoLink',
   'validation.memorialMember',

@@ -11,8 +11,8 @@ export const answerLabels = (kind: InvitationKind): Record<RsvpAnswer, MessageKe
 export type AnswerDraft = Omit<InvitationAnswer, 'answer'> & { answer: RsvpAnswer | '' };
 
 /** One draft per function, starting from answers already given. */
-export const startAnswers = (functions: InvitationFunction[], given: InvitationAnswer[] = []): AnswerDraft[] =>
-  functions.map((f) => given.find((a) => a.functionId === f.id) ?? { functionId: f.id, answer: '', people: 2, children: 0 });
+export const startAnswers = (functions: InvitationFunction[], given: InvitationAnswer[] = [], people = 2): AnswerDraft[] =>
+  functions.map((f) => given.find((a) => a.functionId === f.id) ?? { functionId: f.id, answer: '', people, children: 0 });
 
 export const answersReady = (answers: AnswerDraft[]) => answers.length > 0 && answers.every((a) => a.answer !== '');
 export const answersToInput = (answers: AnswerDraft[]) =>

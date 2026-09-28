@@ -131,25 +131,34 @@ export const invitationInputSchema = z.object({
 });
 export type InvitationInput = z.input<typeof invitationInputSchema>;
 
-const guestIds = z
+const idList = z
   .array(objectIdSchema)
-  .min(1, 'validation.guestsNeeded')
   .max(MAX_INVITATION_GUESTS, 'validation.tooManyGuests')
+  .default([])
   .transform((ids) => [...new Set(ids)]);
 
-export const createInvitationSchema = invitationInputSchema.extend({
-  guestFamilyIds: guestIds,
+/** People invited by name rather than their whole household: at most this many from one family. */
+export const MAX_PEOPLE_PER_FAMILY = 6;
+
+const guestFields = {
+  /** Whole households (सहकुटुंब). */
+  guestFamilyIds: idList,
+  /** Single people, by their member id: the card is addressed to them. */
+  personIds: idList,
   /** Families picked from the tree or linked families; any others count as picked from the directory. */
   treeFamilyIds: z.array(objectIdSchema).max(MAX_INVITATION_GUESTS).default([]),
   linkedFamilyIds: z.array(objectIdSchema).max(MAX_INVITATION_GUESTS).default([]),
-});
+};
+/** Someone must be invited: a household or a person. */
+const someGuest = (g: { guestFamilyIds: string[]; personIds: string[] }, ctx: z.RefinementCtx) => {
+  if (g.guestFamilyIds.length + g.personIds.length === 0) ctx.addIssue({ code: 'custom', path: ['guestFamilyIds'], message: 'validation.guestsNeeded' });
+};
+
+export const createInvitationSchema = invitationInputSchema.extend(guestFields).superRefine(someGuest);
 export type CreateInvitationInput = z.input<typeof createInvitationSchema>;
 
-export const addGuestsSchema = z.object({
-  guestFamilyIds: guestIds,
-  treeFamilyIds: z.array(objectIdSchema).max(MAX_INVITATION_GUESTS).default([]),
-  linkedFamilyIds: z.array(objectIdSchema).max(MAX_INVITATION_GUESTS).default([]),
-});
+export const addGuestsSchema = z.object(guestFields).superRefine(someGuest);
+export type AddGuestsInput = z.input<typeof addGuestsSchema>;
 
 export const invitationRsvpSchema = z.object({
   answers: z
@@ -214,7 +223,7 @@ export interface InvitationAnswer {
 }
 
 /** How a guest family came to be invited: from the host's family tree, their linked families, or picked from the directory. */
-export const GUEST_VIAS = ['tree', 'linked', 'picked'] as const;
+export const GUEST_VIAS = ['tree', 'linked', 'picked', 'person'] as const;
 export type GuestVia = (typeof GUEST_VIAS)[number];
 
 export interface InvitationSummary {
@@ -232,6 +241,8 @@ export interface InvitationSummary {
   answered?: boolean;
   /** For a guest: the host changed a time or venue after they answered. */
   changedSinceAnswer?: boolean;
+  /** For a guest invited by name: whom it is for. Absent for the whole household. */
+  forPeople?: string[];
   /** For the host. */
   invitedCount?: number;
   repliedCount?: number;
@@ -240,6 +251,8 @@ export interface InvitationSummary {
 export interface InvitationGuestView {
   family: LinkedFamily;
   via: GuestVia;
+  /** Invited by name: these people only. Empty: the whole household. */
+  people: string[];
   answers: InvitationAnswer[];
   stay: number;
   respondedByName: string | null;
@@ -263,7 +276,7 @@ export interface InvitationDetail extends InvitationSummary, PatrikaText {
   functions: InvitationFunction[];
   isHost: boolean;
   /** For a guest: their family's answers. */
-  mine?: { answers: InvitationAnswer[]; stay: number; respondedByName: string | null; respondedAt: string | null };
+  mine?: { answers: InvitationAnswer[]; stay: number; respondedByName: string | null; respondedAt: string | null; people: string[] };
   /** For the host: every guest family and the headcount per function. */
   guests?: InvitationGuestView[];
   tally?: { functionId: string; yes: number; maybe: number; no: number; people: number; children: number }[];

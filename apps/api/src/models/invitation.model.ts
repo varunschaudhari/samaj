@@ -90,6 +90,8 @@ const invitationGuestSchema = new Schema(
     /** The host family, so a day's sends can be counted without a join. */
     hostFamilyId: { type: Schema.Types.ObjectId, ref: 'Family', required: true },
     via: { type: String, enum: GUEST_VIAS, required: true },
+    /** Invited by name: these people only, and the card is addressed to them. Empty: the whole household. */
+    people: { type: [new Schema({ memberId: { type: Schema.Types.ObjectId, ref: 'Member', required: true }, name: { type: String, required: true } }, { _id: false })], default: [] },
     /** Copied from the invitation, so a guest's list is one query in date order. */
     lastAt: { type: Date, required: true },
     answers: { type: [answerSchema], default: [] },

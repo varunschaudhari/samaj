@@ -87,7 +87,8 @@ export function InvitationCard({ data, cancelled = false }: { data: CardData; ca
       )}
       {quiet && data.memorial?.years && <p className="mt-1 text-sm text-(--c-muted)">{data.memorial.years}</p>}
       <p className="mx-auto mt-3 max-w-md text-sm text-(--c-muted)">
-        {quiet ? t('invite.card.remembranceInvite', { name: data.hostName }) : t('invite.card.invitesYou', { name: data.hostName })}
+        {/* Invited by name: "invites you", not "you and your family". */}
+        {t(quiet ? (data.addressee ? 'invite.card.remembranceInvitePerson' : 'invite.card.remembranceInvite') : data.addressee ? 'invite.card.invitesPerson' : 'invite.card.invitesYou', { name: data.hostName })}
       </p>
       <Ornament kind={palette.ornament} className="mx-auto mt-5 w-full max-w-xs" />
       <ol className="mx-auto mt-5 flex max-w-md flex-col gap-3 text-left">

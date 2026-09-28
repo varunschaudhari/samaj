@@ -13,17 +13,27 @@ export interface GuestPicks {
   linked: Set<string>;
   /** From the directory: id to name and place, to show them. */
   picked: Map<string, { headName: string; place: string }>;
+  /** Single people, not their household: member id to their name and family. */
+  people: Map<string, { name: string; familyId: string }>;
 }
 
-export const emptyPicks = (): GuestPicks => ({ tree: new Set(), linked: new Set(), picked: new Map() });
+export const emptyPicks = (): GuestPicks => ({ tree: new Set(), linked: new Set(), picked: new Map(), people: new Map() });
 
-/** The ids the API wants, each family once. */
+const householdIds = (p: GuestPicks) => new Set([...p.tree, ...p.linked, ...p.picked.keys()]);
+
+/** The ids the API wants: each household once, and people whose household isn't invited whole. */
 export function picksToInput(p: GuestPicks) {
-  const all = new Set([...p.tree, ...p.linked, ...p.picked.keys()]);
-  return { guestFamilyIds: [...all], treeFamilyIds: [...p.tree], linkedFamilyIds: [...p.linked].filter((id) => !p.tree.has(id)) };
+  const all = householdIds(p);
+  return {
+    guestFamilyIds: [...all],
+    personIds: [...p.people].filter(([, person]) => !all.has(person.familyId)).map(([id]) => id),
+    treeFamilyIds: [...p.tree],
+    linkedFamilyIds: [...p.linked].filter((id) => !p.tree.has(id)),
+  };
 }
 
-export const pickCount = (p: GuestPicks) => new Set([...p.tree, ...p.linked, ...p.picked.keys()]).size;
+/** Families invited: households, and the families of people invited by name. */
+export const pickCount = (p: GuestPicks) => new Set([...householdIds(p), ...[...p.people.values()].map((x) => x.familyId)]).size;
 
 function FamilyGroup({ title, families, chosen, onChange, exclude }: { title: string; families: (LinkedFamily & { through?: string | null })[]; chosen: Set<string>; onChange: (next: Set<string>) => void; exclude: Set<string> }) {
   const t = useT();
@@ -122,7 +132,8 @@ export function GuestPicker({
   });
   // One row per family, not the invitee's own or ones already invited or chosen.
   const chosen = new Set([...picks.tree, ...picks.linked, ...picks.picked.keys()]);
-  const results = [...new Map((found.data ?? []).filter((m) => m.familyId !== ownFamilyId && !alreadyInvited.has(m.familyId)).map((m) => [m.familyId, m])).values()];
+  // One row per person: invite their whole family, or only them.
+  const results = (found.data ?? []).filter((m) => m.familyId !== ownFamilyId && !alreadyInvited.has(m.familyId));
   const count = pickCount(picks);
 
   // Each family goes where it would be ticked: the tree, linked families, or picked from the directory.
@@ -130,7 +141,7 @@ export function GuestPicker({
     if (!audience) return;
     const inTree = new Set(audience.tree.map((f) => f.id));
     const inLinked = new Set(audience.linked.map((f) => f.id));
-    const next = { tree: new Set(picks.tree), linked: new Set(picks.linked), picked: new Map(picks.picked) };
+    const next = { ...picks, tree: new Set(picks.tree), linked: new Set(picks.linked), picked: new Map(picks.picked) };
     for (const f of list.families) {
       if (f.id === ownFamilyId || alreadyInvited.has(f.id)) continue;
       if (inTree.has(f.id)) next.tree.add(f.id);
@@ -163,36 +174,73 @@ export function GuestPicker({
             {results.length === 0 ? (
               <li className="px-3 py-2 text-sm text-fg-muted">{t('tree.noMatch')}</li>
             ) : (
-              results.map((m) => (
-                <li key={m.familyId}>
-                  <button
-                    type="button"
-                    disabled={chosen.has(m.familyId)}
-                    onClick={() => {
-                      const picked = new Map(picks.picked);
-                      picked.set(m.familyId, { headName: m.familyHead ?? m.name, place: m.place });
-                      onChange({ ...picks, picked });
-                      setQuery('');
-                    }}
-                    className="flex min-h-touch w-full items-center gap-3 px-3 py-1.5 text-left hover:bg-surface-muted disabled:opacity-50"
-                  >
-                    <Avatar name={m.familyHead ?? m.name} size="sm" />
-                    <span className="flex min-w-0 flex-col leading-tight">
-                      <span className="truncate text-sm font-semibold text-fg">{t('family.title', { name: m.familyHead ?? m.name })}</span>
+              results.map((m) => {
+                const family = m.familyHead ?? m.name;
+                const whole = chosen.has(m.familyId);
+                return (
+                  <li key={m.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                    <Avatar name={m.name} src={m.photoUrl} size="sm" />
+                    <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                      <span className="truncate text-sm font-semibold text-fg">{m.name}</span>
                       <span className="truncate text-xs text-fg-muted">
-                        {m.name} · {m.place}
+                        {t('family.title', { name: family })} · {m.place}
                       </span>
                     </span>
-                  </button>
-                </li>
-              ))
+                    <span className="flex gap-1.5">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={whole}
+                        onClick={() => {
+                          const picked = new Map(picks.picked);
+                          picked.set(m.familyId, { headName: family, place: m.place });
+                          onChange({ ...picks, picked });
+                          setQuery('');
+                        }}
+                      >
+                        {t('invite.form.wholeFamily')}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={whole || picks.people.has(m.id)}
+                        onClick={() => {
+                          const people = new Map(picks.people);
+                          people.set(m.id, { name: m.name, familyId: m.familyId });
+                          onChange({ ...picks, people });
+                          setQuery('');
+                        }}
+                      >
+                        {t('invite.form.onlyPerson', { name: m.name.split(' ')[0] ?? m.name })}
+                      </Button>
+                    </span>
+                  </li>
+                );
+              })
             )}
           </ul>
         )}
-        {picks.picked.size > 0 && (
+        {(picks.picked.size > 0 || picks.people.size > 0) && (
           <div className="flex flex-col gap-1">
             <span className="text-sm font-semibold text-fg">{t('invite.form.picked')}</span>
             <ul className="flex flex-wrap gap-2">
+              {[...picks.people].map(([id, p]) => (
+                <li key={id} className="flex items-center gap-1 rounded-full border border-kumkum/40 bg-kumkum-soft py-1 pr-1 pl-3 text-sm text-fg">
+                  {t('invite.form.personChip', { name: p.name })}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={t('invite.form.removeGuest', { name: p.name })}
+                    onClick={() => {
+                      const people = new Map(picks.people);
+                      people.delete(id);
+                      onChange({ ...picks, people });
+                    }}
+                  >
+                    <Icon icon={X} size="sm" />
+                  </Button>
+                </li>
+              ))}
               {[...picks.picked].map(([id, f]) => (
                 <li key={id} className="flex items-center gap-1 rounded-full border border-line bg-surface py-1 pr-1 pl-3 text-sm">
                   {t('family.title', { name: f.headName })}

@@ -7,6 +7,7 @@ import {
   type EarlierGuestList,
   type LinkReplyReceipt,
   MAX_LINK_REPLIES,
+  MAX_PEOPLE_PER_FAMILY,
   PATRIKA_MAX_BYTES,
   REMEMBRANCE_KINDS,
   type PatrikaText,
@@ -181,14 +182,30 @@ const EARLIER_LISTS = 6;
 
 const sentSince = (familyId: Types.ObjectId) => InvitationGuestModel.countDocuments({ hostFamilyId: familyId, createdAt: { $gte: new Date(Date.now() - DAY) } });
 
+type GuestPerson = { memberId: Types.ObjectId; name: string };
+/** What an invitation already has for a family: the whole household (no people), or named people. */
+type Existing = Map<string, { people: GuestPerson[] }>;
+
 /**
- * Checks the families about to be invited: verified families the viewer may
- * see, not their own, not already invited, and not ones that hid this
- * family's invitations (left out without saying so). Keeps within the daily
- * limit.
+ * Checks who is about to be invited: households, and single people from
+ * other households. Verified families the viewer may see, not their own,
+ * not ones that hid this family's invitations (left out without saying
+ * so). Keeps within the daily limit. Returns new guests, and existing ones
+ * to change: people added, or a named invitation become the whole household.
  */
-async function guestsToAdd(viewer: Viewer, host: Types.ObjectId, input: GuestsInput, already: Set<string>) {
-  const ids = input.guestFamilyIds.filter((id) => id !== String(host) && !already.has(id));
+async function guestsToAdd(viewer: Viewer, host: Types.ObjectId, input: GuestsInput, existing: Existing) {
+  const households = new Set(input.guestFamilyIds.filter((id) => id !== String(host)));
+  const members = input.personIds.length
+    ? await MemberModel.find({ _id: { $in: input.personIds.map((id) => new Types.ObjectId(id)) }, deceased: { $ne: true } }, { familyId: 1, name: 1 }).lean()
+    : [];
+  if (members.length < input.personIds.length) throw new AppError(400, 'VALIDATION_FAILED', 'Some of those people can’t be invited.', issue('validation.guestNotAllowed', 'personIds'));
+  const peopleBy = new Map<string, GuestPerson[]>();
+  for (const m of members) {
+    const id = String(m.familyId);
+    if (id === String(host) || households.has(id)) continue;
+    peopleBy.set(id, [...(peopleBy.get(id) ?? []), { memberId: m._id, name: m.name }]);
+  }
+  const ids = [...new Set([...households, ...peopleBy.keys()])];
   const [families, mutes, sentToday] = await Promise.all([
     FamilyModel.find({ _id: { $in: ids.map((id) => new Types.ObjectId(id)) } }, { history: 0 }).lean(),
     InvitationMuteModel.find({ mutedFamilyId: host, familyId: { $in: ids.map((id) => new Types.ObjectId(id)) } }, { familyId: 1 }).lean(),
@@ -197,20 +214,40 @@ async function guestsToAdd(viewer: Viewer, host: Types.ObjectId, input: GuestsIn
   const muted = new Set(mutes.map((m) => String(m.familyId)));
   const ok = families.filter((f) => f.status === 'verified' && canViewFamily(viewer, f));
   if (ok.length < ids.length) throw new AppError(400, 'VALIDATION_FAILED', 'Some of those families can’t be invited.', issue('validation.guestNotAllowed'));
-  if (sentToday + ok.length > DAILY_INVITATION_GUESTS) {
-    throw new AppError(409, 'CONFLICT', `A family can invite up to ${DAILY_INVITATION_GUESTS} families a day.`, issue('validation.dailyInvitations'));
-  }
   const tree = new Set(input.treeFamilyIds);
   const linked = new Set(input.linkedFamilyIds);
-  return ok
-    .filter((f) => !muted.has(String(f._id)))
-    .map((f) => ({ familyId: f._id, via: (tree.has(String(f._id)) ? 'tree' : linked.has(String(f._id)) ? 'linked' : 'picked') as GuestVia }));
+  const fresh: { familyId: Types.ObjectId; via: GuestVia; people: GuestPerson[] }[] = [];
+  const changes: { familyId: Types.ObjectId; people: GuestPerson[] }[] = [];
+  for (const f of ok) {
+    const id = String(f._id);
+    if (muted.has(id)) continue;
+    const people = households.has(id) ? [] : (peopleBy.get(id) ?? []);
+    const before = existing.get(id);
+    if (!before) {
+      if (people.length > MAX_PEOPLE_PER_FAMILY) throw new AppError(400, 'VALIDATION_FAILED', 'Too many people from one family.', issue('validation.tooManyPeople', 'personIds'));
+      const via: GuestVia = people.length ? 'person' : tree.has(id) ? 'tree' : linked.has(id) ? 'linked' : 'picked';
+      fresh.push({ familyId: f._id, via, people });
+      continue;
+    }
+    // Already the whole household: nothing to add.
+    if (before.people.length === 0) continue;
+    if (people.length === 0) changes.push({ familyId: f._id, people: [] });
+    else {
+      const merged = [...new Map([...before.people, ...people].map((p) => [String(p.memberId), p])).values()];
+      if (merged.length > MAX_PEOPLE_PER_FAMILY) throw new AppError(400, 'VALIDATION_FAILED', 'Too many people from one family.', issue('validation.tooManyPeople', 'personIds'));
+      if (merged.length > before.people.length) changes.push({ familyId: f._id, people: merged });
+    }
+  }
+  if (sentToday + fresh.length > DAILY_INVITATION_GUESTS) {
+    throw new AppError(409, 'CONFLICT', `A family can invite up to ${DAILY_INVITATION_GUESTS} families a day.`, issue('validation.dailyInvitations'));
+  }
+  return { fresh, changes };
 }
 
 export async function createInvitation(viewer: Viewer, input: CreateInput): Promise<InvitationDetail> {
   assertHost(viewer);
   const host = new Types.ObjectId(viewer.familyId);
-  const guests = await guestsToAdd(viewer, host, input, new Set());
+  const { fresh: guests } = await guestsToAdd(viewer, host, input, new Map());
   const { functions, firstAt, lastAt } = toFunctions(input);
   const invitation = await InvitationModel.create({
     familyId: host,
@@ -281,7 +318,7 @@ export async function getInvitation(viewer: Viewer, id: string): Promise<Invitat
     ? await Promise.all([InvitationGuestModel.find({ invitationId: invitation._id }).sort({ createdAt: 1 }).lean(), InvitationLinkReplyModel.find({ invitationId: invitation._id }).sort({ createdAt: 1 }).lean()])
     : [[], []];
   const summaries = await familySummaries(viewer, [invitation.familyId, ...guests.map((g) => g.familyId)]);
-  const base = summaryOf(invitation.toObject(), summaries.get(String(invitation.familyId)), host ? { invitedCount: guests.length, repliedCount: guests.filter((g) => g.respondedAt).length } : { answered: Boolean(mine?.respondedAt), changedSinceAnswer: changedSince(invitation, mine?.respondedAt) });
+  const base = summaryOf(invitation.toObject(), summaries.get(String(invitation.familyId)), host ? { invitedCount: guests.length, repliedCount: guests.filter((g) => g.respondedAt).length } : { answered: Boolean(mine?.respondedAt), changedSinceAnswer: changedSince(invitation, mine?.respondedAt), ...(mine?.people?.length && { forPeople: mine.people.map((p) => p.name) }) });
   if (!base) throw gone();
   const detail: InvitationDetail = {
     ...base,
@@ -293,11 +330,11 @@ export async function getInvitation(viewer: Viewer, id: string): Promise<Invitat
     isHost: host,
     patrika: patrikaOf(invitation),
   };
-  if (mine) detail.mine = { answers: answersOf(mine.answers), stay: mine.stay ?? 0, respondedByName: mine.respondedByName ?? null, respondedAt: mine.respondedAt?.toISOString() ?? null };
+  if (mine) detail.mine = { people: (mine.people ?? []).map((p) => p.name), answers: answersOf(mine.answers), stay: mine.stay ?? 0, respondedByName: mine.respondedByName ?? null, respondedAt: mine.respondedAt?.toISOString() ?? null };
   if (host) {
     detail.guests = guests.flatMap((g) => {
       const family = summaries.get(String(g.familyId));
-      return family ? [{ family, via: g.via, answers: answersOf(g.answers), stay: g.stay ?? 0, respondedByName: g.respondedByName ?? null, respondedAt: g.respondedAt?.toISOString() ?? null }] : [];
+      return family ? [{ family, via: g.via, people: (g.people ?? []).map((p) => p.name), answers: answersOf(g.answers), stay: g.stay ?? 0, respondedByName: g.respondedByName ?? null, respondedAt: g.respondedAt?.toISOString() ?? null }] : [];
     });
     detail.shareToken = invitation.shareToken ?? null;
     detail.branchShare = await branchShareOf(invitation.branchShare);
@@ -349,9 +386,16 @@ export async function addGuests(viewer: Viewer, id: string, input: GuestsInput):
   assertHost(viewer);
   const invitation = await loadHosted(viewer, id);
   if (isClosed(invitation)) throw new AppError(409, 'CONFLICT', 'This invitation is closed.', issue('validation.invitationClosed', 'invitation'));
-  const already = new Set((await InvitationGuestModel.find({ invitationId: invitation._id }, { familyId: 1 }).lean()).map((g) => String(g.familyId)));
-  const guests = await guestsToAdd(viewer, invitation.familyId, input, already);
-  await InvitationGuestModel.insertMany(guests.map((g) => ({ ...g, invitationId: invitation._id, hostFamilyId: invitation.familyId, lastAt: invitation.lastAt })));
+  const existing: Existing = new Map(
+    (await InvitationGuestModel.find({ invitationId: invitation._id }, { familyId: 1, people: 1 }).lean()).map((g) => [String(g.familyId), { people: g.people ?? [] }]),
+  );
+  const { fresh, changes } = await guestsToAdd(viewer, invitation.familyId, input, existing);
+  await InvitationGuestModel.insertMany(fresh.map((g) => ({ ...g, invitationId: invitation._id, hostFamilyId: invitation.familyId, lastAt: invitation.lastAt })));
+  await Promise.all(
+    changes.map((c) =>
+      InvitationGuestModel.updateOne({ invitationId: invitation._id, familyId: c.familyId }, { $set: { people: c.people, ...(c.people.length === 0 && { via: 'picked' }) } }),
+    ),
+  );
   return getInvitation(viewer, id);
 }
 
@@ -497,7 +541,11 @@ export async function myInvitations(viewer: Viewer): Promise<MyInvitations> {
     invited: guestOf.flatMap((g) => {
       const inv = byId.get(String(g.invitationId));
       if (!inv || muted.has(String(inv.familyId))) return [];
-      const s = summaryOf(inv, summaries.get(String(inv.familyId)), { answered: Boolean(g.respondedAt), changedSinceAnswer: changedSince(inv, g.respondedAt) });
+      const s = summaryOf(inv, summaries.get(String(inv.familyId)), {
+        answered: Boolean(g.respondedAt),
+        changedSinceAnswer: changedSince(inv, g.respondedAt),
+        ...(g.people?.length && { forPeople: g.people.map((p) => p.name) }),
+      });
       return s ? [s] : [];
     }),
     hosting: hosted.flatMap((inv) => {

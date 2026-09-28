@@ -37,6 +37,7 @@ function InvitationRow({ inv, hosting }: { inv: InvitationSummary; hosting: bool
             )}
           </span>
           <span className="text-sm text-fg-muted">
+            {!hosting && inv.forPeople && <span className="font-semibold text-kumkum">{t('invite.host.forPeople', { names: inv.forPeople.join(', ') })} · </span>}
             {!hosting && `${t('invite.from', { name: inv.host.headName })} · ${placeLabel(inv.host.place, inv.host.branch, language)} · `}
             {dates}
             {inv.functionCount > 1 && ` · ${t('invite.list.functions', { count: n(inv.functionCount) })}`}
