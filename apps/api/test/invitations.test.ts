@@ -391,4 +391,20 @@ describe('invitations', () => {
     // Guests never see the request.
     expect(((await api.get(`/api/invitations/${second.id}`).set('Cookie', parents.cookie)).body.invitation as InvitationDetail).branchShare).toBeUndefined();
   });
+
+  it('keeps a card design that suits the occasion, and falls back to the occasion default', async () => {
+    const { host, parents } = await setup();
+    const royal = (await api.post('/api/invitations').set('Cookie', host.cookie).send(wedding([parents.familyId], { theme: 'royal' }))).body.invitation as InvitationDetail;
+    expect(royal.theme).toBe('royal');
+    expect(((await api.get(`/api/invitations/${royal.id}`).set('Cookie', parents.cookie)).body.invitation as InvitationDetail).theme).toBe('royal');
+    // A celebration's design on a remembrance is shown as the remembrance default.
+    const shraddha = (
+      await api
+        .post('/api/invitations')
+        .set('Cookie', host.cookie)
+        .send({ kind: 'shraddha', theme: 'royal', functions: [{ name: 'श्राद्ध', startsAt: at(5), venue: 'Home' }], guestFamilyIds: [parents.familyId] })
+    ).body.invitation as InvitationDetail;
+    expect(shraddha.theme).toBe('quiet');
+    expect((await api.post('/api/invitations').set('Cookie', host.cookie).send(wedding([parents.familyId], { theme: 'neon' }))).status).toBe(400);
+  });
 });

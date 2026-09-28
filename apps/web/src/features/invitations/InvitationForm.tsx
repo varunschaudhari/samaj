@@ -1,4 +1,4 @@
-import { type InvitationDetail, type InvitationInput, type InvitationKind, MAX_INVITATION_FUNCTIONS, invitationInputSchema } from '@samaj/shared';
+import { type InvitationDetail, type InvitationInput, type InvitationKind, type InvitationTheme, MAX_INVITATION_FUNCTIONS, invitationInputSchema, themeFor } from '@samaj/shared';
 import { Button, Chip, Input, Textarea } from '@/components/ui';
 import { Plus, Trash2 } from '@/components/ui/icons';
 import { fromLocalInput, toLocalInput } from '@/features/community/events-api';
@@ -6,6 +6,8 @@ import { fieldError } from '@/features/auth/form-errors';
 import { useT } from '@/i18n';
 import { CELEBRATIONS, FUNCTION_NAMES, REMEMBRANCES, isRemembrance } from './kinds';
 import { PatrikaDetails } from './PatrikaDetails';
+import { TemplatePicker, WordingChips } from './TemplatePicker';
+import { ThemePicker } from './ThemePicker';
 
 export interface FunctionDraft {
   id?: string;
@@ -19,6 +21,7 @@ export interface FunctionDraft {
 
 export interface InvitationDraft {
   kind: InvitationKind;
+  theme: InvitationTheme | null;
   forNames: string;
   message: string;
   functions: FunctionDraft[];
@@ -40,6 +43,7 @@ export const draftFrom = (inv?: InvitationDetail): InvitationDraft =>
   inv
     ? {
         kind: inv.kind,
+        theme: inv.theme,
         forNames: inv.forNames ?? '',
         message: inv.message ?? '',
         functions: inv.functions.map((f) => ({ id: f.id, name: f.name, startsLocal: toLocalInput(f.startsAt), endsLocal: toLocalInput(f.endsAt), venue: f.venue, mapUrl: f.mapUrl ?? '', muhuratLocal: toLocalInput(f.muhuratAt) })),
@@ -49,11 +53,12 @@ export const draftFrom = (inv?: InvitationDetail): InvitationDraft =>
         inviters: lines(inv.inviters),
         memorialMemberId: inv.memorial?.memberId ?? null,
       }
-    : { kind: 'wedding', forNames: '', message: '', functions: [emptyFunction()], honorees: [], kripa: '', blessings: '', inviters: '', memorialMemberId: null };
+    : { kind: 'wedding', theme: null, forNames: '', message: '', functions: [emptyFunction()], honorees: [], kripa: '', blessings: '', inviters: '', memorialMemberId: null };
 
 /** The draft as the API wants it; datetime-local values become ISO times. */
 export const draftToInput = (d: InvitationDraft): InvitationInput => ({
   kind: d.kind,
+  theme: themeFor(d.kind, d.theme),
   forNames: d.forNames,
   message: d.message,
   functions: d.functions.map((f) => ({
@@ -110,11 +115,14 @@ export function InvitationForm({ draft, onChange, errors }: { draft: InvitationD
         ))}
       </fieldset>
 
+      <ThemePicker kind={draft.kind} value={draft.theme} onChange={(theme) => set({ theme })} />
+
       <Input label={t('invite.form.forNames')} labelSuffix={t('common.optional')} hint={t('invite.form.forNamesHint')} value={draft.forNames} onChange={(e) => set({ forNames: e.target.value })} error={err('forNames')} />
 
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-1 text-sm font-semibold text-fg">{t('invite.form.functions')}</legend>
         <p className="-mt-2 text-sm text-fg-muted">{t('invite.form.functionsHint')}</p>
+        <TemplatePicker draft={draft} onChange={onChange} />
         {draft.functions.map((f, i) => (
           <div key={f.id ?? i} className="flex flex-col gap-3 rounded-md border border-line p-3">
             <div className="flex items-end gap-2">
@@ -161,6 +169,7 @@ export function InvitationForm({ draft, onChange, errors }: { draft: InvitationD
 
       <PatrikaDetails draft={draft} onChange={onChange} errors={errors} />
 
+      <WordingChips draft={draft} onChange={onChange} />
       <Textarea label={t('invite.form.message')} labelSuffix={t('common.optional')} hint={t('invite.form.messageHint')} rows={3} maxLength={1000} value={draft.message} onChange={(e) => set({ message: e.target.value })} error={err('message')} />
     </div>
   );

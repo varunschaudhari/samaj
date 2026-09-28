@@ -29,6 +29,7 @@ import {
   type invitationInputSchema,
   type invitationRsvpSchema,
   type linkReplySchema,
+  themeFor,
 } from '@samaj/shared';
 import { createHash, randomBytes } from 'node:crypto';
 import { Types } from 'mongoose';
@@ -94,7 +95,7 @@ async function memorialOf(host: Types.ObjectId, memberId: string | null) {
 }
 
 /** The patrika fields as stored, from the form. */
-const patrikaFields = (input: InvitationInput) => ({ honorees: input.honorees, kripa: input.kripa, blessings: input.blessings, inviters: input.inviters });
+const patrikaFields = (input: InvitationInput) => ({ honorees: input.honorees, kripa: input.kripa, blessings: input.blessings, inviters: input.inviters, theme: input.theme ? themeFor(input.kind, input.theme) : null });
 
 const patrikaOf = (inv: Pick<InvitationDoc, 'patrikaKey' | 'patrikaVersion'>): PatrikaView | null =>
   inv.patrikaKey ? { kind: inv.patrikaKey.endsWith('.pdf') ? 'pdf' : 'image', version: inv.patrikaVersion ?? 0 } : null;
@@ -285,6 +286,7 @@ export async function getInvitation(viewer: Viewer, id: string): Promise<Invitat
   const detail: InvitationDetail = {
     ...base,
     message: invitation.message ?? null,
+    theme: themeFor(invitation.kind, invitation.theme),
     sentByName: invitation.sentByName,
     functions: invitation.functions.map(functionView),
     ...(await patrikaTextOf(invitation)),
@@ -398,6 +400,7 @@ export async function publicInvitation(token: string): Promise<PublicInvitation>
   const head = await MemberModel.findOne({ familyId: invitation.familyId, isHead: true }, { name: 1 }).lean();
   return {
     kind: invitation.kind,
+    theme: themeFor(invitation.kind, invitation.theme),
     forNames: invitation.forNames ?? null,
     message: invitation.message ?? null,
     hostName: head?.name ?? invitation.sentByName,
@@ -662,6 +665,7 @@ export async function branchShareRequests(viewer: Viewer): Promise<BranchShareRe
       ...base,
       ...(await patrikaTextOf(inv)),
       message: inv.message ?? null,
+      theme: themeFor(inv.kind, inv.theme),
       functions: inv.functions.map(functionView),
       shareToken: inv.shareToken,
       requestedByName: inv.branchShare.requestedByName,

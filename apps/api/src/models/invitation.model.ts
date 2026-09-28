@@ -41,6 +41,8 @@ const invitationSchema = new Schema(
     kind: { type: String, enum: INVITATION_KINDS, required: true },
     forNames: { type: String, default: null, trim: true },
     message: { type: String, default: null },
+    /** The card's look; shown as the occasion's default when unset or unsuited. */
+    theme: { type: String, default: null },
     functions: { type: [functionSchema], default: [] },
     /** As a patrika prints them: whose occasion, the elders invoked and blessing, and who invites. */
     honorees: { type: [honoreeSchema], default: [] },

@@ -1,4 +1,4 @@
-import type { InvitationFunction, InvitationKind, PatrikaText } from '@samaj/shared';
+import { type InvitationFunction, type InvitationKind, type InvitationTheme, type PatrikaText, themeFor } from '@samaj/shared';
 import { useState } from 'react';
 import { toast } from '@/components/ui';
 import { formatEventTime } from '@/features/community/events-api';
@@ -12,6 +12,8 @@ interface CardSource extends Omit<PatrikaText, 'memorial'> {
   message: string | null;
   hostName: string;
   functions: InvitationFunction[];
+  theme?: InvitationTheme | null;
+  addressee?: string | null;
 }
 
 /** Makes the card picture in the current language and shares or downloads it. */
@@ -45,7 +47,8 @@ export function useCardImage(card: CardSource, link: string) {
           { label: t(quiet ? 'invite.card.grieving' : 'invite.card.inviters'), names: card.inviters },
         ],
         footer: t('invite.image.footer', { link }),
-        quiet,
+        theme: themeFor(card.kind, card.theme),
+        addressee: card.addressee ? t('invite.card.dear', { name: card.addressee }) : null,
       });
       const how = await shareOrDownload(blob, `${kind}${card.forNames ? ` - ${card.forNames}` : ''}.png`.replace(/[\/:*?"<>|]/g, ''), `${kind}${card.forNames ? `: ${card.forNames}` : ''}\n${link}`);
       if (how === 'downloaded') toast.success(t('invite.image.saved'));

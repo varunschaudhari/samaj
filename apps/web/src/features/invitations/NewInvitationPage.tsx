@@ -100,6 +100,7 @@ export function NewInvitationPage() {
           <InvitationCard
             data={{
               kind: draft.kind,
+              theme: draft.theme,
               forNames: draft.forNames.trim() || null,
               message: draft.message.trim() || null,
               hostName: family.data?.headName ?? '',

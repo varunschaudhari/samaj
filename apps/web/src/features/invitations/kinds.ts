@@ -1,4 +1,4 @@
-import { type InvitationDetail, type InvitationFunction, type InvitationKind, type PatrikaText, REMEMBRANCE_KINDS } from '@samaj/shared';
+import { type InvitationDetail, type InvitationFunction, type InvitationKind, type InvitationTheme, type PatrikaText, REMEMBRANCE_KINDS } from '@samaj/shared';
 import { formatEventTime } from '@/features/community/events-api';
 import type { Language } from '@samaj/shared';
 
@@ -47,9 +47,10 @@ export function muhuratText(muhuratAt: string, startsAt: string, language: Langu
 }
 
 /** The card's content from an invitation as the API gives it; `base` is where its photos are served. */
-export function cardFrom(inv: PatrikaText & { kind: InvitationKind; forNames: string | null; message: string | null; functions: InvitationFunction[] }, hostName: string, base: string) {
+export function cardFrom(inv: PatrikaText & { kind: InvitationKind; theme?: InvitationTheme | null; forNames: string | null; message: string | null; functions: InvitationFunction[] }, hostName: string, base: string) {
   return {
     kind: inv.kind,
+    theme: inv.theme ?? null,
     forNames: inv.forNames,
     message: inv.message,
     hostName,

@@ -29,6 +29,18 @@ export type InvitationKind = (typeof INVITATION_KINDS)[number];
 /** In memory of someone: a quiet card, and "will attend" rather than a celebration. */
 export const REMEMBRANCE_KINDS: readonly InvitationKind[] = ['dashakriya', 'uttarkarya', 'shraddha', 'varshashraddha'];
 
+/** How the card looks. Celebrations and remembrances each have their own. */
+export const CELEBRATION_THEMES = ['traditional', 'royal', 'floral', 'minimal'] as const;
+export const REMEMBRANCE_THEMES = ['quiet', 'lotus'] as const;
+export const INVITATION_THEMES = [...CELEBRATION_THEMES, ...REMEMBRANCE_THEMES] as const;
+export type InvitationTheme = (typeof INVITATION_THEMES)[number];
+
+/** The theme a card is shown in: the one chosen when it suits the occasion, else the occasion's first. */
+export function themeFor(kind: InvitationKind, theme: string | null | undefined): InvitationTheme {
+  const allowed: readonly string[] = REMEMBRANCE_KINDS.includes(kind) ? REMEMBRANCE_THEMES : CELEBRATION_THEMES;
+  return (theme && allowed.includes(theme) ? theme : allowed[0]) as InvitationTheme;
+}
+
 export const RSVP_ANSWERS = ['yes', 'maybe', 'no'] as const;
 export type RsvpAnswer = (typeof RSVP_ANSWERS)[number];
 
@@ -112,6 +124,7 @@ export const invitationInputSchema = z.object({
   blessings: nameList,
   /** Who invites (निमंत्रक). */
   inviters: nameList,
+  theme: z.enum(INVITATION_THEMES).nullish().transform((v) => v ?? null),
   /** For a remembrance: the family member remembered, whose photo the card shows. */
   memorialMemberId: objectIdSchema.nullish().transform((v) => v ?? null),
   functions: z.array(invitationFunctionSchema).min(1, 'validation.functionsNeeded').max(MAX_INVITATION_FUNCTIONS, 'validation.tooManyFunctions'),
@@ -245,6 +258,7 @@ export interface LinkReplyView {
 
 export interface InvitationDetail extends InvitationSummary, PatrikaText {
   message: string | null;
+  theme: InvitationTheme;
   sentByName: string;
   functions: InvitationFunction[];
   isHost: boolean;
@@ -266,6 +280,7 @@ export interface InvitationDetail extends InvitationSummary, PatrikaText {
 /** What the link shows: the card, and nothing about who else was invited. */
 export interface PublicInvitation extends PatrikaText {
   kind: InvitationKind;
+  theme: InvitationTheme;
   forNames: string | null;
   message: string | null;
   hostName: string;
@@ -330,6 +345,7 @@ export interface BranchShareView {
 /** A family's request for the committee: the invitation as guests see it, and its link for the notice. */
 export interface BranchShareRequest extends InvitationSummary, PatrikaText {
   message: string | null;
+  theme: InvitationTheme;
   functions: InvitationFunction[];
   shareToken: string;
   requestedByName: string;
