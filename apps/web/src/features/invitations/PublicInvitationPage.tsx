@@ -13,6 +13,7 @@ import { AnswerRows, StayField, answerLabels, answersReady, answersToInput, star
 import { useLinkReply, usePublicInvitation } from './api';
 import { InvitationCard } from './InvitationCard';
 import { cardFrom, isRemembrance } from './kinds';
+import { CalendarButton } from './CalendarButton';
 import { PatrikaShown } from './Patrika';
 
 /** The reply this phone sent, kept so it can be changed rather than sent twice. */
@@ -111,6 +112,11 @@ export function PublicInvitationPage() {
   return wrap(
     <>
       <InvitationCard cancelled={inv.cancelled} data={cardFrom(inv, inv.hostName, `/api/public/invitations/${token}`)} />
+      {!inv.closed && (
+        <div className="-mt-2 flex justify-center">
+          <CalendarButton kind={inv.kind} forNames={inv.forNames} hostName={inv.hostName} functions={inv.functions} link={window.location.href} />
+        </div>
+      )}
       {inv.patrika && <PatrikaShown patrika={inv.patrika} src={`/api/public/invitations/${token}/patrika`} />}
       {inv.closed ? (
         <p className="text-center text-sm text-fg-muted">{inv.cancelled ? t('invite.rsvp.cancelled') : t('invite.rsvp.closed')}</p>

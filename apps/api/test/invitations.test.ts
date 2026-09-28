@@ -326,4 +326,25 @@ describe('invitations', () => {
     // Another family's lists are its own.
     expect(((await api.get('/api/invitations/audience').set('Cookie', inLaws.cookie)).body.audience as InvitationAudience).earlier).toEqual([]);
   });
+
+  it('lists functions in the next day and a half the family is going to or hosting', async () => {
+    const { host, parents, inLaws } = await setup();
+    const soon = new Date(Date.now() + 20 * 60 * 60 * 1000).toISOString();
+    const inv = (
+      await api
+        .post('/api/invitations')
+        .set('Cookie', host.cookie)
+        .send({ kind: 'munj', forNames: 'Aarav', functions: [{ name: 'मुंज', startsAt: soon, venue: 'Hall' }, { name: 'भोजन', startsAt: at(9), venue: 'Hall' }], guestFamilyIds: [parents.familyId, inLaws.familyId] })
+    ).body.invitation as InvitationDetail;
+    const [munj, bhojan] = inv.functions.map((f) => f.id);
+    await api.put(`/api/invitations/${inv.id}/rsvp`).set('Cookie', parents.cookie).send({ answers: [{ functionId: munj, answer: 'yes', people: 3 }, { functionId: bhojan, answer: 'yes', people: 3 }] });
+    await api.put(`/api/invitations/${inv.id}/rsvp`).set('Cookie', inLaws.cookie).send({ answers: [{ functionId: munj, answer: 'no', people: 0 }, { functionId: bhojan, answer: 'yes', people: 2 }] });
+
+    const upcoming = async (cookie: string) => ((await api.get('/api/invitations').set('Cookie', cookie)).body as MyInvitations).upcoming;
+    expect(await upcoming(parents.cookie)).toEqual([expect.objectContaining({ name: 'मुंज', hostName: 'Anil Wagh', hosting: false })]);
+    expect(await upcoming(inLaws.cookie)).toEqual([]);
+    expect((await upcoming(host.cookie)).map((u) => [u.name, u.hosting])).toEqual([['मुंज', true]]);
+    await api.post(`/api/invitations/${inv.id}/cancel`).set('Cookie', host.cookie);
+    expect(await upcoming(parents.cookie)).toEqual([]);
+  });
 });

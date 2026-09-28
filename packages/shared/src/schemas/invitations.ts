@@ -310,9 +310,23 @@ export interface InvitationAudience {
   leftToday: number;
 }
 
+/** A function coming up soon that the family is going to, or hosting: for "Tomorrow: हळद at 5 pm" on Home. */
+export interface UpcomingFunction {
+  invitationId: string;
+  kind: InvitationKind;
+  forNames: string | null;
+  hostName: string;
+  hosting: boolean;
+  name: string;
+  startsAt: string;
+  venue: string;
+}
+
 export interface MyInvitations {
   invited: InvitationSummary[];
   hosting: InvitationSummary[];
+  /** Functions in the next day and a half the family said it would attend (or maybe), or is hosting. */
+  upcoming: UpcomingFunction[];
   /** Families whose invitations this family chose not to see. */
   hidden: LinkedFamily[];
   /** The viewer's family may send invitations (verified). */

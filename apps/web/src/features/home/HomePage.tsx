@@ -275,6 +275,54 @@ function FamilyRequestsCard({ user }: { user: PublicUser }) {
   );
 }
 
+/** Functions in the next day and a half the family is going to or hosting: "Tomorrow · 5:00 pm · हळद". */
+function UpcomingFunctions({ user }: { user: PublicUser }) {
+  const t = useT();
+  const language = useLanguageStore((s) => s.language);
+  const mine = useMyInvitations(Boolean(user.familyId));
+  const upcoming = mine.data?.upcoming ?? [];
+  if (upcoming.length === 0) return null;
+  const loc = language === 'mr' ? 'mr-IN' : 'en-IN';
+  const dayOf = (iso: string) => {
+    const d = new Date(iso);
+    const today = new Date();
+    const tomorrow = new Date(today.getTime() + 86_400_000);
+    if (d.toDateString() === today.toDateString()) return t('home.upcoming.today');
+    if (d.toDateString() === tomorrow.toDateString()) return t('home.upcoming.tomorrow');
+    return new Intl.DateTimeFormat(loc, { weekday: 'long' }).format(d);
+  };
+  return (
+    <section aria-labelledby="upcoming-functions" className="flex flex-col gap-2 rounded-md border border-line bg-surface p-4 shadow-card">
+      <h2 id="upcoming-functions" className="flex items-center gap-2 font-semibold text-fg">
+        <Icon icon={CalendarDays} className="text-kumkum" weight="duotone" />
+        {t('home.upcoming.title')}
+      </h2>
+      <ul className="flex flex-col divide-y divide-line">
+        {upcoming.map((u) => (
+          <li key={`${u.invitationId}-${u.startsAt}-${u.name}`}>
+            <Link to={`/invitations/${u.invitationId}`} className="flex items-center gap-3 py-2 hover:underline">
+              <span className="w-24 shrink-0 text-sm font-semibold text-kumkum">
+                {dayOf(u.startsAt)}
+                <span className="block font-normal text-fg-muted">{new Intl.DateTimeFormat(loc, { hour: 'numeric', minute: '2-digit' }).format(new Date(u.startsAt))}</span>
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate font-semibold text-fg">
+                  {u.name} · {t(`invite.kind.${u.kind}`)}
+                  {u.forNames && `: ${u.forNames}`}
+                </span>
+                <span className="truncate text-sm text-fg-muted">
+                  {u.hosting ? t('home.upcoming.hosting') : t('invite.from', { name: u.hostName })} · {u.venue}
+                </span>
+              </span>
+              <Icon icon={ChevronRight} className="shrink-0 text-fg-muted" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** Invitations the family hasn't answered yet, or that changed since it did, while answers are still open. */
 function InvitesCard({ user }: { user: PublicUser }) {
   const t = useT();
@@ -438,6 +486,7 @@ export function HomePage() {
       <Hero user={user} canBrowse={canBrowse} />
       {!canBrowse && <VerificationNotice user={user} />}
       <FamilyRequestsCard user={user} />
+      {canBrowse && <UpcomingFunctions user={user} />}
       {canBrowse && <InvitesCard user={user} />}
       {can(user.role, 'member:verify') && <WorkCard user={user} />}
       <QuickTiles user={user} canBrowse={canBrowse} />

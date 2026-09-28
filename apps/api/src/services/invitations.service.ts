@@ -9,6 +9,7 @@ import {
   type PatrikaText,
   type PatrikaView,
   type PublicInvitation,
+  type UpcomingFunction,
   type GuestVia,
   type InvitationAnswer,
   type InvitationAudience,
@@ -44,6 +45,8 @@ type RsvpInput = z.output<typeof invitationRsvpSchema>;
 type LinkReplyInput = z.output<typeof linkReplySchema>;
 
 const DAY = 86_400_000;
+/** "Tomorrow" on Home: functions in the next day and a half. */
+const UPCOMING_WINDOW = 36 * 60 * 60 * 1000;
 /** Answers close half a day after the last function. */
 const CLOSES_AFTER = 12 * 60 * 60 * 1000;
 const gone = () => notFound('That invitation is no longer there.');
@@ -460,7 +463,25 @@ export async function myInvitations(viewer: Viewer): Promise<MyInvitations> {
     : [];
   const summaries = await familySummaries(viewer, [own, ...invitations.map((i) => i.familyId), ...mutes.map((m) => m.mutedFamilyId)]);
   const byId = new Map(invitations.map((i) => [String(i._id), i]));
+  const soon = { from: Date.now() - 2 * 60 * 60 * 1000, to: Date.now() + UPCOMING_WINDOW };
+  const inWindow = (f: FunctionDoc) => f.startsAt.getTime() >= soon.from && f.startsAt.getTime() <= soon.to;
+  const upcomingOf = (inv: InvitationDoc, hosting: boolean, going: (f: FunctionDoc) => boolean): UpcomingFunction[] => {
+    const host = summaries.get(String(inv.familyId));
+    if (inv.cancelledAt || !host) return [];
+    return inv.functions
+      .filter((f) => inWindow(f) && going(f))
+      .map((f) => ({ invitationId: String(inv._id), kind: inv.kind, forNames: inv.forNames ?? null, hostName: host.headName, hosting, name: f.name, startsAt: f.startsAt.toISOString(), venue: f.venue }));
+  };
+  const upcoming = [
+    ...hosted.flatMap((inv) => upcomingOf(inv, true, () => true)),
+    ...guestOf.flatMap((g) => {
+      const inv = byId.get(String(g.invitationId));
+      if (!inv || muted.has(String(inv.familyId))) return [];
+      return upcomingOf(inv, false, (f) => g.answers.some((a) => a.fid === f.fid && a.answer !== 'no'));
+    }),
+  ].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   return {
+    upcoming,
     invited: guestOf.flatMap((g) => {
       const inv = byId.get(String(g.invitationId));
       if (!inv || muted.has(String(inv.familyId))) return [];

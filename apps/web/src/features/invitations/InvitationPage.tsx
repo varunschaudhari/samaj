@@ -2,7 +2,7 @@ import type { InvitationAnswer, InvitationDetail, InvitationFunction, Invitation
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Badge, Button, Card, EmptyState, ErrorState, Icon, Modal, Skeleton, buttonVariants, toast } from '@/components/ui';
-import { ArrowLeft, Download, EyeOff, Pencil, Printer, ImageIcon, SearchX, Share, Trash2, UserPlus, XCircle } from '@/components/ui/icons';
+import { ArrowLeft, BellRing, Download, EyeOff, Pencil, Printer, ImageIcon, SearchX, Share, Trash2, UserPlus, XCircle } from '@/components/ui/icons';
 import { useMe } from '@/features/auth/api';
 import { FormAlert } from '@/features/auth/FormAlert';
 import { placeLabel } from '@/features/branches/api';
@@ -16,6 +16,7 @@ import { InvitationCard } from './InvitationCard';
 import { InvitationForm, draftErrors, draftFrom, draftToInput } from './InvitationForm';
 import { cardFrom, isRemembrance, shareText } from './kinds';
 import { PatrikaEditor, PatrikaShown } from './Patrika';
+import { CalendarButton } from './CalendarButton';
 import { ShareLinkPanel } from './ShareLinkPanel';
 import { useCardImage } from './useCardImage';
 
@@ -57,6 +58,7 @@ function RsvpPanel({ invitation }: { invitation: InvitationDetail }) {
         >
           {t('invite.rsvp.save')}
         </Button>
+        <CalendarButton kind={invitation.kind} forNames={invitation.forNames} hostName={invitation.host.headName} functions={invitation.functions} link={`${window.location.origin}/invitations/${invitation.id}`} />
         {invitation.mine?.respondedByName && invitation.mine.respondedAt && (
           <span className="text-sm text-fg-muted">
             {t('invite.rsvp.answeredBy', { name: invitation.mine.respondedByName })} · {formatDate(invitation.mine.respondedAt, language)}
@@ -143,6 +145,20 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(
     shareText(invitation, { kind: t(`invite.kind.${invitation.kind}`), from: t('invite.from', { name: invitation.host.headName }), open: t('invite.share.link') }, language, url),
   )}`;
+  // Families yet to answer: one WhatsApp message to send in the family group, naming them.
+  const waiting = (invitation.guests ?? []).filter((g) => !g.respondedAt).map((g) => t('family.title', { name: g.family.headName }));
+  const remind =
+    !invitation.closed && waiting.length > 0
+      ? `https://wa.me/?text=${encodeURIComponent(
+          [
+            t('invite.remind.text'),
+            '',
+            shareText(invitation, { kind: t(`invite.kind.${invitation.kind}`), from: t('invite.from', { name: invitation.host.headName }), open: t('invite.share.link') }, language, url),
+            '',
+            t('invite.remind.waiting', { names: waiting.join(', ') }),
+          ].join('\n'),
+        )}`
+      : null;
   const image = useCardImage({ ...invitation, hostName: invitation.host.headName }, url);
   const invited = new Set((invitation.guests ?? []).map((g) => g.family.id));
 
@@ -156,6 +172,12 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
         <Button variant="secondary" size="sm" leadingIcon={ImageIcon} loading={image.busy} onClick={() => void image.make()}>
           {t('invite.image.make')}
         </Button>
+        {remind && (
+          <a href={remind} target="_blank" rel="noreferrer" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+            <Icon icon={BellRing} />
+            {t('invite.remind.button', { count: n(waiting.length) })}
+          </a>
+        )}
         {!invitation.closed && (
           <>
             <Button variant="secondary" size="sm" leadingIcon={UserPlus} onClick={() => setAdding(true)}>
@@ -175,6 +197,7 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
             </Button>
           </>
         )}
+        <CalendarButton kind={invitation.kind} forNames={invitation.forNames} hostName={invitation.host.headName} functions={invitation.functions} link={url} />
         <Button variant="ghost" size="sm" leadingIcon={Download} onClick={() => downloadCsv(invitation, t, language)}>
           {t('invite.host.download')}
         </Button>
