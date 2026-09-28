@@ -282,10 +282,30 @@ export interface LinkReplyReceipt {
   stay: number;
 }
 
-/** Families the host can pick from: their family tree and linked families. */
+/** How a tree family is related: the family's own homes, a married-in woman's माहेर, व्याही, other relatives. */
+export const AUDIENCE_GROUPS = ['family', 'maher', 'inLaws', 'relatives'] as const;
+export type AudienceGroup = (typeof AUDIENCE_GROUPS)[number];
+
+export interface AudienceFamily extends LinkedFamily {
+  group: AudienceGroup;
+  /** For a माहेर: whose (the woman who married in). */
+  through: string | null;
+}
+
+/** An earlier invitation's guests, to invite the same families again. */
+export interface EarlierGuestList {
+  id: string;
+  kind: InvitationKind;
+  forNames: string | null;
+  firstAt: string;
+  families: LinkedFamily[];
+}
+
+/** Families the host can pick from: their family tree, linked families and earlier guest lists. */
 export interface InvitationAudience {
-  tree: LinkedFamily[];
+  tree: AudienceFamily[];
   linked: LinkedFamily[];
+  earlier: EarlierGuestList[];
   /** How many more families this family can invite today. */
   leftToday: number;
 }

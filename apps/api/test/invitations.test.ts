@@ -311,4 +311,19 @@ describe('invitations', () => {
     await answer(parents.cookie, { answers: changed.mine!.answers });
     expect((await guestView()).changedSinceAnswer).toBe(false);
   });
+
+  it('groups the tree by how families are related, and offers earlier guest lists', async () => {
+    const { host, parents, inLaws, friend } = await setup();
+    let audience = (await api.get('/api/invitations/audience').set('Cookie', host.cookie)).body.audience as InvitationAudience;
+    expect(Object.fromEntries(audience.tree.map((f) => [f.headName, f.group]))).toEqual({ 'Ganpat Wagh': 'family', 'Suresh Patil': 'inLaws' });
+    expect(audience.earlier).toEqual([]);
+
+    await api.post('/api/invitations').set('Cookie', host.cookie).send(wedding([parents.familyId, friend.familyId]));
+    audience = (await api.get('/api/invitations/audience').set('Cookie', host.cookie)).body.audience as InvitationAudience;
+    expect(audience.earlier).toHaveLength(1);
+    expect(audience.earlier[0]).toMatchObject({ kind: 'wedding', forNames: 'Rohit & Kavya' });
+    expect(audience.earlier[0]?.families.map((f) => f.headName).sort()).toEqual(['Ganpat Wagh', 'Vijay Karale']);
+    // Another family's lists are its own.
+    expect(((await api.get('/api/invitations/audience').set('Cookie', inLaws.cookie)).body.audience as InvitationAudience).earlier).toEqual([]);
+  });
 });

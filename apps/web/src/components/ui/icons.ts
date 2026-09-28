@@ -91,6 +91,7 @@ export { X } from '@phosphor-icons/react/dist/csr/X';
 export { XCircle } from '@phosphor-icons/react/dist/csr/XCircle';
 export { Copy } from '@phosphor-icons/react/dist/csr/Copy';
 export { Camera } from '@phosphor-icons/react/dist/csr/Camera';
+export { ClockCounterClockwise as History } from '@phosphor-icons/react/dist/csr/ClockCounterClockwise';
 export { UploadSimple as Upload } from '@phosphor-icons/react/dist/csr/UploadSimple';
 export { Image as ImageIcon } from '@phosphor-icons/react/dist/csr/Image';
 export { DownloadSimple as Download } from '@phosphor-icons/react/dist/csr/DownloadSimple';

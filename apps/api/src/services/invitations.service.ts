@@ -1,5 +1,8 @@
 import {
+  type AudienceFamily,
+  type AudienceGroup,
   DAILY_INVITATION_GUESTS,
+  type EarlierGuestList,
   type LinkReplyReceipt,
   MAX_LINK_REPLIES,
   PATRIKA_MAX_BYTES,
@@ -11,6 +14,7 @@ import {
   type InvitationAudience,
   type InvitationDetail,
   type InvitationSummary,
+  type LinkKind,
   type LinkedFamily,
   type MyInvitations,
   type addGuestsSchema,
@@ -111,24 +115,57 @@ function toFunctions(input: InvitationInput, previous: readonly { fid: string }[
   return { functions, firstAt, lastAt };
 }
 
-/** Families the host may pick from: everyone in their family tree, and their linked families. */
+/** Families the host may pick from: everyone in their family tree (grouped by how they are related), their linked families, and earlier guest lists. */
 export async function audienceFor(viewer: Viewer): Promise<InvitationAudience> {
   assertHost(viewer);
   const own = await loadFamily(viewer.familyId);
-  const [tree, links, sentToday] = await Promise.all([getTree(viewer, viewer.familyId).catch(() => null), linksOf(viewer, own), sentSince(own._id)]);
+  const [tree, links, sentToday, earlier] = await Promise.all([getTree(viewer, viewer.familyId).catch(() => null), linksOf(viewer, own), sentSince(own._id), earlierGuestLists(viewer, own._id)]);
   const seen = new Set([viewer.familyId]);
-  const once = (families: LinkedFamily[]) =>
+  const once = <T extends LinkedFamily>(families: T[]) =>
     families.filter((f) => {
       if (!f.canView || seen.has(f.id)) return false;
       seen.add(f.id);
       return true;
     });
+  const people = new Map((tree?.households ?? []).flatMap((h) => h.members.map((m) => [m.id, m] as const)));
+  const byKind = (kind: LinkKind | null): AudienceGroup => (kind === 'inLaws' ? 'inLaws' : kind === 'relatives' ? 'relatives' : 'family');
+  const grouped = (tree?.households ?? []).map((h): AudienceFamily => {
+    // Someone's parents' home: a woman who married in, her माहेर; otherwise the family's own.
+    if (h.via === 'person') {
+      const through = h.through ? people.get(h.through.id) : undefined;
+      return through?.gender === 'female' ? { ...h.family, group: 'maher', through: through.name } : { ...h.family, group: 'family', through: null };
+    }
+    return { ...h.family, group: byKind(h.via), through: null };
+  });
+  const side = (tree?.side ?? []).map((s): AudienceFamily => ({ ...s.family, group: byKind(s.kind), through: null }));
   return {
-    tree: once([...(tree?.households.map((h) => h.family) ?? []), ...(tree?.side.map((s) => s.family) ?? [])]),
+    tree: once([...grouped, ...side]),
     linked: once(links.map((l) => l.family)),
+    earlier,
     leftToday: Math.max(0, DAILY_INVITATION_GUESTS - sentToday),
   };
 }
+
+/** The family's last few invitations and who was on each, to invite the same families again. */
+async function earlierGuestLists(viewer: Viewer, host: Types.ObjectId): Promise<EarlierGuestList[]> {
+  const invitations = await InvitationModel.find({ familyId: host }, { kind: 1, forNames: 1, firstAt: 1 }).sort({ firstAt: -1 }).limit(EARLIER_LISTS).lean();
+  if (invitations.length === 0) return [];
+  const guests = await InvitationGuestModel.find({ invitationId: { $in: invitations.map((i) => i._id) } }, { invitationId: 1, familyId: 1 }).lean();
+  const summaries = await familySummaries(viewer, guests.map((g) => g.familyId));
+  // The same families sent twice (an invitation cancelled and sent again) is one list.
+  const offered = new Set<string>();
+  return invitations.flatMap((inv) => {
+    const families = guests.filter((g) => String(g.invitationId) === String(inv._id)).flatMap((g) => {
+      const f = summaries.get(String(g.familyId));
+      return f?.canView ? [f] : [];
+    });
+    const key = families.map((f) => f.id).sort().join();
+    if (!families.length || offered.has(key)) return [];
+    offered.add(key);
+    return [{ id: String(inv._id), kind: inv.kind, forNames: inv.forNames ?? null, firstAt: inv.firstAt.toISOString(), families }];
+  });
+}
+const EARLIER_LISTS = 6;
 
 const sentSince = (familyId: Types.ObjectId) => InvitationGuestModel.countDocuments({ hostFamilyId: familyId, createdAt: { $gte: new Date(Date.now() - DAY) } });
 

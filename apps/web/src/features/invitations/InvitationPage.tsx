@@ -342,7 +342,7 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
       >
         <div className="flex flex-col gap-3">
           {addGuests.isError && <FormAlert message={errorMessage(addGuests.error)} />}
-          <GuestPicker audience={audience.data} picks={picks} onChange={setPicks} ownFamilyId={me.data?.familyId ?? ''} alreadyInvited={invited} />
+          <GuestPicker audience={audience.data} picks={picks} onChange={setPicks} ownFamilyId={me.data?.familyId ?? ''} alreadyInvited={invited} excludeInvitationId={invitation.id} />
         </div>
       </Modal>
 
