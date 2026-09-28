@@ -9,7 +9,7 @@ import { FormAlert } from '@/features/auth/FormAlert';
 import { fieldError } from '@/features/auth/form-errors';
 import { formatNumber, useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { ApiError } from '@/lib/api';
-import { AnswerRows, answerLabels, answersReady, answersToInput, startAnswers } from './AnswerRows';
+import { AnswerRows, StayField, answerLabels, answersReady, answersToInput, startAnswers } from './AnswerRows';
 import { useLinkReply, usePublicInvitation } from './api';
 import { InvitationCard } from './InvitationCard';
 import { cardFrom, isRemembrance } from './kinds';
@@ -52,6 +52,7 @@ export function PublicInvitationPage() {
   const [name, setName] = useState(receipt?.name ?? '');
   const [place, setPlace] = useState(receipt?.place ?? '');
   const [answers, setAnswers] = useState(startAnswers([]));
+  const [stay, setStay] = useState(receipt?.stay ?? 0);
   const [tried, setTried] = useState(false);
 
   // The link carries the language it was shared in.
@@ -95,7 +96,7 @@ export function PublicInvitationPage() {
     setTried(true);
     if (name.trim().length < 2 || !answersReady(answers)) return;
     reply.mutate(
-      { name, place, answers: answersToInput(answers), ...(receipt && { key: receipt.key }) },
+      { name, place, answers: answersToInput(answers), stay, ...(receipt && { key: receipt.key }) },
       {
         onSuccess: (r) => {
           saveReceipt(token, r);
@@ -147,6 +148,7 @@ export function PublicInvitationPage() {
             <Input label={t('invite.public.place')} labelSuffix={t('common.optional')} value={place} onChange={(e) => setPlace(e.target.value)} maxLength={60} />
           </div>
           <AnswerRows kind={inv.kind} functions={inv.functions} answers={answers} onChange={setAnswers} />
+          {!quiet && <StayField value={stay} onChange={setStay} />}
           {tried && !answersReady(answers) && <p className="text-sm text-danger">{t('invite.public.answerEach')}</p>}
           {reply.isError && <FormAlert message={errorMessage(reply.error)} />}
           <Button className="self-start" loading={reply.isPending} onClick={send}>

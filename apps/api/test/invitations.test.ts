@@ -91,11 +91,11 @@ describe('invitations', () => {
     const seen = (await api.get(`/api/invitations/${inv.id}`).set('Cookie', host.cookie)).body.invitation as InvitationDetail;
     expect(seen.repliedCount).toBe(2);
     expect(seen.tally).toEqual([
-      { functionId: haldi?.id, yes: 1, maybe: 0, no: 1, people: 4 },
-      { functionId: lagna?.id, yes: 1, maybe: 1, no: 0, people: 6 },
+      { functionId: haldi?.id, yes: 1, maybe: 0, no: 1, people: 4, children: 0 },
+      { functionId: lagna?.id, yes: 1, maybe: 1, no: 0, people: 6, children: 0 },
     ]);
     // "No" means nobody is coming.
-    expect(seen.guests?.find((g) => g.family.headName === 'Vijay Karale')?.answers[0]).toEqual({ functionId: haldi?.id, answer: 'no', people: 0 });
+    expect(seen.guests?.find((g) => g.family.headName === 'Vijay Karale')?.answers[0]).toEqual({ functionId: haldi?.id, answer: 'no', people: 0, children: 0 });
     expect(seen.guests?.find((g) => g.family.headName === 'Ganpat Wagh')?.respondedByName).toBe('Ganpat Wagh');
   });
 
@@ -113,7 +113,7 @@ describe('invitations', () => {
     expect(edited.status).toBe(200);
     expect((await api.put(`/api/invitations/${inv.id}`).set('Cookie', parents.cookie).send({ kind: 'wedding', functions: [] })).status).toBe(400);
     const theirs = (await api.get(`/api/invitations/${inv.id}`).set('Cookie', parents.cookie)).body.invitation as InvitationDetail;
-    expect(theirs.mine?.answers).toEqual([{ functionId: lagna?.id, answer: 'yes', people: 3 }]);
+    expect(theirs.mine?.answers).toEqual([{ functionId: lagna?.id, answer: 'yes', people: 3, children: 0 }]);
 
     expect((await api.post(`/api/invitations/${inv.id}/cancel`).set('Cookie', host.cookie)).body.invitation).toMatchObject({ cancelled: true, closed: true });
     expect((await api.put(`/api/invitations/${inv.id}/rsvp`).set('Cookie', parents.cookie).send({ answers: [{ functionId: lagna?.id, answer: 'no', people: 0 }] })).status).toBe(409);
@@ -179,7 +179,7 @@ describe('invitations', () => {
     });
     expect(first.status).toBe(200);
     const key = first.body.reply.key as string;
-    expect(first.body.reply.answers[1]).toEqual({ functionId: lagna, answer: 'no', people: 0 });
+    expect(first.body.reply.answers[1]).toEqual({ functionId: lagna, answer: 'no', people: 0, children: 0 });
 
     // The same phone changes its answer rather than adding a second one.
     await api.post(`/api/public/invitations/${token}/reply`).send({ name: 'Ramesh Patil', place: 'Nashik', key, answers: [{ functionId: haldi, answer: 'yes', people: 4 }, { functionId: lagna, answer: 'maybe', people: 2 }] });
@@ -261,7 +261,7 @@ describe('invitations', () => {
     ).body.invitation as InvitationDetail;
     expect(inv.honorees).toEqual([{ name: 'चि. रोहित', detail: 'श्री. अनिल वाघ यांचे चिरंजीव, अमळनेर' }, { name: 'चि.सौ.कां. काव्या', detail: null }]);
     expect(inv.kripa).toEqual(['कै. रामराव वाघ']);
-    expect(inv.functions[1]?.muhuratAt).toBe(new Date(functions[1]!.muhuratAt!).toISOString());
+    expect(inv.functions[1]?.muhuratAt).toBe(new Date((functions[1] as { muhuratAt: string }).muhuratAt).toISOString());
     // Guests and the link see the same names.
     const guest = (await api.get(`/api/invitations/${inv.id}`).set('Cookie', parents.cookie)).body.invitation as InvitationDetail;
     expect(guest.inviters).toEqual(['श्री. अनिल वाघ', 'सौ. सुनिता वाघ']);
@@ -277,5 +277,38 @@ describe('invitations', () => {
     const own = (await api.post('/api/invitations').set('Cookie', host.cookie).send(shraddha(host.memberIds[0]!))).body.invitation as InvitationDetail;
     expect(own.memorial).toMatchObject({ memberId: host.memberIds[0], name: 'Anil Wagh', photoVersion: null });
     expect((await api.get(`/api/invitations/${own.id}/memorial-photo`).set('Cookie', parents.cookie)).status).toBe(404);
+  });
+
+  it('counts children and places to stay, and marks an invitation changed after a guest answered', async () => {
+    const { host, parents, inLaws } = await setup();
+    const inv = (await api.post('/api/invitations').set('Cookie', host.cookie).send(wedding([parents.familyId, inLaws.familyId]))).body.invitation as InvitationDetail;
+    const [haldi, lagna] = inv.functions.map((f) => f.id);
+    const answer = (cookie: string, body: Record<string, unknown>) => api.put(`/api/invitations/${inv.id}/rsvp`).set('Cookie', cookie).send(body);
+
+    expect((await answer(parents.cookie, { answers: [{ functionId: haldi, answer: 'yes', people: 2, children: 3 }] })).body.error.issues).toContainEqual({ path: 'answers.0.children', message: 'validation.rsvpChildren' });
+    await answer(parents.cookie, { answers: [{ functionId: haldi, answer: 'yes', people: 5, children: 2 }, { functionId: lagna, answer: 'no', people: 5, children: 2 }], stay: 4 });
+    await answer(inLaws.cookie, { answers: [{ functionId: haldi, answer: 'yes', people: 3, children: 1 }, { functionId: lagna, answer: 'yes', people: 3 }] });
+
+    const seen = (await api.get(`/api/invitations/${inv.id}`).set('Cookie', host.cookie)).body.invitation as InvitationDetail;
+    expect(seen.tally?.find((x) => x.functionId === haldi)).toMatchObject({ people: 8, children: 3 });
+    expect(seen.tally?.find((x) => x.functionId === lagna)).toMatchObject({ people: 3, children: 0 });
+    expect(seen.stayTally).toEqual({ replies: 1, people: 4 });
+    expect(seen.guests?.find((g) => g.family.id === parents.familyId)?.stay).toBe(4);
+
+    const guestView = async () => (await api.get(`/api/invitations/${inv.id}`).set('Cookie', parents.cookie)).body.invitation as InvitationDetail;
+    expect((await guestView()).changedSinceAnswer).toBe(false);
+    // Renaming a function isn't something to plan around; moving it is.
+    const edit = (venue: string, name = 'हळद') => ({ ...wedding([]), functions: seen.functions.map((f, i) => ({ ...f, name: i === 0 ? name : f.name, venue: i === 0 ? venue : f.venue })) });
+    await api.put(`/api/invitations/${inv.id}`).set('Cookie', host.cookie).send(edit(seen.functions[0]!.venue, 'हळदी समारंभ'));
+    expect((await guestView()).changedSinceAnswer).toBe(false);
+    await new Promise((r) => setTimeout(r, 5));
+    await api.put(`/api/invitations/${inv.id}`).set('Cookie', host.cookie).send(edit('Samaj hall, Amalner'));
+    const changed = await guestView();
+    expect(changed.changedSinceAnswer).toBe(true);
+    expect(((await api.get('/api/invitations').set('Cookie', parents.cookie)).body as MyInvitations).invited[0]?.changedSinceAnswer).toBe(true);
+    // Answering again clears it.
+    await new Promise((r) => setTimeout(r, 5));
+    await answer(parents.cookie, { answers: changed.mine!.answers });
+    expect((await guestView()).changedSinceAnswer).toBe(false);
   });
 });

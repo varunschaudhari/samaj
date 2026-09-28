@@ -195,8 +195,15 @@ async function loadHosted(viewer: Viewer, id: string) {
   return invitation;
 }
 
-const answersOf = (answers: { fid: string; answer: InvitationAnswer['answer']; people?: number | null }[]): InvitationAnswer[] =>
-  answers.map((a) => ({ functionId: a.fid, answer: a.answer, people: a.people ?? 0 }));
+const answersOf = (answers: { fid: string; answer: InvitationAnswer['answer']; people?: number | null; children?: number | null }[]): InvitationAnswer[] =>
+  answers.map((a) => ({ functionId: a.fid, answer: a.answer, people: a.people ?? 0, children: a.children ?? 0 }));
+
+/** A guest answered, then the host moved a time or venue: they should look again. */
+const changedSince = (inv: Pick<InvitationDoc, 'changedAt'>, respondedAt: Date | null | undefined) => Boolean(respondedAt && inv.changedAt && inv.changedAt > respondedAt);
+
+/** What guests plan around: each function's times and place. A new name alone isn't a change to plan around. */
+const plan = (functions: readonly { fid: string; startsAt: Date; endsAt?: Date | null; venue: string; muhuratAt?: Date | null }[]) =>
+  JSON.stringify(functions.map((f) => [f.fid, f.startsAt.getTime(), f.endsAt?.getTime() ?? null, f.venue, f.muhuratAt?.getTime() ?? null]));
 
 function summaryOf(inv: InvitationDoc, host: LinkedFamily | undefined, extra: Partial<InvitationSummary> = {}): InvitationSummary | null {
   if (!host) return null;
@@ -225,7 +232,7 @@ export async function getInvitation(viewer: Viewer, id: string): Promise<Invitat
     ? await Promise.all([InvitationGuestModel.find({ invitationId: invitation._id }).sort({ createdAt: 1 }).lean(), InvitationLinkReplyModel.find({ invitationId: invitation._id }).sort({ createdAt: 1 }).lean()])
     : [[], []];
   const summaries = await familySummaries(viewer, [invitation.familyId, ...guests.map((g) => g.familyId)]);
-  const base = summaryOf(invitation.toObject(), summaries.get(String(invitation.familyId)), host ? { invitedCount: guests.length, repliedCount: guests.filter((g) => g.respondedAt).length } : { answered: Boolean(mine?.respondedAt) });
+  const base = summaryOf(invitation.toObject(), summaries.get(String(invitation.familyId)), host ? { invitedCount: guests.length, repliedCount: guests.filter((g) => g.respondedAt).length } : { answered: Boolean(mine?.respondedAt), changedSinceAnswer: changedSince(invitation, mine?.respondedAt) });
   if (!base) throw gone();
   const detail: InvitationDetail = {
     ...base,
@@ -236,20 +243,30 @@ export async function getInvitation(viewer: Viewer, id: string): Promise<Invitat
     isHost: host,
     patrika: patrikaOf(invitation),
   };
-  if (mine) detail.mine = { answers: answersOf(mine.answers), respondedByName: mine.respondedByName ?? null, respondedAt: mine.respondedAt?.toISOString() ?? null };
+  if (mine) detail.mine = { answers: answersOf(mine.answers), stay: mine.stay ?? 0, respondedByName: mine.respondedByName ?? null, respondedAt: mine.respondedAt?.toISOString() ?? null };
   if (host) {
     detail.guests = guests.flatMap((g) => {
       const family = summaries.get(String(g.familyId));
-      return family ? [{ family, via: g.via, answers: answersOf(g.answers), respondedByName: g.respondedByName ?? null, respondedAt: g.respondedAt?.toISOString() ?? null }] : [];
+      return family ? [{ family, via: g.via, answers: answersOf(g.answers), stay: g.stay ?? 0, respondedByName: g.respondedByName ?? null, respondedAt: g.respondedAt?.toISOString() ?? null }] : [];
     });
     detail.shareToken = invitation.shareToken ?? null;
-    detail.linkReplies = linkReplies.map((r) => ({ id: String(r._id), name: r.name, place: r.place ?? null, answers: answersOf(r.answers), respondedAt: r.updatedAt.toISOString() }));
+    detail.linkReplies = linkReplies.map((r) => ({ id: String(r._id), name: r.name, place: r.place ?? null, answers: answersOf(r.answers), stay: r.stay ?? 0, respondedAt: r.updatedAt.toISOString() }));
     // Families and link replies count the same in the headcount.
     detail.tally = invitation.functions.map((f) => {
       const answers = [...guests, ...linkReplies].flatMap((g) => g.answers.filter((a) => a.fid === f.fid));
       const count = (a: InvitationAnswer['answer']) => answers.filter((x) => x.answer === a).length;
-      return { functionId: f.fid, yes: count('yes'), maybe: count('maybe'), no: count('no'), people: answers.filter((a) => a.answer === 'yes').reduce((sum, a) => sum + (a.people ?? 0), 0) };
+      const coming = answers.filter((a) => a.answer === 'yes');
+      return {
+        functionId: f.fid,
+        yes: count('yes'),
+        maybe: count('maybe'),
+        no: count('no'),
+        people: coming.reduce((sum, a) => sum + (a.people ?? 0), 0),
+        children: coming.reduce((sum, a) => sum + (a.children ?? 0), 0),
+      };
     });
+    const staying = [...guests, ...linkReplies].filter((g) => (g.stay ?? 0) > 0);
+    detail.stayTally = { replies: staying.length, people: staying.reduce((sum, g) => sum + (g.stay ?? 0), 0) };
   }
   return detail;
 }
@@ -258,6 +275,7 @@ export async function updateInvitation(viewer: Viewer, id: string, input: Invita
   const invitation = await loadHosted(viewer, id);
   if (invitation.cancelledAt) throw new AppError(409, 'CONFLICT', 'This invitation was cancelled.', issue('validation.invitationCancelled', 'invitation'));
   const { functions, firstAt, lastAt } = toFunctions(input, invitation.functions);
+  if (plan(functions) !== plan(invitation.functions)) invitation.changedAt = new Date();
   invitation.kind = input.kind;
   invitation.forNames = input.forNames;
   invitation.message = input.message;
@@ -298,7 +316,9 @@ const closedError = () => new AppError(409, 'CONFLICT', 'Answers are closed for 
 /** Answers for functions the invitation still has; "no" means nobody is coming. */
 const cleanAnswers = (invitation: InvitationDoc, answers: RsvpInput['answers']) => {
   const known = new Set(invitation.functions.map((f) => f.fid));
-  return answers.filter((a) => known.has(a.functionId)).map((a) => ({ fid: a.functionId, answer: a.answer, people: a.answer === 'no' ? 0 : a.people }));
+  return answers
+    .filter((a) => known.has(a.functionId))
+    .map((a) => ({ fid: a.functionId, answer: a.answer, people: a.answer === 'no' ? 0 : a.people, children: a.answer === 'no' ? 0 : Math.min(a.children, a.people) }));
 };
 
 /**
@@ -350,17 +370,17 @@ const hashKey = (key: string) => createHash('sha256').update(key).digest('hex');
 export async function replyByLink(token: string, input: LinkReplyInput): Promise<LinkReplyReceipt> {
   const invitation = await loadShared(token);
   if (isClosed(invitation)) throw closedError();
-  const fields = { name: input.name, place: input.place, answers: cleanAnswers(invitation, input.answers) };
+  const fields = { name: input.name, place: input.place, answers: cleanAnswers(invitation, input.answers), stay: input.stay };
   if (input.key) {
     const updated = await InvitationLinkReplyModel.findOneAndUpdate({ invitationId: invitation._id, keyHash: hashKey(input.key) }, { $set: fields }, { new: true }).lean();
-    if (updated) return { key: input.key, name: updated.name, place: updated.place ?? null, answers: answersOf(updated.answers) };
+    if (updated) return { key: input.key, name: updated.name, place: updated.place ?? null, answers: answersOf(updated.answers), stay: updated.stay ?? 0 };
   }
   if ((await InvitationLinkReplyModel.countDocuments({ invitationId: invitation._id })) >= MAX_LINK_REPLIES) {
     throw new AppError(409, 'CONFLICT', 'This invitation has had as many replies through its link as it can take.', issue('validation.linkRepliesFull', 'invitation'));
   }
   const key = randomBytes(18).toString('base64url');
   const reply = await InvitationLinkReplyModel.create({ ...fields, invitationId: invitation._id, keyHash: hashKey(key) });
-  return { key, name: reply.name, place: reply.place ?? null, answers: answersOf(reply.answers) };
+  return { key, name: reply.name, place: reply.place ?? null, answers: answersOf(reply.answers), stay: reply.stay ?? 0 };
 }
 
 /** The host removes a link reply: a joke, a duplicate, a stranger. */
@@ -377,6 +397,7 @@ export async function answerInvitation(viewer: Viewer, id: string, input: RsvpIn
   if (!guest) throw gone();
   if (isClosed(invitation)) throw closedError();
   guest.set('answers', cleanAnswers(invitation, input.answers));
+  guest.stay = input.stay;
   guest.respondedByName = viewer.name;
   guest.respondedAt = new Date();
   await guest.save();
@@ -406,7 +427,7 @@ export async function myInvitations(viewer: Viewer): Promise<MyInvitations> {
     invited: guestOf.flatMap((g) => {
       const inv = byId.get(String(g.invitationId));
       if (!inv || muted.has(String(inv.familyId))) return [];
-      const s = summaryOf(inv, summaries.get(String(inv.familyId)), { answered: Boolean(g.respondedAt) });
+      const s = summaryOf(inv, summaries.get(String(inv.familyId)), { answered: Boolean(g.respondedAt), changedSinceAnswer: changedSince(inv, g.respondedAt) });
       return s ? [s] : [];
     }),
     hosting: hosted.flatMap((inv) => {

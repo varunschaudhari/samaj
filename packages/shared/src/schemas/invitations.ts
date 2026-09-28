@@ -145,10 +145,14 @@ export const invitationRsvpSchema = z.object({
         functionId: z.string().min(1).max(40),
         answer: z.enum(RSVP_ANSWERS),
         people: z.coerce.number().int().min(0).max(MAX_INVITATION_PEOPLE, 'validation.rsvpPeople'),
-      }),
+        /** Of those coming, how many are children: for the meal count. */
+        children: z.coerce.number().int().min(0).max(MAX_INVITATION_PEOPLE).default(0),
+      }).refine((a) => a.children <= a.people, { path: ['children'], message: 'validation.rsvpChildren' }),
     )
     .min(1)
     .max(MAX_INVITATION_FUNCTIONS),
+  /** People needing a place to stay, for families coming from out of town; 0 for none. */
+  stay: z.coerce.number().int().min(0).max(MAX_INVITATION_PEOPLE, 'validation.rsvpPeople').default(0),
 });
 export type InvitationRsvpInput = z.input<typeof invitationRsvpSchema>;
 
@@ -193,6 +197,7 @@ export interface InvitationAnswer {
   functionId: string;
   answer: RsvpAnswer;
   people: number;
+  children: number;
 }
 
 /** How a guest family came to be invited: from the host's family tree, their linked families, or picked from the directory. */
@@ -212,6 +217,8 @@ export interface InvitationSummary {
   closed: boolean;
   /** For a guest: whether their family has answered. */
   answered?: boolean;
+  /** For a guest: the host changed a time or venue after they answered. */
+  changedSinceAnswer?: boolean;
   /** For the host. */
   invitedCount?: number;
   repliedCount?: number;
@@ -221,6 +228,7 @@ export interface InvitationGuestView {
   family: LinkedFamily;
   via: GuestVia;
   answers: InvitationAnswer[];
+  stay: number;
   respondedByName: string | null;
   respondedAt: string | null;
 }
@@ -231,6 +239,7 @@ export interface LinkReplyView {
   name: string;
   place: string | null;
   answers: InvitationAnswer[];
+  stay: number;
   respondedAt: string;
 }
 
@@ -240,10 +249,12 @@ export interface InvitationDetail extends InvitationSummary, PatrikaText {
   functions: InvitationFunction[];
   isHost: boolean;
   /** For a guest: their family's answers. */
-  mine?: { answers: InvitationAnswer[]; respondedByName: string | null; respondedAt: string | null };
+  mine?: { answers: InvitationAnswer[]; stay: number; respondedByName: string | null; respondedAt: string | null };
   /** For the host: every guest family and the headcount per function. */
   guests?: InvitationGuestView[];
-  tally?: { functionId: string; yes: number; maybe: number; no: number; people: number }[];
+  tally?: { functionId: string; yes: number; maybe: number; no: number; people: number; children: number }[];
+  /** For the host: replies needing a place to stay, and how many people. */
+  stayTally?: { replies: number; people: number };
   /** For the host: the secret part of the link anyone can open, or null when the link is off. */
   shareToken?: string | null;
   linkReplies?: LinkReplyView[];
@@ -268,6 +279,7 @@ export interface LinkReplyReceipt {
   name: string;
   place: string | null;
   answers: InvitationAnswer[];
+  stay: number;
 }
 
 /** Families the host can pick from: their family tree and linked families. */

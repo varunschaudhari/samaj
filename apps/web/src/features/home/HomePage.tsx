@@ -275,12 +275,12 @@ function FamilyRequestsCard({ user }: { user: PublicUser }) {
   );
 }
 
-/** Invitations the family hasn't answered yet, while answers are still open. */
+/** Invitations the family hasn't answered yet, or that changed since it did, while answers are still open. */
 function InvitesCard({ user }: { user: PublicUser }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
   const mine = useMyInvitations(Boolean(user.familyId));
-  const waiting = (mine.data?.invited ?? []).filter((inv) => !inv.answered && !inv.closed);
+  const waiting = (mine.data?.invited ?? []).filter((inv) => (!inv.answered || inv.changedSinceAnswer) && !inv.closed);
   if (waiting.length === 0) return null;
   const only = waiting.length === 1 ? waiting[0] : undefined;
   return (

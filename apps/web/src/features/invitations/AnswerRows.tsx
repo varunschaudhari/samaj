@@ -1,5 +1,5 @@
 import { type InvitationAnswer, type InvitationFunction, type InvitationKind, MAX_INVITATION_PEOPLE, type RsvpAnswer } from '@samaj/shared';
-import { Chip, Input } from '@/components/ui';
+import { Checkbox, Chip, Input } from '@/components/ui';
 import { formatEventTime } from '@/features/community/events-api';
 import { type MessageKey, useLanguageStore, useT } from '@/i18n';
 import { isRemembrance } from './kinds';
@@ -12,10 +12,11 @@ export type AnswerDraft = Omit<InvitationAnswer, 'answer'> & { answer: RsvpAnswe
 
 /** One draft per function, starting from answers already given. */
 export const startAnswers = (functions: InvitationFunction[], given: InvitationAnswer[] = []): AnswerDraft[] =>
-  functions.map((f) => given.find((a) => a.functionId === f.id) ?? { functionId: f.id, answer: '', people: 2 });
+  functions.map((f) => given.find((a) => a.functionId === f.id) ?? { functionId: f.id, answer: '', people: 2, children: 0 });
 
 export const answersReady = (answers: AnswerDraft[]) => answers.length > 0 && answers.every((a) => a.answer !== '');
-export const answersToInput = (answers: AnswerDraft[]) => answers.map((a) => ({ functionId: a.functionId, answer: a.answer as RsvpAnswer, people: a.people }));
+export const answersToInput = (answers: AnswerDraft[]) =>
+  answers.map((a) => ({ functionId: a.functionId, answer: a.answer as RsvpAnswer, people: a.people, children: Math.min(a.children, a.people) }));
 
 /** For each function: coming, maybe or not, and how many people. */
 export function AnswerRows({ kind, functions, answers, onChange }: { kind: InvitationKind; functions: InvitationFunction[]; answers: AnswerDraft[]; onChange: (a: AnswerDraft[]) => void }) {
@@ -54,10 +55,44 @@ export function AnswerRows({ kind, functions, answers, onChange }: { kind: Invit
                   fieldClassName="w-32"
                 />
               )}
+              {a.answer && a.answer !== 'no' && (
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={a.people}
+                  label={t('invite.rsvp.children')}
+                  value={String(a.children)}
+                  onChange={(e) => set(i, { children: Math.max(0, Math.min(a.people, Number(e.target.value) || 0)) })}
+                  fieldClassName="w-32"
+                />
+              )}
             </div>
           </div>
         );
       })}
     </>
+  );
+}
+
+/** Out-of-town guests: how many need a place to stay, 0 for none. */
+export function StayField({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  const t = useT();
+  return (
+    <div className="flex flex-wrap items-end gap-3 rounded-md bg-surface-muted p-3">
+      <Checkbox label={t('invite.rsvp.stay')} checked={value > 0} onChange={(e) => onChange(e.target.checked ? 2 : 0)} />
+      {value > 0 && (
+        <Input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={MAX_INVITATION_PEOPLE}
+          label={t('invite.rsvp.stayPeople')}
+          value={String(value)}
+          onChange={(e) => onChange(Math.max(1, Math.min(MAX_INVITATION_PEOPLE, Number(e.target.value) || 1)))}
+          fieldClassName="w-32"
+        />
+      )}
+    </div>
   );
 }

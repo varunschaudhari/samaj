@@ -9,7 +9,7 @@ import { placeLabel } from '@/features/branches/api';
 import { formatDate, formatNumber, useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
-import { AnswerRows, answerLabels, answersReady, answersToInput, startAnswers } from './AnswerRows';
+import { AnswerRows, StayField, answerLabels, answersReady, answersToInput, startAnswers } from './AnswerRows';
 import { publicLink, useAddGuests, useRemoveLinkReply, useAnswerInvitation, useAudience, useCancelInvitation, useHideFamily, useInvitation, useUpdateInvitation } from './api';
 import { GuestPicker, type GuestPicks, emptyPicks, pickCount, picksToInput } from './GuestPicker';
 import { InvitationCard } from './InvitationCard';
@@ -27,7 +27,11 @@ function RsvpPanel({ invitation }: { invitation: InvitationDetail }) {
   const answer = useAnswerInvitation(invitation.id);
   const quiet = isRemembrance(invitation.kind);
   const [answers, setAnswers] = useState(() => startAnswers(invitation.functions, invitation.mine?.answers));
-  useEffect(() => setAnswers(startAnswers(invitation.functions, invitation.mine?.answers)), [invitation.id, invitation.mine?.respondedAt]);
+  const [stay, setStay] = useState(invitation.mine?.stay ?? 0);
+  useEffect(() => {
+    setAnswers(startAnswers(invitation.functions, invitation.mine?.answers));
+    setStay(invitation.mine?.stay ?? 0);
+  }, [invitation.id, invitation.mine?.respondedAt]);
 
   if (invitation.closed) {
     return <p className="text-center text-sm text-fg-muted">{invitation.cancelled ? t('invite.rsvp.cancelled') : t('invite.rsvp.closed')}</p>;
@@ -37,13 +41,19 @@ function RsvpPanel({ invitation }: { invitation: InvitationDetail }) {
       <h2 id="rsvp" className="font-display text-lg font-semibold text-fg">
         {t(quiet ? 'invite.rsvp.titleRemembrance' : 'invite.rsvp.title')}
       </h2>
+      {invitation.changedSinceAnswer && (
+        <p role="status" className="rounded-md border border-warning bg-warning-soft px-3 py-2 text-sm font-semibold text-warning">
+          {t('invite.rsvp.changed')}
+        </p>
+      )}
       <AnswerRows kind={invitation.kind} functions={invitation.functions} answers={answers} onChange={setAnswers} />
+      {!quiet && <StayField value={stay} onChange={setStay} />}
       {answer.isError && <FormAlert message={errorMessage(answer.error)} />}
       <div className="flex flex-wrap items-center gap-3">
         <Button
           disabled={!answersReady(answers)}
           loading={answer.isPending}
-          onClick={() => answer.mutate({ answers: answersToInput(answers) }, { onSuccess: () => toast.success(t('invite.rsvp.saved', { family: invitation.host.headName })) })}
+          onClick={() => answer.mutate({ answers: answersToInput(answers), stay }, { onSuccess: () => toast.success(t('invite.rsvp.saved', { family: invitation.host.headName })) })}
         >
           {t('invite.rsvp.save')}
         </Button>
@@ -70,6 +80,7 @@ function AnswerPills({ kind, functions, answers }: { kind: InvitationKind; funct
           <span key={f.id} className={cn('rounded-full px-2.5 py-1 font-semibold', a.answer === 'yes' ? 'bg-success-soft text-success' : a.answer === 'maybe' ? 'bg-warning-soft text-warning' : 'bg-surface-muted text-fg-muted')}>
             {f.name}: {t(labels[a.answer])}
             {a.answer !== 'no' && ` · ${formatNumber(a.people, language)}`}
+            {a.answer !== 'no' && a.children > 0 && ` (${t('invite.host.childrenShort', { count: formatNumber(a.children, language) })})`}
           </span>
         ) : null;
       })}
@@ -81,21 +92,24 @@ function AnswerPills({ kind, functions, answers }: { kind: InvitationKind; funct
 function downloadCsv(inv: InvitationDetail, t: ReturnType<typeof useT>, language: 'en' | 'mr') {
   const labels = answerLabels(inv.kind);
   const cell = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  const header = [t('invite.csv.family'), t('invite.csv.place'), t('invite.csv.via'), ...inv.functions.map((f) => f.name), t('invite.csv.answeredBy')];
+  const header = [t('invite.csv.family'), t('invite.csv.place'), t('invite.csv.via'), ...inv.functions.map((f) => f.name), t('invite.csv.stay'), t('invite.csv.answeredBy')];
   const cellsOf = (answers: InvitationAnswer[]) =>
     inv.functions.map((f) => {
       const a = answers.find((x) => x.functionId === f.id);
-      return a ? `${t(labels[a.answer])}${a.answer !== 'no' ? ` (${a.people})` : ''}` : '';
+      if (!a) return '';
+      if (a.answer === 'no') return t(labels[a.answer]);
+      return `${t(labels[a.answer])} (${a.people}${a.children ? `, ${t('invite.host.childrenShort', { count: String(a.children) })}` : ''})`;
     });
   const rows = (inv.guests ?? []).map((g) => [
     t('family.title', { name: g.family.headName }),
     placeLabel(g.family.place, g.family.branch, language),
     t(`invite.host.via.${g.via}`),
     ...cellsOf(g.answers),
+    g.stay ? String(g.stay) : '',
     g.respondedByName ?? '',
   ]);
   // People not on the app who replied through the link.
-  rows.push(...(inv.linkReplies ?? []).map((r) => [r.name, r.place ?? '', t('invite.host.via.link'), ...cellsOf(r.answers), r.name]));
+  rows.push(...(inv.linkReplies ?? []).map((r) => [r.name, r.place ?? '', t('invite.host.via.link'), ...cellsOf(r.answers), r.stay ? String(r.stay) : '', r.name]));
   // A byte-order mark so spreadsheet apps read Marathi correctly.
   const csv = `﻿${[header, ...rows].map((r) => r.map(cell).join(',')).join('\r\n')}`;
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -191,11 +205,17 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
               <li key={f.id} className="flex flex-col gap-1 rounded-md bg-surface-muted p-3">
                 <span className="font-semibold text-fg">{f.name}</span>
                 <span className="font-display text-2xl font-semibold text-primary tabular-nums">{t('invite.host.people', { count: n(tally?.people ?? 0) })}</span>
+                {(tally?.children ?? 0) > 0 && <span className="text-sm text-fg">{t('invite.host.ofThemChildren', { count: n(tally?.children ?? 0) })}</span>}
                 <span className="text-xs text-fg-muted">{t('invite.host.counts', { yes: n(tally?.yes ?? 0), maybe: n(tally?.maybe ?? 0), no: n(tally?.no ?? 0) })}</span>
               </li>
             );
           })}
         </ul>
+        {(invitation.stayTally?.people ?? 0) > 0 && (
+          <p className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
+            {t('invite.host.stay', { people: n(invitation.stayTally?.people ?? 0), replies: n(invitation.stayTally?.replies ?? 0) })}
+          </p>
+        )}
       </Card>
 
       <Card as="section" aria-labelledby="guests" className="flex flex-col gap-3">
@@ -211,6 +231,7 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
                     {t('family.title', { name: g.family.headName })}
                   </Link>
                   <Badge>{t(`invite.host.via.${g.via}`)}</Badge>
+                  {g.stay > 0 && <Badge tone="info">{t('invite.host.stayBadge', { count: n(g.stay) })}</Badge>}
                 </span>
                 <span className="text-xs text-fg-muted">{placeLabel(g.family.place, g.family.branch, language)}</span>
               </div>
@@ -239,6 +260,7 @@ function HostPanel({ invitation }: { invitation: InvitationDetail }) {
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-fg">{r.name}</span>
                     <Badge>{t('invite.host.via.link')}</Badge>
+                    {r.stay > 0 && <Badge tone="info">{t('invite.host.stayBadge', { count: n(r.stay) })}</Badge>}
                   </span>
                   <span className="text-xs text-fg-muted">{[r.place, formatDate(r.respondedAt, language)].filter(Boolean).join(' · ')}</span>
                 </div>

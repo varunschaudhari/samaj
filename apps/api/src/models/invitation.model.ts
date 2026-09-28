@@ -38,6 +38,8 @@ const invitationSchema = new Schema(
     sentByUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     sentByName: { type: String, required: true },
     cancelledAt: { type: Date, default: null },
+    /** When a function's time or venue last changed, or one was added or removed. */
+    changedAt: { type: Date, default: null },
     /** The secret in the link anyone can open, for people not on the app; null when the link is off. */
     shareToken: { type: String, default: null },
     /** The family's own printed patrika: a storage key ending in .jpg, .png, .webp or .pdf. */
@@ -54,6 +56,7 @@ const answerSchema = new Schema(
     fid: { type: String, required: true },
     answer: { type: String, enum: RSVP_ANSWERS, required: true },
     people: { type: Number, default: 0 },
+    children: { type: Number, default: 0 },
   },
   { _id: false },
 );
@@ -69,6 +72,8 @@ const invitationGuestSchema = new Schema(
     /** Copied from the invitation, so a guest's list is one query in date order. */
     lastAt: { type: Date, required: true },
     answers: { type: [answerSchema], default: [] },
+    /** People needing a place to stay. */
+    stay: { type: Number, default: 0 },
     respondedByName: { type: String, default: null },
     respondedAt: { type: Date, default: null },
   },
@@ -85,6 +90,7 @@ const invitationLinkReplySchema = new Schema(
     name: { type: String, required: true, trim: true },
     place: { type: String, default: null, trim: true },
     answers: { type: [answerSchema], default: [] },
+    stay: { type: Number, default: 0 },
     /** SHA-256 of the key the sender's phone keeps, so only that phone can change the reply. */
     keyHash: { type: String, required: true },
   },

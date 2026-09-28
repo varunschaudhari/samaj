@@ -31,7 +31,8 @@ function InvitationRow({ inv, hosting }: { inv: InvitationSummary; hosting: bool
             ) : inv.closed ? (
               <Badge>{t('invite.list.over')}</Badge>
             ) : (
-              !hosting && !inv.answered && <Badge tone="warning">{t('invite.list.notAnswered')}</Badge>
+              !hosting &&
+              (!inv.answered ? <Badge tone="warning">{t('invite.list.notAnswered')}</Badge> : inv.changedSinceAnswer && <Badge tone="warning">{t('invite.list.changed')}</Badge>)
             )}
           </span>
           <span className="text-sm text-fg-muted">

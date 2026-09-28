@@ -148,6 +148,7 @@ export const VALIDATION_KEYS = [
   'validation.tooManyFunctions',
   'validation.guestsNeeded',
   'validation.tooManyGuests',
+  'validation.rsvpChildren',
   'validation.muhurat',
   'validation.tooManyNames',
   'validation.replyName',
