@@ -2,18 +2,19 @@ import type { FamilyTree, TreeHousehold } from '@samaj/shared';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Avatar, Badge, Card, Chip, EmptyState, ErrorState, Icon, IconButton, Skeleton, buttonVariants, toast } from '@/components/ui';
-import { ArrowLeft, Network, Printer, Rows, SearchX, Share, X } from '@/components/ui/icons';
+import { Avatar, Badge, Button, Card, Chip, EmptyState, ErrorState, Icon, IconButton, Skeleton, buttonVariants, toast } from '@/components/ui';
+import { ArrowLeft, Network, Printer, Rows, SearchX, Share, UserPlus, X } from '@/components/ui/icons';
 import { placeLabel } from '@/features/branches/api';
 import { type MessageKey, isMessageKey, useLanguageStore, useT } from '@/i18n';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useDisplayName } from './life';
 import { useMe } from '@/features/auth/api';
+import { AddFromTree, type TreeEdit } from './AddFromTree';
 import { useFamilyTree } from './tree-api';
 import { kinshipFrom } from './kinship';
 import { type Kin, TreeChart, useGenerationLabel, usePersonLine } from './TreeChart';
-import { TreePersonModal } from './TreePersonModal';
+import { AddRelatives, TreePersonModal } from './TreePersonModal';
 import { TreeSearch } from './TreeSearch';
 import { type ChartPerson, findPeople } from './tree-layout';
 
@@ -160,6 +161,8 @@ export function FamilyTreePage() {
   const [view, setView] = useState<View>(savedView);
   const [query, setQuery] = useState('');
   const [opened, setOpened] = useState<ChartPerson | null>(null);
+  // Adding someone, or saying whose child someone is, with the family page's own forms.
+  const [treeEdit, setTreeEdit] = useState<TreeEdit | null>(null);
   const me = useMe();
   // Whose point of view relations are shown from: the viewer, someone picked, or as each family lists them.
   const [from, setFrom] = useState<string | 'me' | 'listed'>('me');
@@ -172,6 +175,8 @@ export function FamilyTreePage() {
   const myId = people.some((p) => p.id === me.data?.memberId) ? (me.data?.memberId ?? null) : null;
   const egoId = from === 'listed' ? null : from === 'me' ? myId : from;
   const ego = people.find((p) => p.id === egoId);
+  const rootHead = people.find((p) => p.rootHousehold && p.isHead);
+  const rootEditable = Boolean(tree.data?.households.some((h) => h.via === null && h.canEdit));
   const kin = useMemo<Kin>(() => (egoId ? { map: kinshipFrom(egoId, people), viewerIsEgo: egoId === myId } : null), [egoId, people, myId]);
   const displayName = useDisplayName();
 
@@ -233,9 +238,13 @@ export function FamilyTreePage() {
     body = (
       <div className="flex flex-col gap-5">
         {alone && (
-          <Card variant="muted" className="flex items-start gap-3">
-            <Icon icon={Network} weight="duotone" className="mt-0.5 text-primary" />
-            <p className="text-sm text-fg">{t('tree.grow')}</p>
+          <Card variant="muted" className="flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <Icon icon={Network} weight="duotone" className="mt-0.5 text-primary" />
+              <p className="text-sm text-fg">{t('tree.grow')}</p>
+            </div>
+            {/* Start growing it right here: the head's parents, wife, children. */}
+            {rootHead && households[0]?.canEdit && <AddRelatives person={rootHead} people={people} onEdit={setTreeEdit} />}
           </Card>
         )}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center print:hidden">
@@ -268,12 +277,24 @@ export function FamilyTreePage() {
             <Link to="/relation" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
               {t('finder.open')}
             </Link>
+            {rootEditable && (
+              <Button variant="secondary" size="sm" leadingIcon={UserPlus} onClick={() => setTreeEdit({ mode: 'add', familyId })}>
+                {t('tree.add.someone')}
+              </Button>
+            )}
             <IconButton icon={Printer} label={t('tree.print')} onClick={() => window.print()} />
             <IconButton icon={Share} label={t('tree.share')} onClick={() => void share()} />
           </div>
         </div>
         {view === 'chart' ? (
-          <TreeChart tree={tree.data} kin={kin} focusId={focusId} matches={matches} onOpen={setOpened} />
+          <TreeChart
+            tree={tree.data}
+            kin={kin}
+            focusId={focusId}
+            matches={matches}
+            onOpen={setOpened}
+            onWhoseChild={(s) => setTreeEdit({ mode: 'edit', familyId: s.householdId, memberId: s.id })}
+          />
         ) : (
           <TreeList tree={tree.data} people={people} kin={kin} focusId={focusId} matches={matches} onOpen={setOpened} />
         )}
@@ -327,8 +348,13 @@ export function FamilyTreePage() {
           setFrom(p.id === myId ? 'me' : p.id);
           setOpened(null);
         }}
+        onEdit={(e) => {
+          setOpened(null);
+          setTreeEdit(e);
+        }}
         onClose={() => setOpened(null)}
       />
+      <AddFromTree edit={treeEdit} onClose={() => setTreeEdit(null)} />
     </div>
   );
 }

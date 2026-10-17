@@ -37,7 +37,7 @@ export interface ChartLayout {
   /** Between a person and each partner beside them: straight to the first, over the top to a second; dashed if they separated. */
   couples: { path: string; former: boolean }[];
   /** Someone whose parents the family hasn't said yet: a short dashed stub above them. */
-  stubs: { x: number; y: number }[];
+  stubs: { id: string; householdId: string; x: number; y: number }[];
   rows: { generation: number; y: number }[];
   /** Under each couple with children: show or hide everyone below them. */
   toggles: { id: string; x: number; y: number; collapsed: boolean; hidden: number }[];
@@ -210,7 +210,7 @@ export function layoutTree(tree: FamilyTree, collapsed: ReadonlySet<string> = ne
   }
   const stubs = roots.flatMap((u) => {
     const p = anchor(u);
-    return PARENT_CHOICES[p.relation] && !p.parentId ? [{ x: p.x + CARD_W / 2, y: p.y }] : [];
+    return PARENT_CHOICES[p.relation] && !p.parentId ? [{ id: p.id, householdId: p.household.id, x: p.x + CARD_W / 2, y: p.y }] : [];
   });
 
   const toggles = visible

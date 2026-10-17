@@ -60,19 +60,26 @@ const RELATION_GENDER: Partial<Record<Relation, Gender>> = {
 /** Shown first; the rest are one tap away. */
 const COMMON_RELATIONS: Relation[] = ['spouse', 'son', 'daughter', 'father', 'mother', 'daughterInLaw'];
 
-function toFormValues(member: FamilyMember | null, relation?: Relation): MemberInput {
+/** Adding from the family tree: who the new person's parent or partner is, and their gender, already known. */
+export interface MemberPrefill {
+  parentId?: string;
+  partnerId?: string;
+  gender?: Gender;
+}
+
+function toFormValues(member: FamilyMember | null, relation?: Relation, prefill: MemberPrefill = {}): MemberInput {
   return {
     name: member?.name ?? '',
     relation: member?.relation ?? relation ?? ('' as MemberInput['relation']),
-    gender: member?.gender ?? (relation ? (RELATION_GENDER[relation] ?? '') : '') as MemberInput['gender'],
+    gender: member?.gender ?? prefill.gender ?? ((relation ? (RELATION_GENDER[relation] ?? '') : '') as MemberInput['gender']),
     birthYear: member?.birthYear ? String(member.birthYear) : '',
     occupation: member?.occupation ?? '',
     education: member?.education ?? '',
     phone: member?.phone ?? '',
     deceased: member?.deceased ?? false,
     deathYear: member?.deathYear ? String(member.deathYear) : '',
-    parentId: member?.parentId ?? '',
-    partnerId: member?.partnerId ?? '',
+    parentId: member?.parentId ?? prefill.parentId ?? '',
+    partnerId: member?.partnerId ?? prefill.partnerId ?? '',
     adopted: member?.adopted ?? false,
     otherParentId: member?.otherParentId ?? '',
     formerPartner: member?.formerPartner ?? false,
@@ -93,14 +100,18 @@ interface MemberFormModalProps {
   headGender?: Gender;
   /** The family's people, to choose whose child or wife someone is. */
   members: FamilyMember[];
+  /** Adding from the tree: parent, partner and gender already known. */
+  prefill?: MemberPrefill;
+  /** Adding from the tree: what this is, in a line ("Add a son of Sagar"). */
+  context?: string;
 }
 
-export function MemberFormModal({ familyId, member, open, onClose, initialRelation, headGender, members }: MemberFormModalProps) {
+export function MemberFormModal({ familyId, member, open, onClose, initialRelation, headGender, members, prefill, context }: MemberFormModalProps) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
   const errorMessage = useErrorMessage();
   const save = useSaveMember(familyId);
-  const form = useForm({ resolver: zodResolver(memberInputSchema), defaultValues: toFormValues(member, initialRelation) });
+  const form = useForm({ resolver: zodResolver(memberInputSchema), defaultValues: toFormValues(member, initialRelation, prefill) });
   const { errors } = form.formState;
   // Adding someone: the person adding them confirms consent (or guardianship, for a child).
   const [consent, setConsent] = useState(false);
@@ -111,11 +122,11 @@ export function MemberFormModal({ familyId, member, open, onClose, initialRelati
   const addAnother = useRef(false);
 
   const reset = () => {
-    form.reset(toFormValues(member, initialRelation));
+    form.reset(toFormValues(member, initialRelation, prefill));
     save.reset();
     setConsent(false);
     setConsentMissing(false);
-    genderChosen.current = Boolean(member);
+    genderChosen.current = Boolean(member || prefill?.gender);
     setShowAll(Boolean(member && !COMMON_RELATIONS.includes(member.relation)));
   };
 
@@ -123,7 +134,7 @@ export function MemberFormModal({ familyId, member, open, onClose, initialRelati
   useEffect(() => {
     if (open) reset();
     // Only when the modal opens or switches person; resetting on every render would wipe typing.
-  }, [open, member?.id, initialRelation]);
+  }, [open, member?.id, initialRelation, prefill?.parentId, prefill?.partnerId]);
 
   const isHead = member?.isHead ?? false;
   const phoneLocked = member?.hasAccount ?? false;
@@ -239,6 +250,7 @@ export function MemberFormModal({ familyId, member, open, onClose, initialRelati
         {member && <PhotoField familyId={familyId} memberId={member.id} name={member.name} photoUrl={member.photoUrl} />}
         <form id="member-form" onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
           {showBanner && <FormAlert message={errorMessage(save.error)} />}
+          {context && !member && <p className="rounded-md bg-primary-soft px-3 py-2 text-sm font-semibold text-primary">{context}</p>}
 
           <Input label={t('member.name')} autoComplete="off" error={fieldError(t, errors.name?.message)} {...form.register('name')} />
 

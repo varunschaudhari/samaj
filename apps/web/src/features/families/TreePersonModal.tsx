@@ -2,13 +2,61 @@ import type { TreeHousehold } from '@samaj/shared';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Avatar, Badge, Button, Chip, Modal, buttonVariants, toast } from '@/components/ui';
+import { UserPlus, UsersRound } from '@/components/ui/icons';
 import { placeLabel } from '@/features/branches/api';
 import { useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
+import type { TreeEdit } from './AddFromTree';
 import { useSamePerson } from './api';
+import { addOptions, marriedIn } from './relatives';
 import { useDisplayName } from './life';
 import { type Kin, usePersonLine, useRelationLabel } from './TreeChart';
 import type { ChartPerson } from './tree-layout';
+
+/** "Add son", "Add wife", "Add father"…: someone new next to this person, the relation worked out for their household. */
+export function AddRelatives({ person, people, onEdit }: { person: ChartPerson; people: ChartPerson[]; onEdit: (edit: TreeEdit) => void }) {
+  const t = useT();
+  const displayName = useDisplayName();
+  const options = addOptions(person, people.filter((p) => p.household.id === person.household.id));
+  // Someone who married in: their parents are in their माहेर, another family.
+  const maher = marriedIn(person) && !person.parentId;
+  if (options.length === 0 && !maher) return null;
+  const name = displayName(person);
+  return (
+    <section aria-labelledby="tree-add" className="flex flex-col gap-2 rounded-md border border-dashed border-primary/50 bg-primary-soft/40 p-3">
+      <h3 id="tree-add" className="text-sm font-semibold text-fg">
+        {t('tree.add.title', { name })}
+      </h3>
+      <div className="flex flex-wrap gap-2">
+        {options.map((o) => (
+          <Button
+            key={`${o.kind}-${o.label}`}
+            variant="secondary"
+            size="sm"
+            leadingIcon={UserPlus}
+            aria-label={t(`tree.add.aria.${o.label}`, { name })}
+            onClick={() =>
+              onEdit({
+                mode: 'add',
+                familyId: person.household.id,
+                relation: o.relation,
+                prefill: { gender: o.gender, parentId: o.parentId, partnerId: o.partnerId },
+                context: t(`tree.add.aria.${o.label}`, { name }),
+              })
+            }
+          >
+            {t(`tree.add.${o.label}`)}
+          </Button>
+        ))}
+        {maher && (
+          <Button variant="secondary" size="sm" leadingIcon={UsersRound} onClick={() => onEdit({ mode: 'maher', familyId: person.household.id, memberId: person.id })}>
+            {t('tree.add.maher')}
+          </Button>
+        )}
+      </div>
+    </section>
+  );
+}
 
 /** One person from the tree: who they are to whom, and the way to their family. */
 export function TreePersonModal({
@@ -19,6 +67,7 @@ export function TreePersonModal({
   ego,
   onFocus,
   onFromHere,
+  onEdit,
   onClose,
 }: {
   person: ChartPerson | null;
@@ -30,6 +79,8 @@ export function TreePersonModal({
   onFocus: (p: ChartPerson) => void;
   /** Show everyone's relation to this person. */
   onFromHere: (p: ChartPerson) => void;
+  /** Add someone next to them, or their माहेर, with the family's own forms. */
+  onEdit: (edit: TreeEdit) => void;
   onClose: () => void;
 }) {
   const t = useT();
@@ -151,6 +202,7 @@ export function TreePersonModal({
             </div>
           )}
         </dl>
+        {edits(person.household.id) && !person.movedTo && <AddRelatives person={person} people={people} onEdit={onEdit} />}
         {twins.length > 0 && (
           <details className="rounded-md border border-line p-3 text-sm">
             <summary className="cursor-pointer font-semibold text-fg">{t('tree.sameAs')}</summary>

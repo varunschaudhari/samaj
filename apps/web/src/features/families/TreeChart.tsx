@@ -94,12 +94,15 @@ export function TreeChart({
   focusId,
   matches,
   onOpen,
+  onWhoseChild,
 }: {
   tree: FamilyTree;
   kin: Kin;
   focusId: string | null;
   matches: Set<string>;
   onOpen: (p: ChartPerson) => void;
+  /** Their parents aren't set and their family may be edited: ask whose child they are. */
+  onWhoseChild?: (person: { id: string; householdId: string }) => void;
 }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
@@ -275,6 +278,22 @@ export function TreeChart({
             {layout.people.map((p) => (
               <PersonCard key={p.id} person={p} kin={kin} focused={p.id === focusId} matched={matches.has(p.id)} onOpen={onOpen} />
             ))}
+            {onWhoseChild &&
+              layout.stubs
+                .filter((s) => tree.households.some((h) => h.family.id === s.householdId && h.canEdit))
+                .map((s) => (
+                  <button
+                    key={`w${s.id}`}
+                    type="button"
+                    onClick={() => onWhoseChild(s)}
+                    title={t('tree.whoseChild')}
+                    aria-label={t('tree.whoseChildOf', { name: displayName(everyone.get(s.id) ?? { name: '', deceased: false }) })}
+                    style={{ left: s.x, top: s.y - 36 }}
+                    className="absolute flex h-6 -translate-x-1/2 items-center gap-1 rounded-full border border-dashed border-primary bg-surface px-2 text-xs font-semibold text-primary hover:bg-primary-soft print:hidden"
+                  >
+                    ? {t('tree.whoseChild')}
+                  </button>
+                ))}
             {layout.toggles.map((g) => {
               const name = displayName(everyone.get(g.id) ?? { name: '', deceased: false });
               return (

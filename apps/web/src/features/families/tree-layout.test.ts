@@ -68,7 +68,7 @@ describe('layoutTree', () => {
     expect(layout.connectors.filter((c) => c.dashed)).toHaveLength(1);
     // Anil to his two sons, Rohit to Aarav, Sagar to Isha.
     expect(layout.connectors).toHaveLength(4);
-    expect(layout.stubs).toEqual([{ x: (at.Dev?.x ?? 0) + CARD_W / 2, y: at.Dev?.y }]);
+    expect(layout.stubs).toEqual([{ id: 'Dev', householdId: 'f1', x: (at.Dev?.x ?? 0) + CARD_W / 2, y: at.Dev?.y }]);
   });
 
   it('draws a line from a wife’s parents in her माहेर to where she stands beside her husband', () => {
