@@ -1383,6 +1383,7 @@ export const mr: Record<MessageKey, string> = {
   'invite.form.functions': 'कार्यक्रम व वेळा',
   'invite.form.functionsHint': 'प्रत्येकाची वेळ व ठिकाण वेगळे. पाहुणे प्रत्येकाला उत्तर देतात.',
   'invite.form.functionName': 'कार्यक्रमाचे नाव',
+  'invite.form.functionNumber': 'कार्यक्रम {n}',
   'invite.form.starts': 'सुरुवात',
   'invite.form.ends': 'समाप्ती',
   'invite.form.venue': 'स्थळ',

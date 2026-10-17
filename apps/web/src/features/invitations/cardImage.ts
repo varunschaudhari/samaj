@@ -183,10 +183,11 @@ export async function drawCardImage(card: CardImageText): Promise<Blob> {
         ctx.stroke();
       }
       y = top + 20;
-      text({ font: `600 40px ${DISPLAY}`, color: P.ink, text: f.name, lineHeight: 56, gapBefore: 12, align: 'left', width: INNER - 112 });
-      text({ font: `400 30px ${BODY}`, color: P.ink, text: `🗓  ${f.when}`, lineHeight: 42, gapBefore: 6, align: 'left', width: INNER - 112 });
-      if (f.muhurat) text({ font: `600 30px ${BODY}`, color: P.highlight, text: `🪷  ${f.muhurat}`, lineHeight: 42, gapBefore: 0, align: 'left', width: INNER - 112 });
-      text({ font: `400 30px ${BODY}`, color: P.ink, text: `📍  ${f.venue}`, lineHeight: 42, gapBefore: 0, align: 'left', width: INNER - 112 });
+      // Centred, like the card on screen and a printed patrika.
+      text({ font: `600 40px ${DISPLAY}`, color: P.ink, text: f.name, lineHeight: 56, gapBefore: 12, width: INNER - 112 });
+      text({ font: `400 30px ${BODY}`, color: P.ink, text: `🗓  ${f.when}`, lineHeight: 42, gapBefore: 6, width: INNER - 112 });
+      if (f.muhurat) text({ font: `600 30px ${BODY}`, color: P.highlight, text: `🪷  ${f.muhurat}`, lineHeight: 42, gapBefore: 0, width: INNER - 112 });
+      text({ font: `400 30px ${BODY}`, color: P.ink, text: `📍  ${f.venue}`, lineHeight: 42, gapBefore: 0, width: INNER - 112 });
       y = top + h + 20;
     }
     if (card.message) text({ font: `400 32px ${BODY}`, color: P.ink, text: card.message, lineHeight: 48, gapBefore: 16, width: INNER - 120 });

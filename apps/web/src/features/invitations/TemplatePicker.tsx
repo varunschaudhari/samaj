@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Input } from '@/components/ui';
+import { Button, Chip, Input } from '@/components/ui';
 import { Sparkles } from '@/components/ui/icons';
 import { useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
@@ -27,16 +27,9 @@ export function TemplatePicker({ draft, onChange }: { draft: InvitationDraft; on
       {templates.length > 1 && (
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t('invite.template.title')}>
           {templates.map((x) => (
-            <button
-              key={x.id}
-              type="button"
-              role="radio"
-              aria-checked={x.id === tpl.id}
-              onClick={() => setChosen(x.id)}
-              className={cn('rounded-full border px-3 py-1.5 text-sm font-semibold', x.id === tpl.id ? 'border-primary bg-primary text-on-primary' : 'border-line-strong bg-surface text-fg')}
-            >
+            <Chip key={x.id} role="radio" aria-checked={x.id === tpl.id} aria-pressed={undefined} selected={x.id === tpl.id} onClick={() => setChosen(x.id)}>
               {t(`invite.template.${x.id}`)}
-            </button>
+            </Chip>
           ))}
         </div>
       )}

@@ -1,5 +1,5 @@
 import { type InvitationDetail, type InvitationInput, type InvitationKind, type InvitationTheme, MAX_INVITATION_FUNCTIONS, invitationInputSchema, themeFor } from '@samaj/shared';
-import { Button, Chip, Input, Textarea } from '@/components/ui';
+import { Button, Chip, IconButton, Input, Textarea } from '@/components/ui';
 import { Plus, Trash2 } from '@/components/ui/icons';
 import { fromLocalInput, toLocalInput } from '@/features/community/events-api';
 import { fieldError } from '@/features/auth/form-errors';
@@ -155,15 +155,18 @@ export function InvitationForm({
       <TemplatePicker draft={draft} onChange={onChange} />
       {draft.functions.map((f, i) => (
         <div key={f.id ?? i} className="flex flex-col gap-3 rounded-md border border-line bg-surface p-3 shadow-card">
-          <div className="flex items-end gap-2">
-            <span className="mb-2.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-zari-soft text-sm font-semibold text-zari-fg tabular-nums" aria-hidden="true">
-              {i + 1}
+          <div className="flex min-h-touch items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-sm font-semibold text-fg">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zari-soft text-sm font-semibold text-zari-fg tabular-nums" aria-hidden="true">
+                {i + 1}
+              </span>
+              {t('invite.form.functionNumber', { n: i + 1 })}
             </span>
-            <Input label={t('invite.form.functionName')} value={f.name} onChange={(e) => setFunction(i, { name: e.target.value })} error={err(`functions.${i}.name`)} fieldClassName="flex-1" />
             {draft.functions.length > 1 && (
-              <Button variant="ghost" size="sm" leadingIcon={Trash2} aria-label={t('invite.form.removeFunction')} onClick={() => set({ functions: draft.functions.filter((_, j) => j !== i) })} />
+              <IconButton icon={Trash2} label={t('invite.form.removeFunction')} onClick={() => set({ functions: draft.functions.filter((_, j) => j !== i) })} />
             )}
           </div>
+          <Input label={t('invite.form.functionName')} value={f.name} onChange={(e) => setFunction(i, { name: e.target.value })} error={err(`functions.${i}.name`)} />
           {FUNCTION_NAMES[draft.kind].length > 0 && (
             <div className="-mt-1 flex flex-wrap gap-1.5">
               {FUNCTION_NAMES[draft.kind].map((name) => (

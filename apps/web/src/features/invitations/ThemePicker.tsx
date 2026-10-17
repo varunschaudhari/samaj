@@ -23,17 +23,20 @@ export function ThemePicker({ kind, value, onChange }: { kind: InvitationKind; v
               aria-checked={on}
               onClick={() => onChange(theme)}
               className={cn(
-                'flex flex-col gap-1.5 rounded-lg p-1.5 text-center transition-shadow duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                'flex h-full flex-col gap-1.5 rounded-lg p-1.5 text-center transition-shadow duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
                 on ? 'bg-primary-soft ring-2 ring-primary' : 'hover:bg-surface-muted',
               )}
             >
-              <span style={themeVars(theme)} className="flex flex-col items-center gap-1.5 rounded-md border-2 border-(--c-frame) bg-(--c-paper) px-2 pt-3 pb-2" aria-hidden="true">
+              <span style={themeVars(theme)} className="flex flex-1 flex-col items-center gap-1.5 rounded-md border-2 border-(--c-frame) bg-(--c-paper) px-2 pt-3 pb-2" aria-hidden="true">
                 <span className="text-[0.6rem] font-semibold text-(--c-top)">{t(p.ornament === 'none' || p.ornament === 'lotus' ? 'invite.card.inMemory' : 'invite.card.ganesh')}</span>
-                <span className="font-display text-sm font-semibold text-(--c-accent)">{t(`invite.kind.${kind}`)}</span>
-                <Ornament kind={p.ornament} className="max-h-3 w-4/5" />
+                <span className="truncate font-display text-sm font-semibold text-(--c-accent)">{t(`invite.kind.${kind}`)}</span>
+                {/* One slot height for every ornament (and for none), so the swatches line up. */}
+                <span className="flex h-3 w-4/5 items-center justify-center">
+                  <Ornament kind={p.ornament} className="h-3 w-full" />
+                </span>
                 <span className="mt-1 w-full rounded-sm border border-(--c-panel-line) bg-(--c-panel) py-1 text-[0.6rem] text-(--c-muted)">· · ·</span>
               </span>
-              <span className="text-xs font-semibold text-fg">{t(`invite.theme.${theme}`)}</span>
+              <span className="mt-auto text-xs font-semibold text-fg">{t(`invite.theme.${theme}`)}</span>
             </button>
           );
         })}

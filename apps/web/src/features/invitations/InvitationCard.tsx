@@ -26,11 +26,15 @@ export interface CardData {
   addressee?: string | null;
 }
 
+/** An icon inside a line of text: on the text's baseline, a little space before the words. */
+const INLINE_ICON = 'mr-1.5 inline-block shrink-0 align-[-0.2em]';
+
 /** A labelled list of names, as printed at the foot of a patrika. */
 function Names({ label, names }: { label: string; names: string[] | undefined }) {
   if (!names?.length) return null;
   return (
-    <div className="flex flex-col gap-0.5">
+    // Each group takes an equal share of the row; a narrow card stacks them, each still centred.
+    <div className="flex min-w-40 flex-1 basis-40 flex-col items-center gap-0.5">
       <span className="text-xs font-semibold tracking-wide text-(--c-muted) uppercase">{label}</span>
       {names.map((n, i) => (
         <span key={i} className="text-sm text-(--c-ink)">
@@ -91,25 +95,26 @@ export function InvitationCard({ data, cancelled = false }: { data: CardData; ca
         {t(quiet ? (data.addressee ? 'invite.card.remembranceInvitePerson' : 'invite.card.remembranceInvite') : data.addressee ? 'invite.card.invitesPerson' : 'invite.card.invitesYou', { name: data.hostName })}
       </p>
       <Ornament kind={palette.ornament} className="mx-auto mt-5 w-full max-w-xs" />
-      <ol className="mx-auto mt-5 flex max-w-md flex-col gap-3 text-left">
+      <ol className="mx-auto mt-5 flex max-w-md flex-col gap-3">
         {data.functions.map((f, i) => (
-          <li key={f.id ?? i} className="flex flex-col gap-1 rounded-md border border-(--c-panel-line) bg-(--c-panel) p-3">
+          <li key={f.id ?? i} className="flex flex-col items-center gap-1 rounded-md border border-(--c-panel-line) bg-(--c-panel) px-3 py-3.5">
             <span className="font-display text-lg font-semibold">{f.name || '…'}</span>
+            {/* Icons sit in the line, so a wrapped line stays centred with its icon. */}
             {f.startsAt && (
-              <span className="flex items-start gap-2 text-sm">
-                <Icon icon={CalendarDays} size="sm" className="mt-0.5 shrink-0 text-(--c-muted)" />
+              <span className="text-sm">
+                <Icon icon={CalendarDays} size="sm" className={`${INLINE_ICON} text-(--c-muted)`} />
                 {formatEventTime(f.startsAt, f.endsAt, language)}
               </span>
             )}
             {f.muhuratAt && f.startsAt && (
-              <span className="flex items-start gap-2 text-sm font-semibold text-(--c-highlight)">
-                <Icon icon={Flower2} size="sm" className="mt-0.5 shrink-0" />
+              <span className="text-sm font-semibold text-(--c-highlight)">
+                <Icon icon={Flower2} size="sm" className={INLINE_ICON} />
                 {t('invite.card.muhurat', { time: muhuratText(f.muhuratAt, f.startsAt, language) })}
               </span>
             )}
             {f.venue && (
-              <span className="flex items-start gap-2 text-sm">
-                <Icon icon={MapPin} size="sm" className="mt-0.5 shrink-0 text-(--c-muted)" />
+              <span className="text-sm">
+                <Icon icon={MapPin} size="sm" className={`${INLINE_ICON} text-(--c-muted)`} />
                 <span>
                   {f.venue}
                   {f.mapUrl && (
@@ -128,7 +133,7 @@ export function InvitationCard({ data, cancelled = false }: { data: CardData; ca
       </ol>
       {data.message && <p className="mx-auto mt-5 max-w-md text-base whitespace-pre-line">{data.message}</p>}
       {data.kripa?.length || data.blessings?.length || data.inviters?.length ? (
-        <div className="mx-auto mt-6 grid max-w-md gap-4 border-t border-(--c-panel-line) pt-4 sm:grid-cols-2">
+        <div className="mx-auto mt-6 flex max-w-lg flex-wrap justify-center gap-x-6 gap-y-4 border-t border-(--c-panel-line) pt-4">
           <Names label={t('invite.card.kripa')} names={data.kripa} />
           <Names label={t('invite.card.blessings')} names={data.blessings} />
           <Names label={t(quiet ? 'invite.card.grieving' : 'invite.card.inviters')} names={data.inviters} />
