@@ -2,14 +2,14 @@ import type { FamilyTree } from '@samaj/shared';
 import { type PointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Avatar, Icon, IconButton } from '@/components/ui';
-import { CornersIn, House, ZoomIn, ZoomOut } from '@/components/ui/icons';
+import { ArrowsOut, CornersIn, House, UserCircle, X, ZoomIn, ZoomOut } from '@/components/ui/icons';
 import { type MessageKey, formatNumber, isMessageKey, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useDisplayName, useLifeLabel } from './life';
-import { CARD_H, CARD_W, type ChartPerson, layoutTree } from './tree-layout';
+import { COMPACT_CARD, type CardSize, type ChartPerson, FULL_CARD, layoutTree } from './tree-layout';
 
-const MIN_ZOOM = 0.4;
-const MAX_ZOOM = 1.6;
+const MIN_ZOOM = 0.3;
+const MAX_ZOOM = 1.8;
 /** Fitting a big tree on screen never starts smaller than this; "Fit" goes further on request. */
 const READABLE_ZOOM = 0.8;
 /** A4 landscape, less the margins, at 96 dpi. */
@@ -52,32 +52,47 @@ export function usePersonLine() {
       .join(' · ');
 }
 
-function PersonCard({ person, kin, focused, matched, onOpen }: { person: ChartPerson; kin: Kin; focused: boolean; matched: boolean; onOpen: (p: ChartPerson) => void }) {
+/** Narrow screens get smaller cards, so a couple and their children fit across. */
+function useCompact() {
+  const query = '(max-width: 640px)';
+  const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    const on = () => setCompact(list.matches);
+    list.addEventListener('change', on);
+    return () => list.removeEventListener('change', on);
+  }, []);
+  return compact;
+}
+
+function PersonCard({ person, kin, card, focused, matched, onOpen }: { person: ChartPerson; kin: Kin; card: CardSize; focused: boolean; matched: boolean; onOpen: (p: ChartPerson) => void }) {
   const t = useT();
   const displayName = useDisplayName();
   const line = usePersonLine();
   const family = t('family.title', { name: person.household.headName });
+  const compact = card.w < FULL_CARD.w;
   return (
     <button
       type="button"
       data-person={person.id}
       onClick={() => onOpen(person)}
       aria-label={`${displayName(person)}, ${line(person, kin)}, ${family}`}
-      style={{ left: person.x, top: person.y, width: CARD_W, height: CARD_H }}
+      style={{ left: person.x, top: person.y, width: card.w, height: card.h }}
       className={cn(
-        'absolute flex items-center gap-2 rounded-md border px-2 text-left shadow-card transition-shadow duration-150 hover:shadow-raised print:shadow-none',
+        'absolute flex items-center rounded-md border text-left shadow-card transition-shadow duration-150 hover:shadow-raised print:shadow-none',
+        compact ? 'gap-1.5 px-1.5' : 'gap-2 px-2',
         person.deceased ? 'bg-surface-muted' : 'bg-surface',
         person.movedTo ? 'border-dashed border-line-strong' : person.isHead && person.rootHousehold ? 'border-primary' : 'border-line',
         matched && 'ring-2 ring-zari',
         focused && 'ring-4 ring-focus',
       )}
     >
-      <Avatar name={person.name} src={person.photoUrl} size="md" className={cn(person.deceased && 'grayscale')} />
+      <Avatar name={person.name} src={person.photoUrl} size={compact ? 'sm' : 'md'} className={cn(person.deceased && 'grayscale')} />
       <span className="flex min-w-0 flex-1 flex-col leading-tight">
-        <span className="line-clamp-2 text-sm font-semibold break-words text-fg">{displayName(person)}</span>
-        <span className="truncate text-xs text-fg-muted">{line(person, kin)}</span>
+        <span className={cn('line-clamp-2 font-semibold break-words text-fg', compact ? 'text-xs' : 'text-sm')}>{displayName(person)}</span>
+        <span className={cn('truncate text-fg-muted', compact ? 'text-[0.65rem]' : 'text-xs')}>{line(person, kin)}</span>
       </span>
-      {person.isHead && <Icon icon={House} size="sm" weight="fill" className="shrink-0 text-primary" />}
+      {person.isHead && !compact && <Icon icon={House} size="sm" weight="fill" className="shrink-0 text-primary" />}
     </button>
   );
 }
@@ -85,13 +100,15 @@ function PersonCard({ person, kin, focused, matched, onOpen }: { person: ChartPe
 /**
  * The tree as a chart: generations top to bottom, lines from parents to
  * children, partners side by side. Scrolls both ways, drags with a mouse,
- * zooms, folds branches away, prints on one landscape page, and centres on
- * the person asked for (or the family's head).
+ * zooms (buttons, pinch, Ctrl and the wheel), opens full screen, folds
+ * branches away, prints on one landscape page, and starts on the viewer
+ * (or the person asked for, or the family's head).
  */
 export function TreeChart({
   tree,
   kin,
   focusId,
+  homeId,
   matches,
   onOpen,
   onWhoseChild,
@@ -99,6 +116,8 @@ export function TreeChart({
   tree: FamilyTree;
   kin: Kin;
   focusId: string | null;
+  /** Where "Back to me" goes, and where the chart starts without a focus: the viewer, else the head. */
+  homeId: string | null;
   matches: Set<string>;
   onOpen: (p: ChartPerson) => void;
   /** Their parents aren't set and their family may be edited: ask whose child they are. */
@@ -108,23 +127,28 @@ export function TreeChart({
   const language = useLanguageStore((s) => s.language);
   const generationLabel = useGenerationLabel();
   const displayName = useDisplayName();
+  const compact = useCompact();
+  const card = compact ? COMPACT_CARD : FULL_CARD;
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
-  const layout = useMemo(() => layoutTree(tree, collapsed), [tree, collapsed]);
+  const layout = useMemo(() => layoutTree(tree, collapsed, card), [tree, collapsed, card]);
   const everyone = useMemo(() => new Map(tree.households.flatMap((h) => h.members.map((m) => [m.id, m] as const))), [tree]);
   const scroller = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
+  const [full, setFull] = useState(false);
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
 
-  // Zooming keeps the same point in the middle; `pending` carries it across the re-render.
+  // Zooming keeps a point of the tree at a place on screen (the middle, unless said); `pending` carries it across the re-render.
   const zoomNow = useRef(zoom);
   zoomNow.current = zoom;
-  const pending = useRef<{ x: number; y: number; smooth: boolean } | null>(null);
-  const scrollToPoint = useCallback((point: { x: number; y: number }, z: number, smooth = false) => {
+  type Anchor = { x: number; y: number; sx?: number; sy?: number };
+  const pending = useRef<(Anchor & { smooth: boolean }) | null>(null);
+  const scrollToPoint = useCallback((point: Anchor, z: number, smooth = false) => {
     const el = scroller.current;
-    el?.scrollTo({ left: point.x * z - el.clientWidth / 2, top: point.y * z - el.clientHeight / 2, behavior: smooth ? 'smooth' : 'auto' });
+    if (!el) return;
+    el.scrollTo({ left: point.x * z - (point.sx ?? el.clientWidth / 2), top: point.y * z - (point.sy ?? el.clientHeight / 2), behavior: smooth ? 'smooth' : 'auto' });
   }, []);
   const zoomTo = useCallback(
-    (z: number, point: { x: number; y: number }) => {
+    (z: number, point: Anchor) => {
       if (z === zoomNow.current) return scrollToPoint(point, z);
       pending.current = { ...point, smooth: false };
       setZoom(z);
@@ -139,51 +163,67 @@ export function TreeChart({
 
   const viewCentre = () => {
     const el = scroller.current;
-    return el ? { x: (el.scrollLeft + el.clientWidth / 2) / zoom, y: (el.scrollTop + el.clientHeight / 2) / zoom } : { x: 0, y: 0 };
+    return el ? { x: (el.scrollLeft + el.clientWidth / 2) / zoomNow.current, y: (el.scrollTop + el.clientHeight / 2) / zoomNow.current } : { x: 0, y: 0 };
+  };
+  /** The tree point under a place on screen, kept at that place. */
+  const pointAt = (clientX: number, clientY: number): Anchor => {
+    const el = scroller.current;
+    if (!el) return { x: 0, y: 0 };
+    const box = el.getBoundingClientRect();
+    const sx = clientX - box.left;
+    const sy = clientY - box.top;
+    return { x: (el.scrollLeft + sx) / zoomNow.current, y: (el.scrollTop + sy) / zoomNow.current, sx, sy };
   };
   const centreOf = useCallback(
     (id: string | null | undefined) => {
       const p = layout.people.find((x) => x.id === id);
-      return p ? { x: p.x + CARD_W / 2, y: p.y + CARD_H / 2 } : undefined;
+      return p ? { x: p.x + layout.card.w / 2, y: p.y + layout.card.h / 2 } : undefined;
     },
-    [layout.people],
+    [layout],
   );
   const fitZoom = useCallback(() => {
     const el = scroller.current;
     return el && layout.width > 0 ? clamp(Math.min(1, (el.clientWidth - 8) / layout.width)) : 1;
   }, [layout.width]);
 
-  // First view of each tree: as large as fits but readable (a wide tree scrolls instead), on the person asked for or the family's head.
-  const latest = useRef({ layout, fitZoom, centreOf });
-  latest.current = { layout, fitZoom, centreOf };
+  // First view of each tree: as large as fits but readable (a wide tree scrolls instead), on the person asked for, the viewer, or the head.
+  const latest = useRef({ layout, fitZoom, centreOf, homeId });
+  latest.current = { layout, fitZoom, centreOf, homeId };
   const focusAtStart = useRef(focusId);
   const glided = useRef(focusId);
   useLayoutEffect(() => {
-    const { layout: now, fitZoom: fit, centreOf: centre } = latest.current;
+    const { layout: now, fitZoom: fit, centreOf: centre, homeId: home } = latest.current;
     const head = now.people.find((p) => p.rootHousehold && p.isHead);
-    zoomTo(Math.max(fit(), READABLE_ZOOM), centre(focusAtStart.current) ?? centre(head?.id) ?? { x: now.width / 2, y: 0 });
+    zoomTo(Math.max(fit(), READABLE_ZOOM), centre(focusAtStart.current) ?? centre(home) ?? centre(head?.id) ?? { x: now.width / 2, y: 0 });
     // Opened on someone (from their card): make sure the chart itself is on screen.
     if (focusAtStart.current) scroller.current?.scrollIntoView({ block: 'nearest' });
-  }, [tree, zoomTo]);
+  }, [tree, card, zoomTo]);
 
   // Someone picked later: open the branches hiding them, then glide to them.
+  const glideTo = useCallback(
+    (id: string) => {
+      const point = centreOf(id);
+      if (!point) {
+        const open = new Set(collapsed);
+        for (let at = everyone.get(id), i = 0; at && i < 64; i++) {
+          if (at.partnerId) open.delete(at.partnerId);
+          if (at.parentId) open.delete(at.parentId);
+          at = at.parentId ? everyone.get(at.parentId) : undefined;
+        }
+        if (open.size !== collapsed.size) setCollapsed(open);
+        return false;
+      }
+      scrollToPoint(point, zoomNow.current, true);
+      return true;
+    },
+    [centreOf, scrollToPoint, collapsed, everyone],
+  );
   useEffect(() => {
     if (!focusId || focusId === glided.current) return;
-    const point = centreOf(focusId);
-    if (!point) {
-      const open = new Set(collapsed);
-      for (let at = everyone.get(focusId), i = 0; at && i < 64; i++) {
-        if (at.partnerId) open.delete(at.partnerId);
-        if (at.parentId) open.delete(at.parentId);
-        at = at.parentId ? everyone.get(at.parentId) : undefined;
-      }
-      if (open.size !== collapsed.size) setCollapsed(open);
-      return;
-    }
+    if (!glideTo(focusId)) return;
     glided.current = focusId;
-    scroller.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    scrollToPoint(point, zoomNow.current, true);
-  }, [focusId, centreOf, scrollToPoint, collapsed, everyone]);
+    if (!full) scroller.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [focusId, glideTo, full]);
 
   // The browser's own print (or the Print button): the whole tree on one landscape page.
   useEffect(() => {
@@ -200,6 +240,68 @@ export function TreeChart({
       window.removeEventListener('afterprint', onAfter);
     };
   }, []);
+
+  // Pinch with two fingers, and Ctrl with the wheel (a trackpad's pinch): zoom around the fingers or the pointer.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    let pinch: { distance: number; zoom: number } | null = null;
+    const between = (e: TouchEvent) => {
+      const a = e.touches[0];
+      const b = e.touches[1];
+      if (!a || !b) return null;
+      return { distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
+    };
+    const onStart = (e: TouchEvent) => {
+      const m = between(e);
+      if (m) pinch = { distance: m.distance, zoom: zoomNow.current };
+    };
+    const onMove = (e: TouchEvent) => {
+      const m = between(e);
+      if (!pinch || !m || pinch.distance === 0) return;
+      e.preventDefault();
+      const z = clamp((pinch.zoom * m.distance) / pinch.distance);
+      if (z !== zoomNow.current) zoomTo(z, pointAt(m.x, m.y));
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) pinch = null;
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      // A wheel notch (100) is about 1.3 times; a trackpad pinch sends many small steps.
+      zoomTo(clamp(zoomNow.current * Math.exp(-e.deltaY / 400)), pointAt(e.clientX, e.clientY));
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd);
+    el.addEventListener('touchcancel', onEnd);
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onEnd);
+      el.removeEventListener('wheel', onWheel);
+    };
+    // pointAt reads only refs.
+  }, [zoomTo]);
+
+  // Full screen: the page behind doesn't scroll, the same part of the tree stays in view, and Escape comes back.
+  useEffect(() => {
+    if (!full) return;
+    const centre = viewCentre();
+    const before = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setFull(false);
+    window.addEventListener('keydown', onKey);
+    requestAnimationFrame(() => scrollToPoint(centre, zoomNow.current));
+    return () => {
+      document.body.style.overflow = before;
+      window.removeEventListener('keydown', onKey);
+    };
+    // Only when going in or out of full screen.
+  }, [full]);
 
   const toggle = (id: string) =>
     setCollapsed((now) => {
@@ -224,14 +326,39 @@ export function TreeChart({
   const endDrag = () => {
     drag.current = null;
   };
+  const home = homeId && everyone.has(homeId) ? homeId : (layout.people.find((p) => p.rootHousehold && p.isHead)?.id ?? null);
 
   return (
-    <div>
-      <div className="relative">
+    <div
+      className={cn(full && 'fixed inset-0 z-50 flex flex-col bg-canvas p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] print:static print:p-0')}
+      role={full ? 'dialog' : undefined}
+      aria-modal={full || undefined}
+      aria-label={full ? t('tree.title') : undefined}
+    >
+      {full && (
+        <div className="flex items-center justify-between gap-2 px-1 pb-2 print:hidden">
+          <span className="truncate font-display text-lg font-semibold text-fg">{t('tree.title')}</span>
+          <IconButton icon={X} label={t('tree.exitFull')} onClick={() => setFull(false)} />
+        </div>
+      )}
+      <div className={cn('relative', full && 'min-h-0 flex-1')}>
+        {/* On a phone the controls below start under the tab bar: full screen is up here too. */}
+        {!full && (
+          <button
+            type="button"
+            onClick={() => setFull(true)}
+            className="absolute top-2 right-2 z-10 flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-primary shadow-raised sm:hidden print:hidden"
+          >
+            <Icon icon={ArrowsOut} size="sm" />
+            {t('tree.full')}
+          </button>
+        )}
         <div className="absolute right-2 bottom-2 z-10 flex gap-1 rounded-md border border-line bg-surface p-1 shadow-raised print:hidden">
+          {home && <IconButton icon={UserCircle} label={t(home === homeId ? 'tree.toMe' : 'tree.toHead')} onClick={() => glideTo(home)} />}
           <IconButton icon={ZoomOut} label={t('tree.zoomOut')} onClick={() => zoomTo(clamp(zoom - 0.15), viewCentre())} disabled={zoom <= MIN_ZOOM} />
           <IconButton icon={ZoomIn} label={t('tree.zoomIn')} onClick={() => zoomTo(clamp(zoom + 0.15), viewCentre())} disabled={zoom >= MAX_ZOOM} />
           <IconButton icon={CornersIn} label={t('tree.fit')} onClick={() => zoomTo(fitZoom(), { x: layout.width / 2, y: layout.height / 2 })} />
+          {!full && <IconButton icon={ArrowsOut} label={t('tree.full')} onClick={() => setFull(true)} />}
         </div>
         <div
           ref={scroller}
@@ -240,8 +367,12 @@ export function TreeChart({
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
           // No taller than the tree, so a small family isn't a big empty box; clear of the phone's bottom bar when scrolled to.
-          style={{ maxHeight: Math.max(240, layout.height * zoom + 2) }}
-          className="h-[70dvh] scroll-mb-24 cursor-grab overflow-auto overscroll-contain rounded-md border border-line bg-canvas active:cursor-grabbing md:scroll-mb-4 print:h-auto print:max-h-none! print:overflow-visible print:border-0"
+          style={full ? undefined : { maxHeight: Math.max(240, layout.height * zoom + 2) }}
+          className={cn(
+            // One finger scrolls natively; two fingers are a pinch, handled above.
+            'cursor-grab touch-pan-x touch-pan-y overflow-auto overscroll-contain rounded-md border border-line bg-canvas active:cursor-grabbing print:h-auto print:max-h-none! print:overflow-visible print:border-0',
+            full ? 'h-full' : 'h-[70dvh] scroll-mb-24 md:scroll-mb-4',
+          )}
         >
           <div className="relative" style={{ width: layout.width, height: layout.height, zoom }}>
             <svg width={layout.width} height={layout.height} className="absolute inset-0" aria-hidden="true">
@@ -276,7 +407,7 @@ export function TreeChart({
               </div>
             ))}
             {layout.people.map((p) => (
-              <PersonCard key={p.id} person={p} kin={kin} focused={p.id === focusId} matched={matches.has(p.id)} onOpen={onOpen} />
+              <PersonCard key={p.id} person={p} kin={kin} card={layout.card} focused={p.id === focusId} matched={matches.has(p.id)} onOpen={onOpen} />
             ))}
             {onWhoseChild &&
               layout.stubs
@@ -317,7 +448,7 @@ export function TreeChart({
           </div>
         </div>
       </div>
-      <p className="mt-2 text-xs text-fg-muted print:hidden">{t('tree.chartHint')}</p>
+      {!full && <p className="mt-2 text-xs text-fg-muted print:hidden">{t('tree.chartHint')}</p>}
     </div>
   );
 }

@@ -258,28 +258,31 @@ export function FamilyTreePage() {
             </Chip>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 print:hidden" role="group" aria-label={t('tree.relFrom')}>
-          <span className="text-sm font-semibold text-fg-muted">{t('tree.relFrom')}</span>
-          <Chip selected={egoId === null} onClick={() => setFrom('listed')} className="px-3">
+        <div className="flex items-center gap-2 print:hidden">
+          {/* One line on a phone: the choices scroll sideways, the actions shrink to icons. */}
+          <div className="-ms-4 flex min-w-0 flex-1 items-center gap-2 overflow-x-auto ps-4 sm:ms-0 sm:flex-wrap sm:overflow-visible sm:ps-0" role="group" aria-label={t('tree.relFrom')}>
+          <span className="shrink-0 text-sm font-semibold text-fg-muted">{t('tree.relFrom')}</span>
+          <Chip selected={egoId === null} onClick={() => setFrom('listed')} className="shrink-0 px-3">
             {t('tree.relListed')}
           </Chip>
           {myId && (
-            <Chip selected={egoId === myId} onClick={() => setFrom('me')} className="px-3">
+            <Chip selected={egoId === myId} onClick={() => setFrom('me')} className="shrink-0 px-3">
               {t('tree.relMe')}
             </Chip>
           )}
           {ego && egoId !== myId && (
-            <Chip selected onClick={() => setFrom(myId ? 'me' : 'listed')} icon={X} className="px-3">
+            <Chip selected onClick={() => setFrom(myId ? 'me' : 'listed')} icon={X} className="shrink-0 px-3">
               {t('tree.relPerson', { name: displayName(ego) })}
             </Chip>
           )}
-          <div className="ms-auto flex items-center gap-1">
-            <Link to="/relation" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <Link to="/relation" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'hidden lg:inline-flex')}>
               {t('finder.open')}
             </Link>
             {rootEditable && (
-              <Button variant="secondary" size="sm" leadingIcon={UserPlus} onClick={() => setTreeEdit({ mode: 'add', familyId })}>
-                {t('tree.add.someone')}
+              <Button variant="secondary" size="sm" leadingIcon={UserPlus} aria-label={t('tree.add.someone')} onClick={() => setTreeEdit({ mode: 'add', familyId })}>
+                <span className="hidden sm:inline">{t('tree.add.someone')}</span>
               </Button>
             )}
             <IconButton icon={Printer} label={t('tree.print')} onClick={() => window.print()} />
@@ -291,6 +294,7 @@ export function FamilyTreePage() {
             tree={tree.data}
             kin={kin}
             focusId={focusId}
+            homeId={myId}
             matches={matches}
             onOpen={setOpened}
             onWhoseChild={(s) => setTreeEdit({ mode: 'edit', familyId: s.householdId, memberId: s.id })}

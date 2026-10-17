@@ -72,6 +72,8 @@ export { SlidersHorizontal } from '@phosphor-icons/react/dist/csr/SlidersHorizon
 export { MagnifyingGlassPlus as ZoomIn } from '@phosphor-icons/react/dist/csr/MagnifyingGlassPlus';
 export { MagnifyingGlassMinus as ZoomOut } from '@phosphor-icons/react/dist/csr/MagnifyingGlassMinus';
 export { CornersIn } from '@phosphor-icons/react/dist/csr/CornersIn';
+export { ArrowsOut } from '@phosphor-icons/react/dist/csr/ArrowsOut';
+export { UserCircle } from '@phosphor-icons/react/dist/csr/UserCircle';
 export { Rows } from '@phosphor-icons/react/dist/csr/Rows';
 export { Printer } from '@phosphor-icons/react/dist/csr/Printer';
 export { FileText } from '@phosphor-icons/react/dist/csr/FileText';

@@ -3,6 +3,13 @@ import { type FamilyTree, type LinkedFamily, PARENT_CHOICES, type TreePerson, na
 /** Sizes in CSS pixels at 100% zoom. Cards are all one size so generations line up across the whole chart. */
 export const CARD_W = 184;
 export const CARD_H = 72;
+export interface CardSize {
+  w: number;
+  h: number;
+}
+export const FULL_CARD: CardSize = { w: CARD_W, h: CARD_H };
+/** On a phone: narrower and shorter, so a couple and their children fit across the screen. */
+export const COMPACT_CARD: CardSize = { w: 136, h: 60 };
 const COUPLE_GAP = 12;
 const SIBLING_GAP = 24;
 const ROOT_GAP = 56;
@@ -39,6 +46,8 @@ export interface ChartLayout {
   /** Someone whose parents the family hasn't said yet: a short dashed stub above them. */
   stubs: { id: string; householdId: string; x: number; y: number }[];
   rows: { generation: number; y: number }[];
+  /** The card size it was laid out for. */
+  card: CardSize;
   /** Under each couple with children: show or hide everyone below them. */
   toggles: { id: string; x: number; y: number; collapsed: boolean; hidden: number }[];
   width: number;
@@ -54,11 +63,13 @@ const byAge = (a: ChartPerson, b: ChartPerson) => (a.birthYear ?? 9999) - (b.bir
  * partnerId), so this only arranges what it is given, and survives loops in
  * it.
  */
-export function layoutTree(tree: FamilyTree, collapsed: ReadonlySet<string> = new Set()): ChartLayout {
+export function layoutTree(tree: FamilyTree, collapsed: ReadonlySet<string> = new Set(), card: CardSize = FULL_CARD): ChartLayout {
+  const CARD_W = card.w;
+  const CARD_H = card.h;
   const people: ChartPerson[] = tree.households.flatMap((h) =>
     h.members.map((m) => ({ ...m, household: h.family, rootHousehold: h.via === null, x: 0, y: 0 })),
   );
-  if (people.length === 0) return { people, connectors: [], couples: [], stubs: [], rows: [], toggles: [], width: 0, height: 0 };
+  if (people.length === 0) return { people, connectors: [], couples: [], stubs: [], rows: [], toggles: [], card, width: 0, height: 0 };
   const byId = new Map(people.map((p) => [p.id, p]));
   const generations = [...new Set(people.map((p) => p.generation))].sort((a, b) => a - b);
   const minGeneration = generations[0] ?? 0;
@@ -224,6 +235,7 @@ export function layoutTree(tree: FamilyTree, collapsed: ReadonlySet<string> = ne
     stubs,
     toggles,
     rows: [...new Set(onChart.map((p) => p.generation))].sort((a, b) => a - b).map((g) => ({ generation: g, y: rowY(g) })),
+    card,
     width: left - ROOT_GAP + PAD,
     height: rowY(generations.at(-1) ?? 0) + CARD_H + PAD,
   };
