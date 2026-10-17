@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn';
 import type { TreeEdit } from './AddFromTree';
 import { useSamePerson } from './api';
 import { addOptions, marriedIn } from './relatives';
+import type { TreeShape } from './tree-shapes';
 import { useDisplayName } from './life';
 import { type Kin, usePersonLine, useRelationLabel } from './TreeChart';
 import type { ChartPerson } from './tree-layout';
@@ -68,6 +69,8 @@ export function TreePersonModal({
   onFocus,
   onFromHere,
   onEdit,
+  onShape,
+  onPath,
   onClose,
 }: {
   person: ChartPerson | null;
@@ -81,6 +84,10 @@ export function TreePersonModal({
   onFromHere: (p: ChartPerson) => void;
   /** Add someone next to them, or their माहेर, with the family's own forms. */
   onEdit: (edit: TreeEdit) => void;
+  /** Show their ancestors or descendants only. */
+  onShape: (shape: TreeShape, person: ChartPerson) => void;
+  /** Light up the people between the chosen point of view and them. */
+  onPath: (person: ChartPerson) => void;
   onClose: () => void;
 }) {
   const t = useT();
@@ -222,6 +229,17 @@ export function TreePersonModal({
           </details>
         )}
         <div className="flex flex-wrap gap-2">
+          {ego && ego.id !== person.id && kin?.map.has(person.id) && (
+            <Button size="sm" onClick={() => onPath(person)}>
+              {kin.viewerIsEgo ? t('tree.path.toMe') : t('tree.path.toPerson', { name: displayName(ego) })}
+            </Button>
+          )}
+          <Button variant="secondary" size="sm" onClick={() => onShape('ancestors', person)}>
+            {t('tree.shape.ancestors')}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => onShape('descendants', person)}>
+            {t('tree.shape.descendants')}
+          </Button>
           {!(kin?.viewerIsEgo && ego?.id === person.id) && (
             <Link
               to={`/relation?${new URLSearchParams({ b: person.id, bf: person.household.id, bn: person.name }).toString()}`}

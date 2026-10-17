@@ -65,7 +65,24 @@ function useCompact() {
   return compact;
 }
 
-function PersonCard({ person, kin, card, focused, matched, onOpen }: { person: ChartPerson; kin: Kin; card: CardSize; focused: boolean; matched: boolean; onOpen: (p: ChartPerson) => void }) {
+function PersonCard({
+  person,
+  kin,
+  card,
+  focused,
+  matched,
+  onPath,
+  onOpen,
+}: {
+  person: ChartPerson;
+  kin: Kin;
+  card: CardSize;
+  focused: boolean;
+  matched: boolean;
+  /** A path is shown: true on it, false off it (faded); null with none. */
+  onPath: boolean | null;
+  onOpen: (p: ChartPerson) => void;
+}) {
   const t = useT();
   const displayName = useDisplayName();
   const line = usePersonLine();
@@ -84,6 +101,8 @@ function PersonCard({ person, kin, card, focused, matched, onOpen }: { person: C
         person.deceased ? 'bg-surface-muted' : 'bg-surface',
         person.movedTo ? 'border-dashed border-line-strong' : person.isHead && person.rootHousehold ? 'border-primary' : 'border-line',
         matched && 'ring-2 ring-zari',
+        onPath === true && 'ring-2 ring-primary',
+        onPath === false && 'opacity-30',
         focused && 'ring-4 ring-focus',
       )}
     >
@@ -110,12 +129,18 @@ export function TreeChart({
   focusId,
   homeId,
   matches,
+  path = null,
+  generationLabel: labelOverride,
   onOpen,
   onWhoseChild,
 }: {
   tree: FamilyTree;
   kin: Kin;
   focusId: string | null;
+  /** The people between two, lit up with the lines joining them; everyone else fades. */
+  path?: ReadonlySet<string> | null;
+  /** Row labels other than "Parents", "Children"… (the वंशावळ's पिढी 1, 2, 3). */
+  generationLabel?: (generation: number) => string;
   /** Where "Back to me" goes, and where the chart starts without a focus: the viewer, else the head. */
   homeId: string | null;
   matches: Set<string>;
@@ -125,7 +150,8 @@ export function TreeChart({
 }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
-  const generationLabel = useGenerationLabel();
+  const defaultLabel = useGenerationLabel();
+  const generationLabel = labelOverride ?? defaultLabel;
   const displayName = useDisplayName();
   const compact = useCompact();
   const card = compact ? COMPACT_CARD : FULL_CARD;
@@ -377,18 +403,33 @@ export function TreeChart({
           <div className="relative" style={{ width: layout.width, height: layout.height, zoom }}>
             <svg width={layout.width} height={layout.height} className="absolute inset-0" aria-hidden="true">
               <g fill="none" stroke="var(--line-strong)" strokeWidth={1.5}>
-                {layout.connectors.map((c, i) => (
-                  <path
-                    key={i}
-                    d={`M${c.x1},${c.y1} V${c.midY} H${c.x2} V${c.y2}`}
-                    stroke={c.marriedIn ? 'var(--kumkum)' : undefined}
-                    strokeDasharray={c.skips ? '1 5' : c.dashed ? '6 4' : undefined}
-                    strokeLinecap={c.skips ? 'round' : undefined}
-                  />
-                ))}
-                {layout.couples.map((c, i) => (
-                  <path key={`c${i}`} d={c.path} stroke={c.former ? 'var(--line-strong)' : 'var(--zari)'} strokeWidth={c.former ? 1.5 : 3} strokeDasharray={c.former ? '4 4' : undefined} />
-                ))}
+                {layout.connectors.map((c, i) => {
+                  const lit = path ? path.has(c.to) && (path.has(c.from) || (c.other !== undefined && path.has(c.other))) : null;
+                  return (
+                    <path
+                      key={i}
+                      d={`M${c.x1},${c.y1} V${c.midY} H${c.x2} V${c.y2}`}
+                      stroke={lit ? 'var(--primary)' : c.marriedIn ? 'var(--kumkum)' : undefined}
+                      strokeWidth={lit ? 3 : undefined}
+                      opacity={lit === false ? 0.25 : undefined}
+                      strokeDasharray={c.skips ? '1 5' : c.dashed ? '6 4' : undefined}
+                      strokeLinecap={c.skips ? 'round' : undefined}
+                    />
+                  );
+                })}
+                {layout.couples.map((c, i) => {
+                  const lit = path ? path.has(c.a) && path.has(c.b) : null;
+                  return (
+                    <path
+                      key={`c${i}`}
+                      d={c.path}
+                      stroke={lit ? 'var(--primary)' : c.former ? 'var(--line-strong)' : 'var(--zari)'}
+                      strokeWidth={c.former && !lit ? 1.5 : 3}
+                      opacity={lit === false ? 0.25 : undefined}
+                      strokeDasharray={c.former ? '4 4' : undefined}
+                    />
+                  );
+                })}
                 {layout.stubs.map((s, i) => (
                   <path key={`s${i}`} d={`M${s.x},${s.y} V${s.y - 24}`} strokeDasharray="3 4" />
                 ))}
@@ -407,7 +448,7 @@ export function TreeChart({
               </div>
             ))}
             {layout.people.map((p) => (
-              <PersonCard key={p.id} person={p} kin={kin} card={layout.card} focused={p.id === focusId} matched={matches.has(p.id)} onOpen={onOpen} />
+              <PersonCard key={p.id} person={p} kin={kin} card={layout.card} focused={p.id === focusId} matched={matches.has(p.id)} onPath={path ? path.has(p.id) : null} onOpen={onOpen} />
             ))}
             {onWhoseChild &&
               layout.stubs

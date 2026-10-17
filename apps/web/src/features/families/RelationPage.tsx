@@ -169,7 +169,7 @@ export function RelationPage() {
             </ol>
           </div>
           {found.tree && (
-            <Link to={`/families/${found.tree.rootId}/tree?focus=${found.to.id}`} className={`${buttonVariants({ variant: 'secondary', size: 'sm' })} self-start`}>
+            <Link to={`/families/${found.tree.rootId}/tree?focus=${found.to.id}&path=${found.from.id}`} className={`${buttonVariants({ variant: 'secondary', size: 'sm' })} self-start`}>
               <Icon icon={Network} />
               {t('finder.showInTree')}
             </Link>

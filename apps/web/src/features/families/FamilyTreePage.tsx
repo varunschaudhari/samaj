@@ -1,18 +1,20 @@
-import type { FamilyTree, TreeHousehold } from '@samaj/shared';
+import { type FamilyTree, type TreeHousehold, gotraName } from '@samaj/shared';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Avatar, Badge, Button, Card, Chip, EmptyState, ErrorState, Icon, IconButton, Skeleton, buttonVariants, toast } from '@/components/ui';
 import { ArrowLeft, Network, Printer, Rows, SearchX, Share, UserPlus, X } from '@/components/ui/icons';
 import { placeLabel } from '@/features/branches/api';
-import { type MessageKey, isMessageKey, useLanguageStore, useT } from '@/i18n';
+import { type MessageKey, formatNumber, isMessageKey, useLanguageStore, useT } from '@/i18n';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useDisplayName } from './life';
 import { useMe } from '@/features/auth/api';
 import { AddFromTree, type TreeEdit } from './AddFromTree';
+import { useFamily } from './api';
 import { useFamilyTree } from './tree-api';
-import { kinshipFrom } from './kinship';
+import { kinshipFrom, kinshipPath } from './kinship';
+import { type TreeShape, TREE_SHAPES, filterTree, shapePeople } from './tree-shapes';
 import { type Kin, TreeChart, useGenerationLabel, usePersonLine } from './TreeChart';
 import { AddRelatives, TreePersonModal } from './TreePersonModal';
 import { TreeSearch } from './TreeSearch';
@@ -166,6 +168,13 @@ export function FamilyTreePage() {
   const me = useMe();
   // Whose point of view relations are shown from: the viewer, someone picked, or as each family lists them.
   const [from, setFrom] = useState<string | 'me' | 'listed'>('me');
+  // The whole tree, or one person's ancestors or descendants, or the वंशावळ.
+  const [shape, setShape] = useState<TreeShape>('all');
+  const [subjectId, setSubjectId] = useState<string | null>(null);
+  // Lit up from the person card or the relation finder: the people between two.
+  const pathFrom = params.get('path');
+  const language = useLanguageStore((s) => s.language);
+  const family = useFamily(familyId);
 
   const people = useMemo<ChartPerson[]>(
     () => tree.data?.households.flatMap((h) => h.members.map((m) => ({ ...m, household: h.family, rootHousehold: h.via === null, x: 0, y: 0 }))) ?? [],
@@ -179,6 +188,31 @@ export function FamilyTreePage() {
   const rootEditable = Boolean(tree.data?.households.some((h) => h.via === null && h.canEdit));
   const kin = useMemo<Kin>(() => (egoId ? { map: kinshipFrom(egoId, people), viewerIsEgo: egoId === myId } : null), [egoId, people, myId]);
   const displayName = useDisplayName();
+
+  // A path shows on the whole tree, so nobody on it is hidden.
+  const path = useMemo(() => {
+    if (!pathFrom || !focusId) return null;
+    const steps = kinshipPath(pathFrom, focusId, people);
+    return steps ? new Set([pathFrom, ...steps.map((s) => s.to.id)]) : null;
+  }, [pathFrom, focusId, people]);
+  const activeShape: TreeShape = path ? 'all' : shape;
+  const subject = people.find((p) => p.id === (subjectId ?? myId ?? rootHead?.id));
+  const shown = useMemo(() => {
+    if (!tree.data || activeShape === 'all') return { tree: tree.data, people };
+    const keep = shapePeople(people, activeShape, subject?.id ?? null, rootHead?.id ?? null);
+    return { tree: filterTree(tree.data, keep), people: people.filter((p) => keep.has(p.id)) };
+  }, [tree.data, people, activeShape, subject?.id, rootHead?.id]);
+  // The वंशावळ counts generations from the earliest ancestor: पिढी 1, 2, 3.
+  const firstGeneration = Math.min(...shown.people.map((p) => p.generation));
+  const pidhi = activeShape === 'vanshavali' ? (g: number) => t('tree.pidhi', { n: formatNumber(g - firstGeneration + 1, language) }) : undefined;
+  const surname = rootHead?.name.trim().split(/\s+/).at(-1) ?? '';
+  const gotra = gotraName(family.data?.gotra, language);
+  const showShape = (s: TreeShape, p?: ChartPerson) => {
+    setShape(s);
+    if (p) setSubjectId(p.id);
+    setOpened(null);
+    if (pathFrom) setParams(focusId ? { focus: focusId } : {}, { replace: true });
+  };
 
   const share = async () => {
     const url = `${window.location.origin}/families/${familyId}/tree`;
@@ -261,20 +295,20 @@ export function FamilyTreePage() {
         <div className="flex items-center gap-2 print:hidden">
           {/* One line on a phone: the choices scroll sideways, the actions shrink to icons. */}
           <div className="-ms-4 flex min-w-0 flex-1 items-center gap-2 overflow-x-auto ps-4 sm:ms-0 sm:flex-wrap sm:overflow-visible sm:ps-0" role="group" aria-label={t('tree.relFrom')}>
-          <span className="shrink-0 text-sm font-semibold text-fg-muted">{t('tree.relFrom')}</span>
-          <Chip selected={egoId === null} onClick={() => setFrom('listed')} className="shrink-0 px-3">
-            {t('tree.relListed')}
-          </Chip>
-          {myId && (
-            <Chip selected={egoId === myId} onClick={() => setFrom('me')} className="shrink-0 px-3">
-              {t('tree.relMe')}
+            <span className="shrink-0 text-sm font-semibold text-fg-muted">{t('tree.relFrom')}</span>
+            <Chip selected={egoId === null} onClick={() => setFrom('listed')} className="shrink-0 px-3">
+              {t('tree.relListed')}
             </Chip>
-          )}
-          {ego && egoId !== myId && (
-            <Chip selected onClick={() => setFrom(myId ? 'me' : 'listed')} icon={X} className="shrink-0 px-3">
-              {t('tree.relPerson', { name: displayName(ego) })}
-            </Chip>
-          )}
+            {myId && (
+              <Chip selected={egoId === myId} onClick={() => setFrom('me')} className="shrink-0 px-3">
+                {t('tree.relMe')}
+              </Chip>
+            )}
+            {ego && egoId !== myId && (
+              <Chip selected onClick={() => setFrom(myId ? 'me' : 'listed')} icon={X} className="shrink-0 px-3">
+                {t('tree.relPerson', { name: displayName(ego) })}
+              </Chip>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <Link to="/relation" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'hidden lg:inline-flex')}>
@@ -289,18 +323,54 @@ export function FamilyTreePage() {
             <IconButton icon={Share} label={t('tree.share')} onClick={() => void share()} />
           </div>
         </div>
+        <div className="-ms-4 flex items-center gap-2 overflow-x-auto ps-4 sm:ms-0 sm:flex-wrap sm:overflow-visible sm:ps-0 print:hidden" role="group" aria-label={t('tree.shape.label')}>
+          <span className="shrink-0 text-sm font-semibold text-fg-muted">{t('tree.shape.label')}</span>
+          {TREE_SHAPES.map((s) => (
+            <Chip key={s} selected={activeShape === s} onClick={() => showShape(s)} className="shrink-0 px-3">
+              {t(`tree.shape.${s}`)}
+            </Chip>
+          ))}
+          {(activeShape === 'ancestors' || activeShape === 'descendants') && subject && (
+            <span className="shrink-0 text-sm text-fg-muted">{t('tree.shape.of', { name: displayName(subject) })}</span>
+          )}
+        </div>
+        {(activeShape === 'ancestors' || activeShape === 'descendants') && <p className="-mt-3 text-xs text-fg-muted print:hidden">{t('tree.shape.pickHint')}</p>}
+        {activeShape === 'vanshavali' && (
+          <Card className="flex flex-col items-center gap-1 border-zari bg-zari-soft/40 text-center">
+            <span className="font-display text-2xl font-semibold text-fg">{t('tree.vanshavali.title', { surname })}</span>
+            <span className="text-sm text-fg-muted">
+              {gotra ? t('tree.vanshavali.gotra', { gotra }) : t('tree.vanshavali.noGotra')} · {t('tree.vanshavali.count', { count: formatNumber(shown.people.length, language) })}
+            </span>
+            <span className="text-xs text-fg-muted print:hidden">{t('tree.vanshavali.hint')}</span>
+          </Card>
+        )}
+        {path && pathFrom && focusId && (
+          <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary bg-primary-soft px-4 py-2 text-sm print:hidden">
+            <span className="font-semibold text-fg">
+              {t('tree.path.showing', {
+                a: displayName(people.find((p) => p.id === pathFrom) ?? { name: '', deceased: false }),
+                b: displayName(people.find((p) => p.id === focusId) ?? { name: '', deceased: false }),
+              })}
+            </span>
+            <Button variant="ghost" size="sm" leadingIcon={X} onClick={() => setParams({ focus: focusId }, { replace: true })}>
+              {t('tree.path.clear')}
+            </Button>
+          </div>
+        )}
         {view === 'chart' ? (
           <TreeChart
-            tree={tree.data}
+            tree={shown.tree ?? tree.data}
             kin={kin}
             focusId={focusId}
             homeId={myId}
+            path={path}
+            generationLabel={pidhi}
             matches={matches}
             onOpen={setOpened}
             onWhoseChild={(s) => setTreeEdit({ mode: 'edit', familyId: s.householdId, memberId: s.id })}
           />
         ) : (
-          <TreeList tree={tree.data} people={people} kin={kin} focusId={focusId} matches={matches} onOpen={setOpened} />
+          <TreeList tree={shown.tree ?? tree.data} people={shown.people} kin={kin} focusId={focusId} matches={matches} onOpen={setOpened} />
         )}
         {truncated && <p className="text-center text-sm text-fg-muted">{t('tree.truncated')}</p>}
         {side.length > 0 && (
@@ -355,6 +425,12 @@ export function FamilyTreePage() {
         onEdit={(e) => {
           setOpened(null);
           setTreeEdit(e);
+        }}
+        onShape={showShape}
+        onPath={(p) => {
+          if (!ego) return;
+          setOpened(null);
+          setParams({ focus: p.id, path: ego.id }, { replace: true });
         }}
         onClose={() => setOpened(null)}
       />

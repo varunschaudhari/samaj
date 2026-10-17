@@ -40,9 +40,9 @@ export interface ChartLayout {
    * for adoption, dotted across a generation nobody listed; `marriedIn` from a
    * wife's (or husband's) parents in their माहेर to where they stand now.
    */
-  connectors: { x1: number; y1: number; midY: number; x2: number; y2: number; dashed: boolean; skips: boolean; marriedIn?: boolean }[];
+  connectors: { x1: number; y1: number; midY: number; x2: number; y2: number; dashed: boolean; skips: boolean; marriedIn?: boolean; from: string; other?: string; to: string }[];
   /** Between a person and each partner beside them: straight to the first, over the top to a second; dashed if they separated. */
-  couples: { path: string; former: boolean }[];
+  couples: { path: string; former: boolean; a: string; b: string }[];
   /** Someone whose parents the family hasn't said yet: a short dashed stub above them. */
   stubs: { id: string; householdId: string; x: number; y: number }[];
   rows: { generation: number; y: number }[];
@@ -188,7 +188,7 @@ export function layoutTree(tree: FamilyTree, collapsed: ReadonlySet<string> = ne
           ? `M${first.x + CARD_W},${y + CARD_H / 2} H${p.x}`
           : // Over the top of whoever stands between them.
             `M${first.x + (CARD_W * 3) / 4},${y} V${y - 10} H${p.x + CARD_W / 2} V${y}`;
-      couples.push({ path, former: p.formerPartner });
+      couples.push({ path, former: p.formerPartner, a: first.id, b: p.id });
     });
     for (const c of kids(u)) {
       const child = anchor(c);
@@ -201,6 +201,9 @@ export function layoutTree(tree: FamilyTree, collapsed: ReadonlySet<string> = ne
         y2: child.y,
         dashed: child.adopted === true,
         skips: child.generation - u.generation > 1,
+        from: first.id,
+        other: other?.id,
+        to: child.id,
       });
     }
   }
@@ -217,6 +220,9 @@ export function layoutTree(tree: FamilyTree, collapsed: ReadonlySet<string> = ne
       dashed: false,
       skips: p.generation - parents.generation > 1,
       marriedIn: true,
+      from: anchor(parents).id,
+      other: parents.people[1]?.id,
+      to: p.id,
     });
   }
   const stubs = roots.flatMap((u) => {
