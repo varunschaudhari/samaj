@@ -40,10 +40,11 @@ const WHOSE: Partial<Record<MessageKey, MessageKey>> = {
  * or "Daughter's family" when someone in it is the head's son or daughter
  * (a son who heads it, a daughter who married into it), else by generation.
  */
-function useHouseholdLabel(headKin: Map<string, MessageKey>) {
+function useHouseholdLabel(headKin: Map<string, MessageKey>, ownFamily: boolean) {
   const t = useT();
   return (h: TreeHousehold) => {
-    if (h.via === null) return t('tree.thisFamily');
+    // The family the tree is drawn for: the viewer's own, or the one whose page this is.
+    if (h.via === null) return t(ownFamily ? 'tree.thisFamily.yours' : 'tree.thisFamily.page');
     if (h.via === 'person') return t('tree.household.person', { name: h.through?.name ?? '' });
     const head = h.members.find((m) => m.isHead);
     const joiner = [...(head ? [head] : []), ...h.members].map((m) => WHOSE[headKin.get(m.id) ?? ('' as MessageKey)]).find(Boolean);
@@ -120,19 +121,35 @@ function TreeList({
   focusId,
   matches,
   labelOf,
+  flat = false,
+  generationLabel: labelOverride,
   onOpen,
 }: {
   tree: FamilyTree;
   labelOf: (h: TreeHousehold) => string;
+  /** One row of people per generation, couples side by side, without the household boxes (the वंशावळ). */
+  flat?: boolean;
+  generationLabel?: (generation: number) => string;
   people: ChartPerson[];
   kin: Kin;
   focusId: string | null;
   matches: Set<string>;
   onOpen: (p: ChartPerson) => void;
 }) {
-  const generationLabel = useGenerationLabel();
+  const defaultLabel = useGenerationLabel();
+  const generationLabel = labelOverride ?? defaultLabel;
   const t = useT();
   const generations = [...new Set(people.map((p) => p.generation))].sort((a, b) => a - b);
+  // Flat: oldest first, each with whoever married them beside them.
+  const couplesIn = (g: number) => {
+    const here = people.filter((p) => p.generation === g);
+    const ids = new Set(here.map((p) => p.id));
+    const beside = (p: ChartPerson) => Boolean(p.partnerId && ids.has(p.partnerId));
+    const byAge = (a: ChartPerson, b: ChartPerson) => (a.birthYear ?? 9999) - (b.birthYear ?? 9999) || a.name.localeCompare(b.name);
+    const groups = here.filter((p) => !beside(p)).sort(byAge).map((a) => [a, ...here.filter((q) => q.partnerId === a.id)]);
+    const placed = new Set(groups.flat().map((p) => p.id));
+    return [...groups, ...here.filter((p) => !placed.has(p.id)).map((p) => [p])];
+  };
   // The root family first in each generation, then by generation of the household.
   const ordered = [...tree.households].sort((a, b) => Number(b.via === null) - Number(a.via === null) || a.generation - b.generation);
 
@@ -147,16 +164,31 @@ function TreeList({
           {i > 0 && <span className="h-6 w-px bg-line-strong" aria-hidden="true" />}
           <h2 className={cn('rounded-full px-4 py-1 text-sm font-semibold', g === 0 ? 'bg-primary text-on-primary' : 'bg-surface-muted text-fg')}>{generationLabel(g)}</h2>
           <span className="h-3 w-px bg-line-strong" aria-hidden="true" />
-          <div className="-mx-4 flex w-[calc(100%+2rem)] gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:w-full md:flex-wrap md:justify-center md:overflow-visible md:px-0">
-            {ordered.map((h) => {
-              const here = people.filter((p) => p.household.id === h.family.id && p.generation === g);
-              return here.length > 0 ? (
-                <HouseholdGroup key={h.family.id} household={h} label={labelOf(h)} people={here}>
-                  {(p) => <PersonChip key={p.id} person={p} kin={kin} focused={p.id === focusId} matched={matches.has(p.id)} onOpen={onOpen} />}
-                </HouseholdGroup>
-              ) : null;
-            })}
-          </div>
+          {flat ? (
+            <ul className="flex w-full flex-wrap justify-center gap-x-4 gap-y-2">
+              {couplesIn(g).map((group) => (
+                <li key={group[0]?.id}>
+                  <ul className="flex flex-wrap items-center gap-1">
+                    {group.map((p, j) => [
+                      j > 0 && <li key={`${p.id}-tie`} aria-hidden="true" className="h-0.5 w-3 bg-zari" />,
+                      <PersonChip key={p.id} person={p} kin={kin} focused={p.id === focusId} matched={matches.has(p.id)} onOpen={onOpen} />,
+                    ])}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="-mx-4 flex w-[calc(100%+2rem)] gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:w-full md:flex-wrap md:justify-center md:overflow-visible md:px-0">
+              {ordered.map((h) => {
+                const here = people.filter((p) => p.household.id === h.family.id && p.generation === g);
+                return here.length > 0 ? (
+                  <HouseholdGroup key={h.family.id} household={h} label={labelOf(h)} people={here}>
+                    {(p) => <PersonChip key={p.id} person={p} kin={kin} focused={p.id === focusId} matched={matches.has(p.id)} onOpen={onOpen} />}
+                  </HouseholdGroup>
+                ) : null;
+              })}
+            </div>
+          )}
         </li>
       ))}
     </ol>
@@ -211,7 +243,7 @@ export function FamilyTreePage() {
   const kin = useMemo<Kin>(() => (egoId ? { map: kinshipFrom(egoId, people), viewerIsEgo: egoId === myId } : null), [egoId, people, myId]);
   // Everyone's relation to the family's head, to name each household by who joins it.
   const headKin = useMemo(() => (rootHead ? kinshipFrom(rootHead.id, people) : new Map<string, MessageKey>()), [rootHead, people]);
-  const householdLabel = useHouseholdLabel(headKin);
+  const householdLabel = useHouseholdLabel(headKin, me.data?.familyId === familyId);
   const displayName = useDisplayName();
 
   // A path shows on the whole tree, so nobody on it is hidden.
@@ -442,7 +474,17 @@ export function FamilyTreePage() {
             onWhoseChild={(s) => setTreeEdit({ mode: 'edit', familyId: s.householdId, memberId: s.id })}
           />
         ) : (
-          <TreeList tree={shown.tree ?? tree.data} labelOf={householdLabel} people={shown.people} kin={kin} focusId={focusId} matches={matches} onOpen={setOpened} />
+          <TreeList
+            tree={shown.tree ?? tree.data}
+            labelOf={householdLabel}
+            flat={activeShape === 'vanshavali'}
+            generationLabel={pidhi}
+            people={shown.people}
+            kin={kin}
+            focusId={focusId}
+            matches={matches}
+            onOpen={setOpened}
+          />
         )}
         {truncated && <p className="text-center text-sm text-fg-muted">{t('tree.truncated')}</p>}
         {side.length > 0 && (
