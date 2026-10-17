@@ -10,12 +10,15 @@ matrimonyRouter.get('/mine', m.mine);
 matrimonyRouter.get('/search', m.search);
 matrimonyRouter.get('/review', m.pending);
 
+// What the family page already knows about someone, to start their profile with.
+matrimonyRouter.get('/prefill/:memberId', m.prefill);
 matrimonyRouter.post('/profiles', m.create);
 matrimonyRouter.get('/profiles/:id', m.get);
 matrimonyRouter.put('/profiles/:id', m.update);
 matrimonyRouter.post('/profiles/:id/pause', m.pause);
 matrimonyRouter.post('/profiles/:id/resume', m.resume);
 matrimonyRouter.post('/profiles/:id/close', m.close);
+matrimonyRouter.post('/profiles/:id/submit', m.submit);
 matrimonyRouter.post('/profiles/:id/resubmit', m.resubmit);
 matrimonyRouter.post('/profiles/:id/approve', m.approve);
 matrimonyRouter.post('/profiles/:id/reject', m.reject);
@@ -26,6 +29,9 @@ matrimonyRouter.post('/profiles/:id/photos', express.raw({ type: ['image/jpeg', 
 matrimonyRouter.get('/profiles/:id/photos/:photoId', m.getPhoto);
 matrimonyRouter.delete('/profiles/:id/photos/:photoId', m.removePhoto);
 matrimonyRouter.post('/profiles/:id/photos/:photoId/main', m.makeMainPhoto);
+
+// Shortlist or pass, private to the family.
+matrimonyRouter.put('/marks', m.mark);
 
 matrimonyRouter.get('/interests', m.listInterests);
 matrimonyRouter.post('/interests', m.sendInterest);

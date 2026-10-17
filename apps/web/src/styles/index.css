@@ -78,6 +78,8 @@
   --color-hero-to: var(--hero-to);
   --color-on-hero: var(--on-hero);
   --color-on-hero-muted: var(--on-hero-muted);
+  --color-on-photo: var(--on-photo);
+  --color-on-photo-muted: var(--on-photo-muted);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
@@ -105,6 +107,11 @@
       transform: translateX(300%);
     }
   }
+}
+
+/* The shade under text laid over a photo, so white text reads on any picture. */
+@utility photo-shade {
+  background-image: linear-gradient(to top, var(--photo-shade) 0%, var(--photo-shade-mid) 45%, transparent 75%);
 }
 
 /* The hero band behind greetings and the sign-in screen. */

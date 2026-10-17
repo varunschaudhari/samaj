@@ -2,7 +2,7 @@ import type { GotraId, InterestItem, MyMatrimony, ProfileDetail, ProfilePage } f
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { InterestModel } from '../src/models/interest.model';
 import { ProfileModel } from '../src/models/profile.model';
-import { api, clearDb, createFamily, seedBranches, startDb, stopDb } from './helpers';
+import { api, clearDb, completeProfile, createFamily, seedBranches, startDb, stopDb } from './helpers';
 
 beforeAll(startDb);
 afterAll(stopDb);
@@ -18,17 +18,16 @@ beforeEach(async () => {
   admin = (await createFamily(branches.pune, { account: 'admin', people: [{ name: 'Admin Person' }] })).cookie;
 });
 
-const fields = (contactName = 'Parent Name') => ({
-  heightCm: '170',
-  education: 'B.E. Computer',
-  occupation: 'Engineer',
-  income: '6to10',
-  manglik: 'no',
-  about: 'Works in Pune, enjoys cricket.',
-  expectations: 'Educated, family-minded.',
-  contactName,
-  contactPhone: '98220 11111',
-});
+const fields = (birthYear: number, contactName = 'Parent Name') =>
+  completeProfile(birthYear, {
+    heightCm: '170',
+    education: 'B.E. Computer',
+    occupation: 'Engineer',
+    manglik: 'no',
+    about: 'Works in Pune, enjoys cricket.',
+    expectations: 'Educated, family-minded.',
+    contactName,
+  });
 
 /** A verified family with an account (the head) and one grown child. */
 async function familyWithChild(branchId: string, child: { name: string; gender: 'male' | 'female'; age: number }, gotra: GotraId | null = 'kashyap') {
@@ -40,11 +39,11 @@ async function familyWithChild(branchId: string, child: { name: string; gender: 
       { name: child.name, relation: child.gender === 'male' ? 'son' : 'daughter', gender: child.gender, birthYear: year - child.age },
     ],
   });
-  return { ...family, childId: family.memberIds[1] ?? '' };
+  return { ...family, childId: family.memberIds[1] ?? '', birthYear: year - child.age };
 }
 
 async function liveProfile(fam: Awaited<ReturnType<typeof familyWithChild>>) {
-  const created = await api.post('/api/matrimony/profiles').set('Cookie', fam.cookie).send({ ...fields(), memberId: fam.childId, consent: true });
+  const created = await api.post('/api/matrimony/profiles').set('Cookie', fam.cookie).send({ ...fields(fam.birthYear), memberId: fam.childId, consent: true });
   expect(created.status).toBe(201);
   const id = (created.body.profile as ProfileDetail).id;
   // An admin approves, so fixtures can live in any branch.
@@ -58,17 +57,17 @@ describe('creating a profile', () => {
     const mine = (await api.get('/api/matrimony/mine').set('Cookie', fam.cookie)).body as MyMatrimony;
     expect(mine.eligible.map((e) => e.name)).toEqual(['Rohit Wagh']);
 
-    const res = await api.post('/api/matrimony/profiles').set('Cookie', fam.cookie).send({ ...fields(), memberId: fam.childId, consent: true });
+    const res = await api.post('/api/matrimony/profiles').set('Cookie', fam.cookie).send({ ...fields(fam.birthYear), memberId: fam.childId, consent: true });
     expect(res.status).toBe(201);
     expect(res.body.profile).toMatchObject({ name: 'Rohit Wagh', age: 27, status: 'pending', contact: { phone: '+919822011111' } });
   });
 
   it('requires consent, legal age and a birth year', async () => {
     const fam = await familyWithChild(branches.amalner, { name: 'Young Son', gender: 'male', age: 19 });
-    const noConsent = await api.post('/api/matrimony/profiles').set('Cookie', fam.cookie).send({ ...fields(), memberId: fam.childId });
+    const noConsent = await api.post('/api/matrimony/profiles').set('Cookie', fam.cookie).send({ ...fields(fam.birthYear), memberId: fam.childId });
     expect(noConsent.body.error.issues).toContainEqual({ path: 'consent', message: 'validation.consent' });
 
-    const young = await api.post('/api/matrimony/profiles').set('Cookie', fam.cookie).send({ ...fields(), memberId: fam.childId, consent: true });
+    const young = await api.post('/api/matrimony/profiles').set('Cookie', fam.cookie).send({ ...fields(fam.birthYear), memberId: fam.childId, consent: true });
     expect(young.body.error.issues).toEqual([{ path: 'memberId', message: 'validation.profileTooYoung' }]);
 
     const mine = (await api.get('/api/matrimony/mine').set('Cookie', fam.cookie)).body as MyMatrimony;
@@ -77,19 +76,19 @@ describe('creating a profile', () => {
 
   it('only for verified families, and only by the family itself', async () => {
     const pending = await createFamily(branches.amalner, { status: 'pending', account: 'member', people: [{ name: 'P' }, { name: 'Pending Son', gender: 'male', birthYear: year - 26 }] });
-    const res = await api.post('/api/matrimony/profiles').set('Cookie', pending.cookie).send({ ...fields(), memberId: pending.memberIds[1], consent: true });
+    const res = await api.post('/api/matrimony/profiles').set('Cookie', pending.cookie).send({ ...fields(year - 26), memberId: pending.memberIds[1], consent: true });
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('NOT_VERIFIED');
 
     const fam = await familyWithChild(branches.amalner, { name: 'Rohit Wagh', gender: 'male', age: 27 });
     const outsider = await familyWithChild(branches.pune, { name: 'Other', gender: 'female', age: 25 });
-    const res2 = await api.post('/api/matrimony/profiles').set('Cookie', outsider.cookie).send({ ...fields(), memberId: fam.childId, consent: true });
+    const res2 = await api.post('/api/matrimony/profiles').set('Cookie', outsider.cookie).send({ ...fields(fam.birthYear), memberId: fam.childId, consent: true });
     expect(res2.status).toBe(403);
   });
 
   it("keeps pending profiles out of other families' sight", async () => {
     const fam = await familyWithChild(branches.amalner, { name: 'Rohit Wagh', gender: 'male', age: 27 });
-    const created = (await api.post('/api/matrimony/profiles').set('Cookie', fam.cookie).send({ ...fields(), memberId: fam.childId, consent: true })).body.profile as ProfileDetail;
+    const created = (await api.post('/api/matrimony/profiles').set('Cookie', fam.cookie).send({ ...fields(fam.birthYear), memberId: fam.childId, consent: true })).body.profile as ProfileDetail;
     const other = await familyWithChild(branches.amalner, { name: 'Neha Dhole', gender: 'female', age: 24 }, 'atri');
     expect((await api.get(`/api/matrimony/profiles/${created.id}`).set('Cookie', other.cookie)).status).toBe(404);
   });
@@ -98,7 +97,7 @@ describe('creating a profile', () => {
 describe('committee review', () => {
   it('committee approves in its branch, not its own family, and can remove with a note', async () => {
     const fam = await familyWithChild(branches.amalner, { name: 'Rohit Wagh', gender: 'male', age: 27 });
-    const created = (await api.post('/api/matrimony/profiles').set('Cookie', fam.cookie).send({ ...fields(), memberId: fam.childId, consent: true })).body.profile as ProfileDetail;
+    const created = (await api.post('/api/matrimony/profiles').set('Cookie', fam.cookie).send({ ...fields(fam.birthYear), memberId: fam.childId, consent: true })).body.profile as ProfileDetail;
 
     const queue = await api.get('/api/matrimony/review').set('Cookie', committee);
     expect(queue.body.items.map((p: { id: string }) => p.id)).toEqual([created.id]);
@@ -117,7 +116,7 @@ describe('committee review', () => {
 
   it('rejection sends it back to the family, who can resubmit', async () => {
     const fam = await familyWithChild(branches.amalner, { name: 'Rohit Wagh', gender: 'male', age: 27 });
-    const created = (await api.post('/api/matrimony/profiles').set('Cookie', fam.cookie).send({ ...fields(), memberId: fam.childId, consent: true })).body.profile as ProfileDetail;
+    const created = (await api.post('/api/matrimony/profiles').set('Cookie', fam.cookie).send({ ...fields(fam.birthYear), memberId: fam.childId, consent: true })).body.profile as ProfileDetail;
     await api.post(`/api/matrimony/profiles/${created.id}/reject`).set('Cookie', committee).send({ reason: 'Please add education details.' });
     const seen = (await api.get(`/api/matrimony/profiles/${created.id}`).set('Cookie', fam.cookie)).body.profile as ProfileDetail;
     expect(seen).toMatchObject({ status: 'rejected', moderationNote: 'Please add education details.' });
@@ -130,7 +129,8 @@ describe('search', () => {
     const groom = await familyWithChild(branches.amalner, { name: 'Rohit Wagh', gender: 'male', age: 27 }, 'kashyap');
     const groomId = await liveProfile(groom);
     await liveProfile(await familyWithChild(branches.bhusawal, { name: 'Neha Dhole', gender: 'female', age: 24 }, 'atri'));
-    await liveProfile(await familyWithChild(branches.pune, { name: 'Komal Bagul', gender: 'female', age: 31 }, null));
+    // Kul is required before a profile goes to the committee, so every live profile has one.
+    await liveProfile(await familyWithChild(branches.pune, { name: 'Komal Bagul', gender: 'female', age: 31 }, 'garg'));
     await liveProfile(await familyWithChild(branches.amalner, { name: 'Same Gotra', gender: 'female', age: 25 }, 'kashyap'));
     await liveProfile(await familyWithChild(branches.amalner, { name: 'Another Groom', gender: 'male', age: 28 }, 'atri'));
 
@@ -175,7 +175,7 @@ describe('interests', () => {
     await api.post(`/api/matrimony/interests/${received[0]?.id}/accept`).set('Cookie', bride.cookie);
 
     const after = (await api.get(`/api/matrimony/profiles/${brideId}`).set('Cookie', groom.cookie)).body.profile as ProfileDetail;
-    expect(after.contact).toEqual({ name: 'Parent Name', phone: '+919822011111' });
+    expect(after.contact).toMatchObject({ name: 'Parent Name', phone: '+919822011111', parentWhatsapp: '+919822011111', address: { pincode: '425401' } });
     const theirs = (await api.get(`/api/matrimony/profiles/${groomId}`).set('Cookie', bride.cookie)).body.profile as ProfileDetail;
     expect(theirs.contact?.phone).toBe('+919822011111');
   });

@@ -1,4 +1,4 @@
-import { HeartHandshake, Inbox, Search, UserRound } from '@/components/ui/icons';
+import { CalendarDays, HeartHandshake, Inbox, Search, UserRound } from '@/components/ui/icons';
 import { Navigate, NavLink, Outlet } from 'react-router';
 import { LIST_PAGE } from '@/components/layout/page-width';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -31,6 +31,7 @@ export function MatrimonyLayout() {
     { to: '/matrimony/interests', label: t('matrimony.tab.interests'), icon: Inbox, badge: waiting, end: false },
     // Exact match: another family's profile lives under /matrimony/profiles/:id too.
     { to: '/matrimony/profiles', label: t('matrimony.tab.profiles'), icon: UserRound, badge: 0, end: true },
+    { to: '/matrimony/melavas', label: t('matrimony.tab.melava'), icon: CalendarDays, badge: 0, end: false },
   ];
 
   return (
@@ -44,7 +45,7 @@ export function MatrimonyLayout() {
             end={s.end}
             className={({ isActive }) =>
               cn(
-                // Equal thirds on phones, with icons from sm up, so all three labels fit at 360px.
+                // Equal widths on phones, with icons from sm up, so all four labels fit at 360px.
                 '-mb-px flex min-h-touch flex-1 items-center justify-center gap-2 border-b-2 px-2 text-center text-sm leading-tight font-semibold transition-colors duration-150 sm:flex-none sm:px-4',
                 isActive ? 'border-primary text-primary' : 'border-transparent text-fg-muted hover:text-fg',
               )

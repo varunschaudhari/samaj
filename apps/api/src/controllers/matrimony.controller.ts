@@ -1,4 +1,4 @@
-import { closeProfileSchema, moderationReasonSchema, profileCreateSchema, profileFieldsSchema, profileSearchSchema, sendInterestSchema } from '@samaj/shared';
+import { closeProfileSchema, markSchema, moderationReasonSchema, profileCreateSchema, profileFieldsSchema, profileSearchSchema, sendInterestSchema } from '@samaj/shared';
 import type { Request, Response } from 'express';
 import * as interests from '../services/interest.service';
 import * as matrimony from '../services/matrimony.service';
@@ -25,6 +25,8 @@ export const pause = async (req: Request, res: Response) => res.json({ profile: 
 export const resume = async (req: Request, res: Response) => res.json({ profile: await matrimony.setPaused(viewer(req), id(req), false) });
 export const close = async (req: Request, res: Response) =>
   res.json({ profile: await matrimony.closeProfile(viewer(req), id(req), closeProfileSchema.parse(req.body).reason) });
+export const prefill = async (req: Request, res: Response) => res.json({ prefill: await matrimony.prefillFor(viewer(req), String(req.params.memberId ?? '')) });
+export const submit = async (req: Request, res: Response) => res.json({ profile: await matrimony.submitProfile(viewer(req), id(req)) });
 export const resubmit = async (req: Request, res: Response) => res.json({ profile: await matrimony.resubmitProfile(viewer(req), id(req)) });
 
 export const addPhoto = async (req: Request, res: Response) =>
@@ -35,6 +37,11 @@ export async function getPhoto(req: Request, res: Response) {
   const { data, contentType } = await matrimony.getPhoto(viewer(req), id(req), photoId(req));
   // A photo's id never points at different bytes, so browsers may keep it.
   res.set('Cache-Control', 'private, max-age=31536000, immutable').type(contentType).send(data);
+}
+
+export async function mark(req: Request, res: Response) {
+  const input = markSchema.parse(req.body);
+  res.json(await matrimony.setMark(viewer(req), input.fromProfileId, input.profileId, input.kind));
 }
 
 export const pending = async (req: Request, res: Response) => res.json({ items: await matrimony.listPendingProfiles(viewer(req)) });

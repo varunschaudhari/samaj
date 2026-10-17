@@ -1,4 +1,19 @@
-import { CLOSE_REASONS, DIETS, GENDERS, GOTRA_IDS, INCOME_RANGES, MANGLIK, MARITAL_STATUSES, NAKSHATRA_IDS, PROFILE_STATUSES, RASHI_IDS } from '@samaj/shared';
+import {
+  BIRTH_TIMES_OF_DAY,
+  CLOSE_REASONS,
+  DIETS,
+  EDUCATION_LEVELS,
+  EMPLOYER_TYPES,
+  GENDERS,
+  GOTRA_IDS,
+  INCOME_VISIBILITY,
+  MANGLIK,
+  MARITAL_STATUSES,
+  NAKSHATRA_IDS,
+  PROFILE_STATUSES,
+  PROMPT_IDS,
+  RASHI_IDS,
+} from '@samaj/shared';
 import { type InferSchemaType, Schema, type Types, model } from 'mongoose';
 import { branchPathPlugin } from './plugins';
 
@@ -25,6 +40,9 @@ const preferencesSchema = new Schema(
   { _id: false },
 );
 
+/** A prompt and the family's answer, shown as a card between photos. */
+const promptSchema = new Schema({ prompt: { type: String, enum: PROMPT_IDS, required: true }, answer: { type: String, required: true } }, { _id: false });
+
 /** A profile photo. The _id names it in URLs; the key is where the file is stored. */
 const photoSchema = new Schema({ key: { type: String, required: true } });
 
@@ -38,27 +56,58 @@ const profileSchema = new Schema(
     memberId: { type: Schema.Types.ObjectId, ref: 'Member', required: true, unique: true },
     familyId: { type: Schema.Types.ObjectId, ref: 'Family', required: true, index: true },
 
+    surname: { type: String, default: null },
+    firstName: { type: String, default: null },
+    fatherName: { type: String, default: null },
     heightCm: { type: Number, default: null },
     maritalStatus: { type: String, enum: MARITAL_STATUSES, default: null },
     diet: { type: String, enum: DIETS, default: null },
+    hasDisability: { type: Boolean, default: false },
+    disabilityDetail: { type: String, default: null },
     /** YYYY-MM-DD; its year always matches the member's birth year. */
     birthDate: { type: String, default: null },
+    birthTimeOfDay: { type: String, enum: BIRTH_TIMES_OF_DAY, default: null },
     birthTime: { type: String, default: null },
     birthPlace: { type: String, default: null },
     rashi: { type: String, enum: RASHI_IDS, default: null },
     nakshatra: { type: String, enum: NAKSHATRA_IDS, default: null },
     manglik: { type: String, enum: MANGLIK, default: null },
-    maternalGotra: { type: String, enum: GOTRA_IDS, default: null },
+    educationLevel: { type: String, enum: EDUCATION_LEVELS, default: null },
     education: { type: String, default: null },
+    otherEducation: { type: String, default: null },
     occupation: { type: String, default: null },
+    employerType: { type: String, enum: EMPLOYER_TYPES, default: null },
+    employerName: { type: String, default: null },
+    employerAddress: { type: String, default: null },
+    designation: { type: String, default: null },
     workLocation: { type: String, default: null },
-    income: { type: String, enum: INCOME_RANGES, default: null },
-    fatherOccupation: { type: String, default: null },
+    /** Exact rupees per month. Others only ever see a band, and only as incomeVisibility allows. */
+    monthlyIncome: { type: Number, default: null },
+    incomeVisibility: { type: String, enum: INCOME_VISIBILITY, default: 'accepted' },
+    parentName: { type: String, default: null },
+    parentOccupation: { type: String, default: null },
+    parentWorkVillage: { type: String, default: null },
     motherOccupation: { type: String, default: null },
-    nativePlace: { type: String, default: null },
+    nativeVillage: { type: String, default: null },
+    nativeDistrict: { type: String, default: null },
     siblings: { type: siblingsSchema, default: () => ({}) },
+    mamaName: { type: String, default: null },
+    /** The maternal uncle's kul. Matches are kept away from it, both ways (see matrimony.service). */
+    mamaKul: { type: String, enum: GOTRA_IDS, default: null },
+    mamaVillage: { type: String, default: null },
+    mamaNativeVillage: { type: String, default: null },
+    mamaNativeDistrict: { type: String, default: null },
+    mamaMobile: { type: String, default: null },
+    addressLine: { type: String, default: null },
+    village: { type: String, default: null },
+    taluka: { type: String, default: null },
+    district: { type: String, default: null },
+    pincode: { type: String, default: null },
+    candidateMobile: { type: String, default: null },
+    parentWhatsapp: { type: String, default: null },
     about: { type: String, default: null },
     expectations: { type: String, default: null },
+    prompts: { type: [promptSchema], default: [] },
     preferences: { type: preferencesSchema, default: () => ({}) },
     /** Up to MAX_PROFILE_PHOTOS, in order; the first is the main one. */
     photos: { type: [photoSchema], default: [] },

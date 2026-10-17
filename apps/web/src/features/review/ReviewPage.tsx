@@ -11,7 +11,7 @@ import { BranchSelect, useBranchLabel } from '@/features/branches/BranchSelect';
 import { type ReviewFilters, usePendingFamilies } from '@/features/families/api';
 import { EnrolFamilyModal } from '@/features/families/EnrolFamilyModal';
 import { usePendingProfiles } from '@/features/matrimony/api';
-import { ProfileCardSkeleton, ProfileCardView } from '@/features/matrimony/ProfileCardView';
+import { PROFILE_GRID, ProfileCardSkeleton, ProfileCardView } from '@/features/matrimony/ProfileCardView';
 import { usePendingMembers, usePendingMoves } from '@/features/families/links-api';
 import { PendingMembersList, PendingMovesList } from './ApprovalLists';
 import { cn } from '@/lib/cn';
@@ -149,7 +149,7 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
   let profileBody;
   if (profiles.isPending) {
     profileBody = (
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4" aria-busy="true">
+      <ul className={PROFILE_GRID} aria-busy="true">
         {[0, 1].map((i) => (
           <ProfileCardSkeleton key={i} />
         ))}
@@ -161,7 +161,7 @@ export function ReviewPage({ embedded = false }: { embedded?: boolean }) {
     profileBody = <EmptyState icon={HeartHandshake} title={t('matrimony.review.emptyTitle')} body={t('matrimony.review.emptyBody')} />;
   } else {
     profileBody = (
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+      <ul className={PROFILE_GRID}>
         {profiles.data.map((p) => (
           <ProfileCardView key={p.id} profile={p} href={`/matrimony/profiles/${p.id}`} />
         ))}

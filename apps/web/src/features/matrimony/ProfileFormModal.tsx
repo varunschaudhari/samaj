@@ -1,21 +1,29 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
+  BIRTH_TIMES_OF_DAY,
   DIETS,
-  INCOME_RANGES,
+  EDUCATION_LEVELS,
+  EMPLOYER_TYPES,
+  INCOME_VISIBILITY,
   MANGLIK,
   MARITAL_STATUSES,
+  MAX_PROMPTS,
+  type MissingField,
+  PROMPT_IDS,
   NAKSHATRAS,
   RASHIS,
+  REQUIRED_FOR_REVIEW,
   type MyMatrimony,
   type ProfileDetail,
   type ProfileFieldsInput,
   profileCreateSchema,
   profileFieldsSchema,
+  timeOfDayOf,
 } from '@samaj/shared';
-import { ArrowLeft, ArrowRight, Phone, X } from '@/components/ui/icons';
-import { useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight, Phone, Plus, Send, Trash2, X } from '@/components/ui/icons';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { type FieldPath, type Resolver, useForm } from 'react-hook-form';
-import { Button, Chip, Input, Modal, Select, Textarea, toast } from '@/components/ui';
+import { Button, Chip, IconButton, Input, Modal, Select, Textarea, toast } from '@/components/ui';
 import { useMe } from '@/features/auth/api';
 import { FormAlert } from '@/features/auth/FormAlert';
 import { applyServerIssues, fieldError } from '@/features/auth/form-errors';
@@ -24,9 +32,13 @@ import { BranchSelect } from '@/features/branches/BranchSelect';
 import { gotraOptions } from '@/features/families/gotra-options';
 import { type MessageKey, useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { cn } from '@/lib/cn';
-import { formatHeight, useCreateProfile, useUpdateProfile } from './api';
+import { formatHeight, useCreateProfile, usePrefill, useUpdateProfile } from './api';
 
-export type ProfileFormTarget = { mode: 'create'; eligible: MyMatrimony['eligible']; memberId?: string } | { mode: 'edit'; profile: ProfileDetail };
+export type ProfileFormTarget =
+  /** contact: who to call, when the office fills the form for a family; otherwise the signed-in parent. */
+  | { mode: 'create'; eligible: MyMatrimony['eligible']; memberId?: string; contact?: { name: string; phone: string | null } }
+  /** startAt: open on the step holding this field, from the checklist. */
+  | { mode: 'edit'; profile: ProfileDetail; startAt?: MissingField };
 
 const HEIGHTS = Array.from({ length: 61 }, (_, i) => 140 + i);
 const AGES = Array.from({ length: 43 }, (_, i) => 18 + i);
@@ -35,24 +47,50 @@ const COUNTS = Array.from({ length: 11 }, (_, i) => i);
 type FormValues = ProfileFieldsInput & { memberId?: string; consent?: boolean };
 type Field = FieldPath<FormValues>;
 
-/** The form in steps, so a long biodata isn't one wall of fields. Each step lists the fields it validates. */
+/** The form in steps, following the samaj's paper form. Each step lists the fields it validates. */
 const STEPS: { id: string; label: MessageKey; fields: Field[] }[] = [
-  { id: 'basics', label: 'matrimony.step.basics', fields: ['memberId', 'heightCm', 'maritalStatus', 'diet'] },
-  { id: 'horoscope', label: 'matrimony.step.horoscope', fields: ['birthDate', 'birthTime', 'birthPlace', 'rashi', 'nakshatra', 'manglik', 'maternalGotra'] },
-  { id: 'career', label: 'matrimony.step.career', fields: ['education', 'occupation', 'workLocation', 'income'] },
+  { id: 'candidate', label: 'matrimony.step.candidate', fields: ['memberId', 'surname', 'firstName', 'fatherName', 'maritalStatus', 'heightCm', 'diet', 'hasDisability', 'disabilityDetail'] },
+  { id: 'birth', label: 'matrimony.step.birth', fields: ['birthDate', 'birthTimeOfDay', 'birthTime', 'birthPlace', 'rashi', 'nakshatra', 'manglik'] },
+  {
+    id: 'career',
+    label: 'matrimony.step.career',
+    fields: ['educationLevel', 'education', 'otherEducation', 'occupation', 'employerType', 'employerName', 'employerAddress', 'designation', 'workLocation', 'monthlyIncome', 'incomeVisibility'],
+  },
   {
     id: 'family',
     label: 'matrimony.step.family',
-    fields: ['fatherOccupation', 'motherOccupation', 'nativePlace', 'siblings.brothers', 'siblings.brothersMarried', 'siblings.sisters', 'siblings.sistersMarried'],
+    fields: [
+      'parentName',
+      'parentOccupation',
+      'parentWorkVillage',
+      'motherOccupation',
+      'nativeVillage',
+      'nativeDistrict',
+      'siblings.brothers',
+      'siblings.brothersMarried',
+      'siblings.sisters',
+      'siblings.sistersMarried',
+      'mamaName',
+      'mamaKul',
+      'mamaVillage',
+      'mamaNativeVillage',
+      'mamaNativeDistrict',
+      'mamaMobile',
+    ],
   },
   {
     id: 'preferences',
     label: 'matrimony.step.preferences',
-    fields: ['about', 'expectations', 'preferences.ageMin', 'preferences.ageMax', 'preferences.heightMinCm', 'preferences.maritalStatuses', 'preferences.diets', 'preferences.branchIds'],
+    fields: ['about', 'prompts', 'expectations', 'preferences.ageMin', 'preferences.ageMax', 'preferences.heightMinCm', 'preferences.maritalStatuses', 'preferences.diets', 'preferences.branchIds'],
   },
-  { id: 'contact', label: 'matrimony.step.contact', fields: ['contactName', 'contactPhone', 'consent'] },
+  {
+    id: 'contact',
+    label: 'matrimony.step.contact',
+    fields: ['addressLine', 'village', 'taluka', 'district', 'pincode', 'contactName', 'contactPhone', 'candidateMobile', 'parentWhatsapp', 'consent'],
+  },
 ];
 const ALL_FIELDS = STEPS.flatMap((s) => s.fields);
+const REQUIRED = new Set<string>(REQUIRED_FOR_REVIEW);
 
 const text = (v: string | null | undefined) => v ?? '';
 const num = (v: number | null | undefined) => (v === null || v === undefined ? '' : String(v));
@@ -60,31 +98,59 @@ const num = (v: number | null | undefined) => (v === null || v === undefined ? '
 function defaults(target: ProfileFormTarget | null, me: { name: string; phone: string } | undefined): FormValues {
   if (target?.mode === 'edit') {
     const p = target.profile;
+    const a = p.contact?.address;
     return {
+      surname: text(p.surname),
+      firstName: text(p.firstName),
+      fatherName: text(p.fatherName),
       heightCm: num(p.heightCm),
       maritalStatus: text(p.maritalStatus),
       diet: text(p.diet),
+      hasDisability: p.hasDisability,
+      disabilityDetail: text(p.disabilityDetail),
       birthDate: text(p.birthDate),
+      birthTimeOfDay: text(p.birthTimeOfDay),
       birthTime: text(p.birthTime),
       birthPlace: text(p.birthPlace),
       rashi: text(p.rashi),
       nakshatra: text(p.nakshatra),
       manglik: text(p.manglik),
-      maternalGotra: text(p.maternalGotra),
+      educationLevel: text(p.educationLevel),
       education: text(p.education),
+      otherEducation: text(p.otherEducation),
       occupation: text(p.occupation),
+      employerType: text(p.employerType),
+      employerName: text(p.employerName),
+      employerAddress: text(p.contact?.employerAddress),
+      designation: text(p.designation),
       workLocation: text(p.workLocation),
-      income: text(p.income),
-      fatherOccupation: text(p.fatherOccupation),
+      monthlyIncome: num(p.monthlyIncome),
+      incomeVisibility: p.incomeVisibility,
+      parentName: text(p.parentName),
+      parentOccupation: text(p.parentOccupation),
+      parentWorkVillage: text(p.parentWorkVillage),
       motherOccupation: text(p.motherOccupation),
-      nativePlace: text(p.nativePlace),
+      nativeVillage: text(p.nativeVillage),
+      nativeDistrict: text(p.nativeDistrict),
       siblings: {
         brothers: num(p.siblings.brothers),
         brothersMarried: num(p.siblings.brothersMarried),
         sisters: num(p.siblings.sisters),
         sistersMarried: num(p.siblings.sistersMarried),
       },
+      mamaName: text(p.mamaName),
+      mamaKul: text(p.mamaKul),
+      mamaVillage: text(p.mamaVillage),
+      mamaNativeVillage: text(p.mamaNativeVillage),
+      mamaNativeDistrict: text(p.mamaNativeDistrict),
+      mamaMobile: text(p.contact?.mamaMobile),
+      addressLine: text(a?.line),
+      village: text(a?.village),
+      taluka: text(a?.taluka),
+      district: text(a?.district),
+      pincode: text(a?.pincode),
       about: text(p.about),
+      prompts: p.prompts,
       expectations: text(p.expectations),
       preferences: {
         ageMin: num(p.preferences.ageMin),
@@ -96,42 +162,71 @@ function defaults(target: ProfileFormTarget | null, me: { name: string; phone: s
       },
       contactName: p.contact?.name ?? '',
       contactPhone: p.contact?.phone ?? '',
+      candidateMobile: text(p.contact?.candidateMobile),
+      parentWhatsapp: text(p.contact?.parentWhatsapp),
     };
   }
+  const person = target?.eligible.find((e) => e.memberId === (target.memberId ?? target.eligible[0]?.memberId));
+  const [first = '', ...rest] = (person?.name ?? '').split(' ');
+  const contact = target?.mode === 'create' && target.contact ? { name: target.contact.name, phone: target.contact.phone ?? '' } : me;
   return {
-    memberId: target?.memberId ?? target?.eligible[0]?.memberId ?? '',
+    memberId: person?.memberId ?? '',
     consent: false,
+    // Prefilled from the family page: given name first, surname last, as names are listed there.
+    surname: rest.at(-1) ?? '',
+    firstName: first,
+    fatherName: '',
     heightCm: '',
     maritalStatus: 'neverMarried',
     diet: '',
+    hasDisability: false,
+    disabilityDetail: '',
     birthDate: '',
+    birthTimeOfDay: '',
     birthTime: '',
     birthPlace: '',
     rashi: '',
     nakshatra: '',
     manglik: '',
-    maternalGotra: '',
+    educationLevel: '',
     education: '',
+    otherEducation: '',
     occupation: '',
+    employerType: '',
+    employerName: '',
+    employerAddress: '',
+    designation: '',
     workLocation: '',
-    income: '',
-    fatherOccupation: '',
+    monthlyIncome: '',
+    incomeVisibility: 'accepted',
+    parentName: contact?.name ?? '',
+    parentOccupation: '',
+    parentWorkVillage: '',
     motherOccupation: '',
-    nativePlace: '',
+    nativeVillage: '',
+    nativeDistrict: '',
     siblings: { brothers: '', brothersMarried: '', sisters: '', sistersMarried: '' },
+    mamaName: '',
+    mamaKul: '',
+    mamaVillage: '',
+    mamaNativeVillage: '',
+    mamaNativeDistrict: '',
+    mamaMobile: '',
+    addressLine: '',
+    village: '',
+    taluka: '',
+    district: '',
+    pincode: '',
     about: '',
+    prompts: [],
     expectations: '',
     preferences: { ageMin: '', ageMax: '', heightMinCm: '', maritalStatuses: [], diets: [], branchIds: [] },
-    // Usually the parent creating the profile is the one families should call.
-    contactName: me?.name ?? '',
-    contactPhone: me?.phone ?? '',
+    // Usually the parent creating the profile is the one families should call, on WhatsApp too.
+    contactName: contact?.name ?? '',
+    contactPhone: contact?.phone ?? '',
+    candidateMobile: '',
+    parentWhatsapp: contact?.phone ?? '',
   };
-}
-
-/** The error message for a (possibly nested) field, translated. */
-function useFieldError(form: ReturnType<typeof useForm<FormValues>>) {
-  const t = useT();
-  return (name: Field) => fieldError(t, form.getFieldState(name, form.formState).error?.message);
 }
 
 /** Toggle chips for a multi-choice preference; none selected means "any". */
@@ -150,6 +245,16 @@ function ChoiceChips<V extends string>({ label, options, value, onChange, option
   );
 }
 
+function Group({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+  return (
+    <fieldset className="flex flex-col gap-4 rounded-md border border-line p-4">
+      <legend className="px-1 text-sm font-semibold text-fg">{title}</legend>
+      {hint && <p className="-mt-1 text-sm text-fg-muted">{hint}</p>}
+      {children}
+    </fieldset>
+  );
+}
+
 export function ProfileFormModal({ target, onClose, onCreated }: { target: ProfileFormTarget | null; onClose: () => void; onCreated?: (id: string) => void }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
@@ -161,6 +266,10 @@ export function ProfileFormModal({ target, onClose, onCreated }: { target: Profi
   const mutation = target?.mode === 'edit' ? update : create;
   const isCreate = target?.mode === 'create';
   const [step, setStep] = useState(0);
+  // New profiles start with only the fields the samaj form requires; the rest are a tap away.
+  const [showAll, setShowAll] = useState(false);
+  // Which create button was pressed: keep as a draft, or send for approval.
+  const sendRef = useRef(false);
 
   const form = useForm<FormValues>({
     // Create and edit share every field; create adds memberId and consent. FormValues covers both,
@@ -168,22 +277,56 @@ export function ProfileFormModal({ target, onClose, onCreated }: { target: Profi
     resolver: (isCreate ? zodResolver(profileCreateSchema) : zodResolver(profileFieldsSchema)) as unknown as Resolver<FormValues>,
     defaultValues: defaults(target, me.data ?? undefined),
   });
-  const err = useFieldError(form);
+  const err = (name: Field) => fieldError(t, form.getFieldState(name, form.formState).error?.message);
+  /** Required-for-approval fields carry no "optional" tag; the rest do. */
+  const opt = (name: string) => (REQUIRED.has(name) ? undefined : t('common.optional'));
+  /** Whether a field is on screen: always when required (or who sees income), otherwise when all fields are shown. */
+  const shown = (name: string) => showAll || REQUIRED.has(name) || name === 'incomeVisibility';
 
   useEffect(() => {
     if (target) {
       form.reset(defaults(target, me.data ?? undefined));
       create.reset();
       update.reset();
-      setStep(0);
+      const startAt = target.mode === 'edit' ? target.startAt : undefined;
+      const index = startAt ? STEPS.findIndex((s) => s.fields.includes(startAt as Field)) : -1;
+      setStep(Math.max(0, index));
+      setShowAll(target.mode === 'edit');
     }
     // Once per opening.
   }, [target]);
+
+  // An exact time fills in its band, so families only type one.
+  const birthTime = form.watch('birthTime');
+  useEffect(() => {
+    if (typeof birthTime === 'string' && /^\d{2}:\d{2}$/.test(birthTime)) form.setValue('birthTimeOfDay', timeOfDayOf(birthTime), { shouldDirty: true });
+  }, [birthTime]);
 
   // The birth date must fall in the birth year from the family page.
   const memberId = form.watch('memberId');
   const age = target?.mode === 'edit' ? target.profile.age : target?.eligible.find((e) => e.memberId === memberId)?.age;
   const birthYear = age !== null && age !== undefined ? new Date().getFullYear() - age : null;
+  const hasDisability = form.watch('hasDisability');
+
+  // Start a new profile from the family page: names, parents, siblings, places and phones.
+  // Facts about the person themselves follow the chosen person; the rest only fill blanks.
+  const prefill = usePrefill(isCreate ? memberId : undefined);
+  useEffect(() => {
+    const data = prefill.data;
+    if (!data) return;
+    // parentName too: the family page gives it surname first, as the samaj form wants.
+    const personal = new Set(['surname', 'firstName', 'fatherName', 'parentName', 'education', 'occupation', 'candidateMobile']);
+    for (const [key, value] of Object.entries(data)) {
+      if (key === 'siblings' && value && typeof value === 'object') {
+        for (const [k, v] of Object.entries(value)) form.setValue(`siblings.${k}` as Field, String(v) as never);
+        continue;
+      }
+      const current = form.getValues(key as Field);
+      if (personal.has(key) || current === '' || current === undefined || current === null) form.setValue(key as Field, value as never);
+    }
+  }, [prefill.data]);
+  const prompts = form.watch('prompts') ?? [];
+  const setPrompts = (next: NonNullable<FormValues['prompts']>) => form.setValue('prompts', next, { shouldDirty: true });
 
   /** Jump to the first step with an error. */
   const showFirstError = () => {
@@ -207,9 +350,10 @@ export function ProfileFormModal({ target, onClose, onCreated }: { target: Profi
           onError,
         });
       } else {
-        create.mutate(values as Parameters<typeof create.mutate>[0], {
+        const submit = sendRef.current;
+        create.mutate({ ...(values as Parameters<typeof create.mutate>[0]), submit }, {
           onSuccess: (profile) => {
-            toast.success(t('matrimony.created', { name: profile.name }));
+            toast.success(submit ? t('matrimony.created', { name: profile.name }) : t('matrimony.draftSaved', { name: profile.name }));
             onClose();
             onCreated?.(profile.id);
           },
@@ -230,7 +374,38 @@ export function ProfileFormModal({ target, onClose, onCreated }: { target: Profi
   const prefs = form.watch('preferences');
   const setPrefs = <K extends 'maritalStatuses' | 'diets' | 'branchIds'>(key: K, value: NonNullable<FormValues['preferences']>[K]) =>
     form.setValue(`preferences.${key}`, value as never, { shouldDirty: true });
-  const hasServerError = ALL_FIELDS.some((f) => form.getFieldState(f).error?.type === 'server');
+  const hasFieldError = ALL_FIELDS.some((f) => form.getFieldState(f).error?.type === 'server');
+
+  const input = (name: Field, label: string, props: Record<string, unknown> = {}) =>
+    shown(name) ? <Input label={label} labelSuffix={opt(name)} error={err(name)} {...props} {...form.register(name)} /> : null;
+  /** A short list of choices as big tap buttons instead of a dropdown. Tapping the chosen one again clears an optional choice. */
+  const choice = <V extends string>(name: Field, label: string, values: readonly V[], optionLabel: (v: V) => string) => {
+    if (!shown(name)) return null;
+    const value = form.watch(name) as unknown as string | undefined;
+    return (
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="mb-1.5 text-sm font-semibold text-fg">
+          {label}
+          {opt(name) && <span className="font-normal text-fg-muted"> ({opt(name)})</span>}
+        </legend>
+        <div className="flex flex-wrap gap-2">
+          {values.map((v) => (
+            <Chip
+              key={v}
+              selected={value === v}
+              onClick={() =>
+                form.setValue(name, (value === v && !REQUIRED.has(name) && name !== 'incomeVisibility' ? '' : v) as never, { shouldDirty: true, shouldValidate: form.formState.isSubmitted })
+              }
+            >
+              {optionLabel(v)}
+            </Chip>
+          ))}
+        </div>
+        {err(name) && <p className="text-sm text-danger">{err(name)}</p>}
+      </fieldset>
+    );
+  };
+  const phone = (name: Field, label: string, hint?: string) => input(name, label, { type: 'tel', inputMode: 'numeric', leadingIcon: Phone, hint });
 
   return (
     <Modal
@@ -249,16 +424,28 @@ export function ProfileFormModal({ target, onClose, onCreated }: { target: Profi
               {t('common.cancel')}
             </Button>
           )}
-          {/* Editing can save from any step; creating walks to the end, where consent is. */}
-          {!isCreate && !last && (
-            <Button type="submit" form="profile-form" variant="secondary" loading={mutation.isPending}>
-              {t('common.save')}
+          {/* A draft can be saved from any step; sending needs the last step, where consent is. */}
+          {isCreate ? (
+            <Button type="submit" form="profile-form" variant="secondary" loading={create.isPending && !sendRef.current} onClick={() => (sendRef.current = false)}>
+              {t('matrimony.saveDraft')}
             </Button>
+          ) : (
+            !last && (
+              <Button type="submit" form="profile-form" variant="secondary" loading={mutation.isPending}>
+                {t('common.save')}
+              </Button>
+            )
           )}
           {last ? (
-            <Button type="submit" form="profile-form" loading={mutation.isPending}>
-              {isCreate ? t('matrimony.submitForReview') : t('common.save')}
-            </Button>
+            isCreate ? (
+              <Button type="submit" form="profile-form" leadingIcon={Send} loading={create.isPending && sendRef.current} onClick={() => (sendRef.current = true)}>
+                {t('matrimony.submitForReview')}
+              </Button>
+            ) : (
+              <Button type="submit" form="profile-form" loading={mutation.isPending}>
+                {t('common.save')}
+              </Button>
+            )
           ) : (
             <Button trailingIcon={ArrowRight} onClick={next}>
               {t('matrimony.form.next')}
@@ -288,7 +475,13 @@ export function ProfileFormModal({ target, onClose, onCreated }: { target: Profi
       </ol>
 
       <form id="profile-form" onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-        {mutation.isError && !hasServerError && <FormAlert message={errorMessage(mutation.error)} />}
+        {mutation.isError && !hasFieldError && <FormAlert message={errorMessage(mutation.error)} />}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-muted px-3 py-2 text-sm">
+          <span className="text-fg-muted">{showAll ? t('matrimony.form.allShown') : t('matrimony.form.requiredOnly')}</span>
+          <button type="button" className="min-h-9 font-semibold text-primary hover:underline" onClick={() => setShowAll((v) => !v)}>
+            {showAll ? t('matrimony.form.showRequired') : t('matrimony.form.showAll')}
+          </button>
+        </div>
 
         {step === 0 && (
           <>
@@ -301,16 +494,14 @@ export function ProfileFormModal({ target, onClose, onCreated }: { target: Profi
                 ))}
               </Select>
             )}
+            <div className="grid gap-4 sm:grid-cols-3">
+              {input('surname', t('matrimony.surname'))}
+              {input('firstName', t('matrimony.firstName'))}
+              {input('fatherName', t('matrimony.fatherName'), { hint: t('matrimony.fatherNameHint') })}
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Select label={t('matrimony.maritalStatus')} error={err('maritalStatus')} {...form.register('maritalStatus')}>
-                <option value="">{t('matrimony.notSaying')}</option>
-                {MARITAL_STATUSES.map((m) => (
-                  <option key={m} value={m}>
-                    {t(`matrimony.marital.${m}`)}
-                  </option>
-                ))}
-              </Select>
-              <Select label={t('matrimony.height')} labelSuffix={t('common.optional')} error={err('heightCm')} {...form.register('heightCm')}>
+              {choice('maritalStatus', t('matrimony.maritalStatus'), MARITAL_STATUSES, (m) => t(`matrimony.marital.${m}`))}
+              <Select label={t('matrimony.height')} labelSuffix={opt('heightCm')} error={err('heightCm')} {...form.register('heightCm')}>
                 <option value="">{t('matrimony.notSaying')}</option>
                 {HEIGHTS.map((cm) => (
                   <option key={cm} value={cm}>
@@ -319,35 +510,32 @@ export function ProfileFormModal({ target, onClose, onCreated }: { target: Profi
                 ))}
               </Select>
             </div>
-            <Select label={t('matrimony.diet')} labelSuffix={t('common.optional')} error={err('diet')} {...form.register('diet')}>
-              <option value="">{t('matrimony.notSaying')}</option>
-              {DIETS.map((d) => (
-                <option key={d} value={d}>
-                  {t(`matrimony.diet.${d}`)}
-                </option>
-              ))}
-            </Select>
+            {choice('diet', t('matrimony.diet'), DIETS, (d) => t(`matrimony.diet.${d}`))}
+            <label className="flex min-h-touch cursor-pointer items-center gap-3 text-sm text-fg">
+              <input type="checkbox" className="size-5 shrink-0 accent-primary" {...form.register('hasDisability')} />
+              {t('matrimony.hasDisability')}
+            </label>
+            {hasDisability && <Textarea label={t('matrimony.disabilityDetail')} rows={2} error={err('disabilityDetail')} {...form.register('disabilityDetail')} />}
           </>
         )}
 
         {step === 1 && (
           <>
+            <Input
+              label={t('matrimony.birthDate')}
+              hint={birthYear ? t('matrimony.birthDateHint', { year: birthYear }) : undefined}
+              type="date"
+              min={birthYear ? `${birthYear}-01-01` : undefined}
+              max={birthYear ? `${birthYear}-12-31` : undefined}
+              error={err('birthDate')}
+              {...form.register('birthDate')}
+            />
+            {choice('birthTimeOfDay', t('matrimony.timeOfDay'), BIRTH_TIMES_OF_DAY, (b) => t(`matrimony.timeOfDay.${b}`))}
+            {input('birthTime', t('matrimony.exactTime'), { type: 'time', hint: t('matrimony.exactTimeHint') })}
+            {input('birthPlace', t('matrimony.birthPlace'))}
+            {showAll && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                label={t('matrimony.birthDate')}
-                labelSuffix={t('common.optional')}
-                hint={birthYear ? t('matrimony.birthDateHint', { year: birthYear }) : undefined}
-                type="date"
-                min={birthYear ? `${birthYear}-01-01` : undefined}
-                max={birthYear ? `${birthYear}-12-31` : undefined}
-                error={err('birthDate')}
-                {...form.register('birthDate')}
-              />
-              <Input label={t('matrimony.birthTime')} labelSuffix={t('common.optional')} type="time" error={err('birthTime')} {...form.register('birthTime')} />
-            </div>
-            <Input label={t('matrimony.birthPlace')} labelSuffix={t('common.optional')} error={err('birthPlace')} {...form.register('birthPlace')} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Select label={t('matrimony.rashi')} labelSuffix={t('common.optional')} error={err('rashi')} {...form.register('rashi')}>
+              <Select label={t('matrimony.rashi')} labelSuffix={opt('rashi')} error={err('rashi')} {...form.register('rashi')}>
                 <option value="">{t('matrimony.notSaying')}</option>
                 {RASHIS.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -355,7 +543,7 @@ export function ProfileFormModal({ target, onClose, onCreated }: { target: Profi
                   </option>
                 ))}
               </Select>
-              <Select label={t('matrimony.nakshatra')} labelSuffix={t('common.optional')} error={err('nakshatra')} {...form.register('nakshatra')}>
+              <Select label={t('matrimony.nakshatra')} labelSuffix={opt('nakshatra')} error={err('nakshatra')} {...form.register('nakshatra')}>
                 <option value="">{t('matrimony.notSaying')}</option>
                 {NAKSHATRAS.map((n) => (
                   <option key={n.id} value={n.id}>
@@ -364,16 +552,62 @@ export function ProfileFormModal({ target, onClose, onCreated }: { target: Profi
                 ))}
               </Select>
             </div>
+            )}
+            {choice('manglik', t('matrimony.manglik'), MANGLIK, (m) => t(`matrimony.manglik.${m}`))}
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            {choice('educationLevel', t('matrimony.educationLevel'), EDUCATION_LEVELS, (e) => t(`matrimony.educationLevel.${e}`))}
+            {input('education', t('matrimony.degree'), { placeholder: 'B.E. Mechanical' })}
+            {input('otherEducation', t('matrimony.otherEducation'))}
+            {input('occupation', t('member.occupation'))}
+            {choice('employerType', t('matrimony.employerType'), EMPLOYER_TYPES, (e) => t(`matrimony.employerType.${e}`))}
             <div className="grid gap-4 sm:grid-cols-2">
-              <Select label={t('matrimony.manglik')} labelSuffix={t('common.optional')} error={err('manglik')} {...form.register('manglik')}>
-                <option value="">{t('matrimony.notSaying')}</option>
-                {MANGLIK.map((m) => (
-                  <option key={m} value={m}>
-                    {t(`matrimony.manglik.${m}`)}
-                  </option>
+              {input('employerName', t('matrimony.employerName'))}
+              {input('designation', t('matrimony.designation'))}
+            </div>
+            {input('employerAddress', t('matrimony.employerAddress'))}
+            {input('workLocation', t('matrimony.workLocation'), { placeholder: 'Pune' })}
+            <Group title={t('matrimony.monthlyIncome')} hint={t('matrimony.incomeHint')}>
+              {input('monthlyIncome', t('matrimony.monthlyIncomeAmount'), { inputMode: 'numeric', placeholder: '45000' })}
+              {choice('incomeVisibility', t('matrimony.incomeVisibility'), INCOME_VISIBILITY, (v) => t(`matrimony.incomeVisibility.${v}`))}
+            </Group>
+          </>
+        )}
+
+        {step === 3 && (
+          <>
+            <Group title={t('matrimony.section.parent')}>
+              {input('parentName', t('matrimony.parentName'), { hint: t('matrimony.surnameFirst') })}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {input('parentOccupation', t('matrimony.parentOccupation'))}
+                {input('parentWorkVillage', t('matrimony.parentWorkVillage'))}
+              </div>
+              {input('motherOccupation', t('matrimony.motherOccupation'))}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {input('nativeVillage', t('matrimony.nativeVillage'))}
+                {input('nativeDistrict', t('matrimony.nativeDistrict'))}
+              </div>
+              {showAll && (
+              <div className="grid grid-cols-2 gap-4">
+                {(['brothers', 'brothersMarried', 'sisters', 'sistersMarried'] as const).map((key) => (
+                  <Select key={key} label={t(`matrimony.form.${key}`)} labelSuffix={t('common.optional')} error={err(`siblings.${key}`)} {...form.register(`siblings.${key}`)}>
+                    <option value="">{t('matrimony.notSaying')}</option>
+                    {COUNTS.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </Select>
                 ))}
-              </Select>
-              <Select label={t('matrimony.maternalGotra')} labelSuffix={t('common.optional')} error={err('maternalGotra')} {...form.register('maternalGotra')}>
+              </div>
+              )}
+            </Group>
+            <Group title={t('matrimony.section.mama')} hint={t('matrimony.mamaHint')}>
+              {input('mamaName', t('matrimony.mamaName'), { hint: t('matrimony.surnameFirst') })}
+              <Select label={t('matrimony.mamaKul')} error={err('mamaKul')} {...form.register('mamaKul')}>
                 <option value="">{t('matrimony.notSaying')}</option>
                 {gotraOptions(language).map((g) => (
                   <option key={g.id} value={g.id}>
@@ -381,73 +615,84 @@ export function ProfileFormModal({ target, onClose, onCreated }: { target: Profi
                   </option>
                 ))}
               </Select>
-            </div>
+              {input('mamaVillage', t('matrimony.mamaVillage'))}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {input('mamaNativeVillage', t('matrimony.mamaNativeVillage'))}
+                {input('mamaNativeDistrict', t('matrimony.nativeDistrict'))}
+              </div>
+              {phone('mamaMobile', t('matrimony.mamaMobile'))}
+            </Group>
           </>
         )}
 
-        {step === 2 && (
-          <>
-            <Input label={t('member.education')} labelSuffix={t('common.optional')} placeholder="B.E. Computer, M.Com…" error={err('education')} {...form.register('education')} />
-            <Input label={t('member.occupation')} labelSuffix={t('common.optional')} error={err('occupation')} {...form.register('occupation')} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input label={t('matrimony.workLocation')} labelSuffix={t('common.optional')} placeholder="Pune" error={err('workLocation')} {...form.register('workLocation')} />
-              <Select label={t('matrimony.income')} labelSuffix={t('common.optional')} error={err('income')} {...form.register('income')}>
-                <option value="">{t('matrimony.notSaying')}</option>
-                {INCOME_RANGES.map((r) => (
-                  <option key={r} value={r}>
-                    {t(`matrimony.income.${r}`)}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </>
+        {step === 4 && !showAll && (
+          <div className="flex flex-col items-start gap-3 rounded-md border border-dashed border-line-strong p-4">
+            <p className="text-sm text-fg">{t('matrimony.form.optionalStep')}</p>
+            <Button variant="secondary" size="sm" onClick={() => setShowAll(true)}>
+              {t('matrimony.form.showAll')}
+            </Button>
+          </div>
         )}
-
-        {step === 3 && (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input label={t('matrimony.fatherOccupation')} labelSuffix={t('common.optional')} error={err('fatherOccupation')} {...form.register('fatherOccupation')} />
-              <Input label={t('matrimony.motherOccupation')} labelSuffix={t('common.optional')} error={err('motherOccupation')} {...form.register('motherOccupation')} />
-            </div>
-            <Input label={t('matrimony.nativePlace')} labelSuffix={t('common.optional')} hint={t('matrimony.nativePlaceHint')} error={err('nativePlace')} {...form.register('nativePlace')} />
-            <div className="grid grid-cols-2 gap-4">
-              {(['brothers', 'brothersMarried', 'sisters', 'sistersMarried'] as const).map((key) => (
-                <Select key={key} label={t(`matrimony.form.${key}`)} labelSuffix={t('common.optional')} error={err(`siblings.${key}`)} {...form.register(`siblings.${key}`)}>
-                  <option value="">{t('matrimony.notSaying')}</option>
-                  {COUNTS.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </Select>
-              ))}
-            </div>
-          </>
-        )}
-
-        {step === 4 && (
+        {step === 4 && showAll && (
           <>
             <Textarea label={t('matrimony.about')} labelSuffix={t('common.optional')} hint={t('matrimony.aboutHint')} rows={3} error={err('about')} {...form.register('about')} />
-            <fieldset className="flex flex-col gap-4 rounded-md border border-line p-4">
-              <legend className="px-1 text-sm font-semibold text-fg">{t('matrimony.expectations')}</legend>
-              <p className="text-sm text-fg-muted">{t('matrimony.pref.hint')}</p>
+            <Group title={t('matrimony.prompts.title')} hint={t('matrimony.prompts.hint', { max: MAX_PROMPTS })}>
+              {prompts.map((item, i) => (
+                <div key={i} className="flex flex-col gap-2 rounded-md bg-surface-muted p-3">
+                  <div className="flex items-end gap-2">
+                    <Select
+                      label={t('matrimony.prompts.question')}
+                      fieldClassName="flex-1"
+                      value={item.prompt}
+                      onChange={(e) => setPrompts(prompts.map((x, j) => (j === i ? { ...x, prompt: e.target.value as (typeof PROMPT_IDS)[number] } : x)))}
+                    >
+                      {PROMPT_IDS.filter((id) => id === item.prompt || !prompts.some((x) => x.prompt === id)).map((id) => (
+                        <option key={id} value={id}>
+                          {t(`matrimony.prompt.${id}`)}
+                        </option>
+                      ))}
+                    </Select>
+                    <IconButton icon={Trash2} label={t('matrimony.prompts.remove')} onClick={() => setPrompts(prompts.filter((_, j) => j !== i))} />
+                  </div>
+                  <Textarea
+                    label={t('matrimony.prompts.answer')}
+                    hideLabel
+                    rows={2}
+                    maxLength={200}
+                    placeholder={t('matrimony.prompts.placeholder')}
+                    value={item.answer}
+                    error={err(`prompts.${i}.answer` as Field)}
+                    onChange={(e) => setPrompts(prompts.map((x, j) => (j === i ? { ...x, answer: e.target.value } : x)))}
+                  />
+                </div>
+              ))}
+              {prompts.length < MAX_PROMPTS && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leadingIcon={Plus}
+                  className="self-start"
+                  onClick={() => {
+                    const unused = PROMPT_IDS.find((id) => !prompts.some((x) => x.prompt === id));
+                    if (unused) setPrompts([...prompts, { prompt: unused, answer: '' }]);
+                  }}
+                >
+                  {t('matrimony.prompts.add')}
+                </Button>
+              )}
+            </Group>
+            <Group title={t('matrimony.expectations')} hint={t('matrimony.pref.hint')}>
               <div className="grid grid-cols-2 gap-4">
-                <Select label={t('matrimony.pref.ageMin')} error={err('preferences.ageMin')} {...form.register('preferences.ageMin')}>
-                  <option value="">{t('matrimony.pref.any')}</option>
-                  {AGES.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </Select>
-                <Select label={t('matrimony.pref.ageMax')} error={err('preferences.ageMax')} {...form.register('preferences.ageMax')}>
-                  <option value="">{t('matrimony.pref.any')}</option>
-                  {AGES.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </Select>
+                {(['ageMin', 'ageMax'] as const).map((key) => (
+                  <Select key={key} label={t(`matrimony.pref.${key}`)} error={err(`preferences.${key}`)} {...form.register(`preferences.${key}`)}>
+                    <option value="">{t('matrimony.pref.any')}</option>
+                    {AGES.map((a) => (
+                      <option key={a} value={a}>
+                        {a}
+                      </option>
+                    ))}
+                  </Select>
+                ))}
               </div>
               <Select label={t('matrimony.pref.heightMin')} error={err('preferences.heightMinCm')} {...form.register('preferences.heightMinCm')}>
                 <option value="">{t('matrimony.pref.any')}</option>
@@ -491,18 +736,31 @@ export function ProfileFormModal({ target, onClose, onCreated }: { target: Profi
                 )}
               </div>
               <Textarea label={t('matrimony.pref.inWords')} labelSuffix={t('common.optional')} rows={3} error={err('expectations')} {...form.register('expectations')} />
-            </fieldset>
+            </Group>
           </>
         )}
 
         {step === 5 && (
           <>
-            <fieldset className="flex flex-col gap-4 rounded-md border border-line p-4">
-              <legend className="px-1 text-sm font-semibold text-fg">{t('matrimony.contact')}</legend>
-              <p className="text-sm text-fg-muted">{t('matrimony.contactHint')}</p>
-              <Input label={t('matrimony.contactName')} error={err('contactName')} {...form.register('contactName')} />
-              <Input label={t('member.phone')} type="tel" inputMode="numeric" leadingIcon={Phone} error={err('contactPhone')} {...form.register('contactPhone')} />
-            </fieldset>
+            <Group title={t('matrimony.section.address')}>
+              {input('addressLine', t('matrimony.addressLine'))}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {input('village', t('matrimony.village'))}
+                {input('taluka', t('matrimony.taluka'))}
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {input('district', t('matrimony.district'))}
+                {input('pincode', t('matrimony.pincode'), { inputMode: 'numeric', maxLength: 6 })}
+              </div>
+            </Group>
+            <Group title={t('matrimony.contact')} hint={t('matrimony.contactHint')}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {input('contactName', t('matrimony.contactName'))}
+                {phone('contactPhone', t('matrimony.mobile'))}
+              </div>
+              {phone('candidateMobile', t('matrimony.candidateMobile'))}
+              {phone('parentWhatsapp', t('matrimony.parentWhatsapp'), t('matrimony.parentWhatsappHint'))}
+            </Group>
             {isCreate && (
               <div className="flex flex-col gap-1.5">
                 <label className="flex min-h-touch cursor-pointer items-start gap-3 rounded-sm bg-surface-muted p-3 text-sm text-fg">

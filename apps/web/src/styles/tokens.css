@@ -46,6 +46,12 @@
   --on-hero: #ffffff; /* 6.5:1 on hero-from */
   --on-hero-muted: #cfe6e1; /* 4.9:1 on hero-from; zari on hero is decoration only (2.3:1) */
 
+  /* Text over photos (matrimony cards): white on a dark shade that rises from the bottom. */
+  --on-photo: #ffffff;
+  --on-photo-muted: rgb(255 255 255 / 0.86);
+  --photo-shade: rgb(6 12 11 / 0.86);
+  --photo-shade-mid: rgb(6 12 11 / 0.35);
+
   /* Status */
   --success: #1d6f3a;
   --success-soft: #e2f0e6;

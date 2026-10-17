@@ -7,7 +7,7 @@
  * number below is invented.
  */
 import argon2 from 'argon2';
-import { type BranchKind, type FamilyStatus, type Gender, type GotraId, type LinkKind, NAKSHATRA_IDS, PRIVACY_NOTICE_VERSION, RASHI_IDS, type Relation, type Role } from '@samaj/shared';
+import { type BranchKind, type FamilyStatus, type Gender, type GotraId, GOTRA_IDS, type LinkKind, NAKSHATRA_IDS, PRIVACY_NOTICE_VERSION, RASHI_IDS, type Relation, type Role } from '@samaj/shared';
 import { Types } from 'mongoose';
 import { env } from '../config/env';
 import { connectDb, disconnectDb } from '../config/db';
@@ -26,6 +26,7 @@ import { EventModel } from '../models/event.model';
 import { RsvpModel } from '../models/rsvp.model';
 import { OfficeBearerModel } from '../models/office-bearer.model';
 import { ProfileModel } from '../models/profile.model';
+import { MelavaModel, MelavaRegistrationModel } from '../models/melava.model';
 import { ineligibility } from '../services/matrimony.service';
 
 if (env.NODE_ENV === 'production') {
@@ -417,6 +418,8 @@ async function main() {
       SessionModel,
       ProfileModel,
       InterestModel,
+      MelavaModel,
+      MelavaRegistrationModel,
       NoticeModel,
       EventModel,
       RsvpModel,
@@ -589,11 +592,80 @@ async function main() {
   }
 
   /** Biodata details and preferences, varied by index so search has something to rank. */
-  const seedBiodata = (person: { gender: string; birthYear?: number | null }, family: { place: string; branchAncestors: Types.ObjectId[]; branchId: Types.ObjectId }, i: number) => {
+  const seedBiodata = (
+    person: { name: string; gender: string; birthYear?: number | null; education?: string | null },
+    family: { place: string; gotra?: GotraId | null; address?: string | null; branchAncestors: Types.ObjectId[]; branchId: Types.ObjectId },
+    head: { name: string; phone?: string | null } | undefined,
+    district: string,
+    i: number,
+  ) => {
     const age = new Date().getFullYear() - (person.birthYear ?? 2000);
     const male = person.gender === 'male';
     const diet = (['vegetarian', 'vegetarian', 'eggetarian', 'nonVegetarian'] as const)[i % 4];
+    const [firstName = person.name, ...restOfName] = person.name.split(' ');
+    const surname = restOfName.at(-1) ?? '';
+    const headFirst = head?.name.split(' ')[0] ?? 'Parent';
+    const education = person.education ?? 'Graduate';
+    const educationLevel = /^(M\.|MBA|MS|MCA|M\.Sc)/i.test(education) ? 'master' : /diploma|D\.Ed|ITI/i.test(education) ? 'diploma' : /12th|10th|HSC|SSC/i.test(education) ? 'other' : 'bachelor';
+    // Any kul but the family's own, so the mama rule has something to work on.
+    const mamaKul = GOTRA_IDS.filter((g) => g !== family.gotra)[i % (GOTRA_IDS.length - 1)];
+    const mobile = (n: number) => `+9197${String(10000000 + i * 97 + n).padStart(8, '0')}`;
     return {
+      // Identity as on the samaj form.
+      surname,
+      firstName,
+      fatherName: headFirst,
+      hasDisability: false,
+      educationLevel: educationLevel as 'master' | 'bachelor' | 'diploma' | 'other',
+      employerType: (['private', 'government', 'selfEmployed'] as const)[i % 3],
+      employerName: i % 3 === 2 ? null : pick(['Tata Motors', 'Zilla Parishad', 'Infosys', 'State Bank of India', 'Bajaj Auto'], i),
+      designation: pick(['Engineer', 'Clerk', 'Manager', 'Teacher', 'Officer'], i),
+      monthlyIncome: [18_000, 32_000, 45_000, 65_000, 120_000, 12_000][i % 6],
+      incomeVisibility: (['accepted', 'everyone', 'accepted', 'hidden'] as const)[i % 4],
+      parentName: `${surname} ${headFirst}`,
+      parentWorkVillage: family.place,
+      mamaName: `${pick(['Patil', 'Chaudhari', 'Mahajan', 'Karale', 'Wagh'], i + 2)} ${pick(['Suresh', 'Ramesh', 'Dilip', 'Anil', 'Vasant'], i)}`,
+      mamaKul,
+      mamaVillage: pick(['Erandol', 'Parola', 'Chopda', 'Yawal', 'Raver'], i),
+      mamaNativeVillage: pick(['Erandol', 'Parola', 'Chopda', 'Yawal', 'Raver'], i + 1),
+      mamaNativeDistrict: district,
+      mamaMobile: mobile(3),
+      addressLine: family.address ?? `${10 + (i % 90)}, Samaj Colony`,
+      village: family.place,
+      taluka: family.place,
+      district,
+      pincode: String(425001 + (i % 400)),
+      candidateMobile: mobile(1),
+      parentWhatsapp: head?.phone ?? mobile(2),
+      nativeDistrict: district,
+      // Most families answer two prompts; some leave them for later.
+      prompts:
+        i % 3 === 2
+          ? []
+          : [
+              {
+                prompt: 'ourFamily' as const,
+                answer: pick(
+                  [
+                    'A close-knit family: grandparents, parents and two siblings under one roof in the village.',
+                    'We run a small oil mill (ghani) that my grandfather started. Everyone helps on festival days.',
+                    'Simple, devotional family. Wari every year, and a big Diwali with all the cousins.',
+                  ],
+                  i,
+                ),
+              },
+              {
+                prompt: (['perfectWeekend', 'iValue', 'proudOf'] as const)[i % 3],
+                answer: pick(
+                  [
+                    'A morning trek near Nashik, then misal pav and a long nap.',
+                    'Honesty, respect for elders, and keeping promises, big or small.',
+                    'Cleared my exams while helping with the family business.',
+                  ],
+                  i,
+                ),
+              },
+            ],
       maritalStatus: i % 9 === 8 ? ('divorced' as const) : ('neverMarried' as const),
       diet,
       birthDate: `${person.birthYear}-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 27) + 1).padStart(2, '0')}`,
@@ -602,9 +674,9 @@ async function main() {
       rashi: RASHI_IDS[i % RASHI_IDS.length],
       nakshatra: NAKSHATRA_IDS[(i * 5) % NAKSHATRA_IDS.length],
       workLocation: pick(['Pune', 'Mumbai', 'Jalgaon', 'Nashik', 'Aurangabad'], i),
-      fatherOccupation: pick(['Farmer', 'Oil mill owner', 'Retired teacher', 'Shopkeeper', 'Government service'], i),
+      parentOccupation: pick(['Farmer', 'Oil mill owner', 'Retired teacher', 'Shopkeeper', 'Government service'], i),
       motherOccupation: pick(['Homemaker', 'Teacher', 'Homemaker', 'Tailoring business'], i),
-      nativePlace: family.place,
+      nativeVillage: family.place,
       siblings: { brothers: i % 3, brothersMarried: i % 3 ? 1 : 0, sisters: (i + 1) % 3, sistersMarried: 0 },
       preferences: {
         // Grooms' families usually look a few years younger, brides' a few years older.
@@ -627,6 +699,8 @@ async function main() {
     const candidate = members.find((m) => !m.deceased && !members.some((x) => x.partnerId && String(x.partnerId) === String(m._id)) && ineligibility(m, hasSpouse) === null);
     if (!candidate?.birthYear) continue;
     const head = members.find((m) => m.isHead);
+    const districtBranch = await BranchModel.findById(family.branchAncestors[0] ?? family.branchId, { name: 1 }).lean();
+    const district = (districtBranch?.name ?? 'Jalgaon').replace(/ District$/, '');
     // Most go live; every fourth waits for the committee, so the review queue has something in it.
     const live = i % 4 !== 3;
     await ProfileModel.create({
@@ -634,10 +708,9 @@ async function main() {
       familyId: family._id,
       heightCm: candidate.gender === 'male' ? 165 + (i % 14) : 150 + (i % 12),
       education: candidate.education ?? 'Graduate',
-      occupation: candidate.occupation ?? null,
-      income: (['3to6', '6to10', '10to20', null, 'above20', 'below3'] as const)[i % 6],
+      occupation: candidate.occupation ?? pick(['Engineer', 'Teacher', 'Accountant', 'Business', 'Nurse'], i),
       manglik: (['no', 'dontKnow', 'no', 'yes'] as const)[i % 4],
-      ...seedBiodata(candidate, family, i),
+      ...seedBiodata(candidate, family, head, district, i),
       about: pick(
         [
           'Close-knit family. Enjoys reading and travel, and helps with the family business on weekends.',
@@ -660,6 +733,39 @@ async function main() {
       branchAncestors: family.branchAncestors,
     });
     profileCount++;
+  }
+
+  // A melava run by the district committee: some families registered, a few already numbered.
+  const districtCommittee = await UserModel.findOne({ role: 'committee' }).orFail().lean();
+  const melavaDistrict = await BranchModel.findOne({ name: 'Jalgaon District' }).orFail().lean();
+  const melava = await MelavaModel.create({
+    name: 'Jalgaon Jilha Teli Samaj Vadhu-Var Palak Parichay Melava',
+    date: `${new Date().getFullYear()}-12-25`,
+    venue: 'Santaji Bhavan, Jalgaon',
+    branchId: melavaDistrict._id,
+    branchAncestors: melavaDistrict.ancestors,
+    fee: 500,
+    paymentInstructions: 'UPI: telisamaj.jalgaon@upi\nOr pay at the samaj office, Santaji Bhavan, 10 am to 6 pm.',
+    createdByUserId: districtCommittee._id,
+  });
+  const forMelava = await ProfileModel.find({ status: 'active' }).sort({ activatedAt: -1 }).limit(12).lean();
+  for (const [i, p] of forMelava.entries()) {
+    const type = p.gender === 'female' ? 'bride' : 'groom';
+    // The first eight have paid; the office has checked them and handed out numbers.
+    const verified = i < 8;
+    const number = verified ? await MelavaModel.findByIdAndUpdate(melava._id, { $inc: { [`counters.${type}`]: 1 } }, { returnDocument: 'after' }).lean() : null;
+    await MelavaRegistrationModel.create({
+      melavaId: melava._id,
+      profileId: p._id,
+      familyId: p.familyId,
+      candidateType: type,
+      status: verified ? 'verified' : 'pendingPayment',
+      candidateNumber: number?.counters?.[type] ?? null,
+      paymentRef: `UPI${String(412300 + i * 37)}`,
+      registeredByUserId: admin._id,
+      verifiedByUserId: verified ? districtCommittee._id : null,
+      verifiedAt: verified ? new Date() : null,
+    });
   }
 
   // Notices from the committees, so every district's Community feed has something.

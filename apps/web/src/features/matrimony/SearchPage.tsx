@@ -1,5 +1,5 @@
-import { DIETS, type Diet, MARITAL_STATUSES, type MaritalStatus, SEARCH_SORTS, type SearchSort, gotraName } from '@samaj/shared';
-import { Clock, HeartHandshake, Info, SearchX, X } from '@/components/ui/icons';
+import { DIETS, type Diet, MARITAL_STATUSES, type MaritalStatus, SEARCH_SORTS, SEARCH_VIEWS, type SearchSort, type SearchView, gotraName } from '@samaj/shared';
+import { Cards, Clock, Grid, HeartHandshake, Info, SearchX, SlidersHorizontal, Star, X } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { type ActiveFilter, Button, Chip, ChipRow, EmptyState, ErrorState, Icon, ListToolbar, LoadMore, Select, Skeleton, buttonVariants } from '@/components/ui';
@@ -7,10 +7,18 @@ import { BranchSelect, useBranchLabel } from '@/features/branches/BranchSelect';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatTotal, useLanguageStore, useT } from '@/i18n';
 import { type SearchFilters, formatHeight, useMyMatrimony, useProfile, useProfileSearch } from './api';
-import { ProfileCardSkeleton, ProfileCardView } from './ProfileCardView';
+import { DiscoverDeck } from './DiscoverDeck';
+import { PROFILE_GRID, ProfileCardSkeleton, ProfileCardView } from './ProfileCardView';
+import { cn } from '@/lib/cn';
 
 const AGES = Array.from({ length: 43 }, (_, i) => 18 + i);
 const HEIGHTS = Array.from({ length: 13 }, (_, i) => 145 + i * 5);
+
+const VIEWS = [
+  { id: 'all', label: 'matrimony.view.all', icon: Grid },
+  { id: 'discover', label: 'matrimony.view.discover', icon: Cards },
+  { id: 'shortlist', label: 'matrimony.view.shortlist', icon: Star },
+] as const;
 
 const oneOf = <T extends string>(values: readonly T[], value: string | null): T | '' => ((values as readonly string[]).includes(value ?? '') ? (value as T) : '');
 
@@ -25,10 +33,13 @@ export function SearchPage() {
   const forProfile = live.some((p) => p.id === params.get('for')) ? (params.get('for') ?? '') : (live[0]?.id ?? '');
   const own = live.find((p) => p.id === forProfile);
   const [education, setEducation] = useState(params.get('edu') ?? '');
+  // Height, marital status and diet wait behind "More filters", unless one is already in use.
+  const [moreFilters, setMoreFilters] = useState(Boolean(params.get('height') || params.get('marital') || params.get('diet')));
   const debouncedEducation = useDebouncedValue(education.trim());
 
   const filters: SearchFilters = {
     forProfile,
+    view: oneOf<SearchView>(SEARCH_VIEWS, params.get('view')) || 'all',
     sort: oneOf<SearchSort>(SEARCH_SORTS, params.get('sort')) || 'match',
     ageMin: params.get('ageMin') ?? '',
     ageMax: params.get('ageMax') ?? '',
@@ -123,7 +134,7 @@ export function SearchPage() {
   let body;
   if (results.isPending) {
     body = (
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4" aria-busy="true" aria-label={t('common.loading')}>
+      <ul className={PROFILE_GRID} aria-busy="true" aria-label={t('common.loading')}>
         {[0, 1, 2, 3].map((i) => (
           <ProfileCardSkeleton key={i} />
         ))}
@@ -131,6 +142,8 @@ export function SearchPage() {
     );
   } else if (results.isError && items.length === 0) {
     body = <ErrorState title={t('matrimony.search.error')} error={results.error} onRetry={() => results.refetch()} retrying={results.isFetching} />;
+  } else if (items.length === 0 && filters.view === 'shortlist') {
+    body = <EmptyState icon={Star} title={t('matrimony.shortlist.emptyTitle')} body={t('matrimony.shortlist.emptyBody')} />;
   } else if (items.length === 0) {
     body = filtered ? (
       <EmptyState
@@ -149,9 +162,9 @@ export function SearchPage() {
   } else {
     body = (
       <div className="flex flex-col gap-4">
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4" aria-busy={results.isPlaceholderData || undefined}>
+        <ul className={PROFILE_GRID} aria-busy={results.isPlaceholderData || undefined}>
           {items.map((p) => (
-            <ProfileCardView key={p.id} profile={p} href={`/matrimony/profiles/${p.id}?from=${forProfile}`} />
+            <ProfileCardView key={p.id} profile={p} href={`/matrimony/profiles/${p.id}?from=${forProfile}`} markFrom={forProfile} />
           ))}
         </ul>
         <LoadMore {...results} label={t('matrimony.search.more')} />
@@ -170,17 +183,41 @@ export function SearchPage() {
           ))}
         </Select>
       ) : (
-        <p className="text-sm text-fg-muted">{t('matrimony.search.forOne', { name: own.name })}</p>
+        <p className="text-sm text-fg-muted">
+          {own.gotra ? t('matrimony.search.forOneKul', { name: own.name, kul: gotraName(own.gotra, language) ?? '' }) : t('matrimony.search.forOne', { name: own.name })}
+        </p>
       )}
-      {own.gotra && <p className="text-sm text-fg-muted">{t('matrimony.search.gotraRule', { gotra: gotraName(own.gotra, language) ?? '' })}</p>}
+      {live.length > 1 && own.gotra && <p className="text-sm text-fg-muted">{t('matrimony.search.gotraRule', { gotra: gotraName(own.gotra, language) ?? '' })}</p>}
 
-      <ChipRow label={t('matrimony.search.sort')}>
-        {SEARCH_SORTS.map((sort) => (
-          <Chip key={sort} selected={filters.sort === sort} onClick={() => set('sort', sort === 'match' ? '' : sort)}>
-            {t(`matrimony.search.sort.${sort}`)}
-          </Chip>
+      {/* Browse the grid, discover one at a time, or look again at the shortlist. */}
+      <div role="tablist" aria-label={t('matrimony.view.label')} className="flex self-start rounded-full border border-line bg-surface p-1 shadow-card">
+        {VIEWS.map((v) => (
+          <button
+            key={v.id}
+            type="button"
+            role="tab"
+            aria-selected={filters.view === v.id}
+            onClick={() => set('view', v.id === 'all' ? '' : v.id)}
+            className={cn(
+              'inline-flex min-h-10 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-colors duration-150',
+              filters.view === v.id ? 'bg-primary text-on-primary' : 'text-fg-muted hover:text-fg',
+            )}
+          >
+            <Icon icon={v.icon} size="sm" />
+            {t(v.label)}
+          </button>
         ))}
-      </ChipRow>
+      </div>
+
+      {filters.view !== 'discover' && (
+        <ChipRow label={t('matrimony.search.sort')}>
+          {SEARCH_SORTS.map((sort) => (
+            <Chip key={sort} selected={filters.sort === sort} onClick={() => set('sort', sort === 'match' ? '' : sort)}>
+              {t(`matrimony.search.sort.${sort}`)}
+            </Chip>
+          ))}
+        </ChipRow>
+      )}
       {filters.sort === 'match' && ownDetail.isSuccess && !hasPrefs && (
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-muted">
           <Icon icon={Info} size="sm" />
@@ -226,6 +263,19 @@ export function SearchPage() {
                 </option>
               ))}
             </Select>
+            <BranchSelect
+              label={t('directory.filterBranch')}
+              allLabel={t('directory.allBranches')}
+              value={filters.branchId}
+              onChange={(v) => set('branch', v)}
+            />
+            {!moreFilters && (
+              <Button variant="ghost" leadingIcon={SlidersHorizontal} onClick={() => setMoreFilters(true)}>
+                {t('matrimony.search.moreFilters')}
+              </Button>
+            )}
+            {moreFilters && (
+            <>
             <Select label={t('matrimony.search.heightMin')} hideLabel value={filters.heightMin} onChange={(e) => set('height', e.target.value)} fieldClassName="md:w-36">
               <option value="">{t('matrimony.height')}</option>
               {HEIGHTS.map((cm) => (
@@ -250,16 +300,13 @@ export function SearchPage() {
                 </option>
               ))}
             </Select>
-            <BranchSelect
-              label={t('directory.filterBranch')}
-              allLabel={t('directory.allBranches')}
-              value={filters.branchId}
-              onChange={(v) => set('branch', v)}
-            />
+            </>
+            )}
+
           </>
         }
       />
-      {body}
+      {filters.view === 'discover' ? <DiscoverDeck filters={filters} /> : body}
     </div>
   );
 }

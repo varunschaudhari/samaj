@@ -7,7 +7,7 @@ import { canBrowseDirectory, canViewProfile } from './access';
 import { toCards } from './matrimony.service';
 import { notVerified } from './member.service';
 import type { Viewer } from './viewer';
-import { gotrasOf } from './matrimony.service';
+import { kulClash } from './matrimony.service';
 
 const refuse = (status: number, message: string, key: string) =>
   new AppError(status, status === 409 ? 'CONFLICT' : 'FORBIDDEN', message, [{ path: 'interest', message: key }] satisfies FieldIssue[]);
@@ -21,8 +21,10 @@ export async function sendInterest(viewer: Viewer, fromProfileId: string, toProf
   if (from.status !== 'active' || to.status !== 'active') throw refuse(409, 'Both profiles need to be live.', 'validation.interestNotActive');
   if (String(from.familyId) === String(to.familyId)) throw refuse(403, 'Both profiles are in the same family.', 'validation.interestSameFamily');
   if (from.gender === to.gender) throw refuse(403, 'Interest is only for the opposite gender.', 'validation.interestGender');
-  // Same rule as search: the API refuses same-gotra matches even if someone crafts the request.
-  if (gotrasOf(from).some((g) => gotrasOf(to).includes(g))) throw refuse(403, 'Both families have the same gotra.', 'validation.interestSameGotra');
+  // Same rules as search: the API refuses kul clashes even if someone crafts the request.
+  const clash = kulClash(from, to);
+  if (clash === 'same') throw refuse(403, 'Both families have the same gotra.', 'validation.interestSameGotra');
+  if (clash === 'mama') throw refuse(403, 'One family’s kul is the other’s maternal uncle’s kul.', 'validation.mamaKulClash');
 
   const reverse = await InterestModel.findOne({ fromProfileId: to._id, toProfileId: from._id, status: { $in: ['pending', 'accepted'] } }).lean();
   if (reverse) throw refuse(409, 'They already sent you interest. Answer it in Interests.', 'validation.interestReverse');

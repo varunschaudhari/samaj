@@ -119,6 +119,8 @@ export const router = createBrowserRouter([
               { path: 'interests', lazy: page(async () => (await import('@/features/matrimony/InterestsPage')).InterestsPage) },
               { path: 'profiles', lazy: page(async () => (await import('@/features/matrimony/MyProfilesPage')).MyProfilesPage) },
               { path: 'profiles/:id', lazy: page(async () => (await import('@/features/matrimony/ProfileDetailPage')).ProfileDetailPage) },
+              { path: 'melavas', lazy: page(async () => (await import('@/features/melava/MelavasPage')).MelavasPage) },
+              { path: 'melavas/:id', lazy: page(async () => (await import('@/features/melava/MelavaDetailPage')).MelavaDetailPage) },
             ],
           },
           { path: '/review', lazy: guarded('member:verify', async () => (await import('@/features/review/ReviewPage')).ReviewPage) },

@@ -2,14 +2,18 @@ import type {
   Diet,
   InterestItem,
   Language,
+  MarkInput,
+  MarkKind,
   MaritalStatus,
   SearchSort,
+  SearchView,
   MyMatrimony,
   ProfileCard,
   ProfileCreateInput,
   ProfileDetail,
   ProfileFieldsInput,
   ProfilePage,
+  ProfilePrefill,
 } from '@samaj/shared';
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -34,8 +38,19 @@ export function useProfile(id: string | undefined) {
   });
 }
 
+/** What the family page already says about someone, to start their profile with. */
+export function usePrefill(memberId: string | undefined) {
+  return useQuery({
+    queryKey: ['matrimony', 'prefill', memberId ?? ''],
+    queryFn: async ({ signal }) => (await api.get<{ prefill: ProfilePrefill }>(`/matrimony/prefill/${memberId}`, undefined, signal)).prefill,
+    enabled: Boolean(memberId),
+    staleTime: 60_000,
+  });
+}
+
 export interface SearchFilters {
   forProfile: string;
+  view: SearchView;
   sort: SearchSort;
   ageMin: string;
   ageMax: string;
@@ -94,7 +109,8 @@ export function useUpdateProfile(id: string) {
   return useMatrimonyMutation(async (input: ProfileFieldsInput) => (await api.put<{ profile: ProfileDetail }>(`/matrimony/profiles/${id}`, input)).profile);
 }
 
-type Action = 'pause' | 'resume' | 'resubmit' | 'approve';
+/** submit: a complete draft goes to the committee. */
+type Action = 'submit' | 'pause' | 'resume' | 'resubmit' | 'approve';
 type ReasonAction = 'close' | 'reject' | 'remove';
 
 /** Status changes on a profile. close takes { reason: 'married' | 'withdrawn' }; reject and remove take a note. */
@@ -133,6 +149,11 @@ export function useProfilePhotos(id: string) {
     store,
   );
   return { add, makeMain, remove };
+}
+
+/** Shortlist or pass on a profile (kind null clears it). Search and the profile page both change. */
+export function useSetMark() {
+  return useMatrimonyMutation(async (input: MarkInput) => api.put<{ kind: MarkKind | null }>('/matrimony/marks', input));
 }
 
 export function useSendInterest() {

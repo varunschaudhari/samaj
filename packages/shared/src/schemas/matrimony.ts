@@ -25,15 +25,50 @@ export const ELIGIBLE_RELATIONS = ['son', 'daughter', 'brother', 'sister', 'neph
 /** Legal minimum marriage age in India. */
 export const MIN_MARRIAGE_AGE: Record<Gender, number> = { male: 21, female: 18, other: 18 };
 
-export const PROFILE_STATUSES = ['pending', 'active', 'rejected', 'paused', 'closed'] as const;
+/** 'draft': saved by the family but not yet sent to the committee (details may still be missing). */
+export const PROFILE_STATUSES = ['draft', 'pending', 'active', 'rejected', 'paused', 'closed'] as const;
 export type ProfileStatus = (typeof PROFILE_STATUSES)[number];
 
 /** Why a profile was closed: the family found a match, withdrew it, or the committee removed it. */
 export const CLOSE_REASONS = ['married', 'withdrawn', 'removed'] as const;
 export type CloseReason = (typeof CLOSE_REASONS)[number];
 
-export const INCOME_RANGES = ['below3', '3to6', '6to10', '10to20', 'above20'] as const;
-export type IncomeRange = (typeof INCOME_RANGES)[number];
+/** Monthly income is stored exactly; other families only ever see one of these bands. */
+export const INCOME_BANDS = ['below15', '15to25', '25to50', '50to100', 'above100'] as const;
+export type IncomeBand = (typeof INCOME_BANDS)[number];
+
+export function incomeBandOf(monthly: number): IncomeBand {
+  if (monthly < 15_000) return 'below15';
+  if (monthly < 25_000) return '15to25';
+  if (monthly < 50_000) return '25to50';
+  if (monthly < 100_000) return '50to100';
+  return 'above100';
+}
+
+/** Who sees the income band: anyone who can see the profile, only a family whose interest was accepted, or nobody. */
+export const INCOME_VISIBILITY = ['everyone', 'accepted', 'hidden'] as const;
+export type IncomeVisibility = (typeof INCOME_VISIBILITY)[number];
+
+/** The time-of-birth bands on the samaj form. The exact time is optional, for kundli matching. */
+export const BIRTH_TIMES_OF_DAY = ['pahate', 'sakal', 'dupar', 'sandhya', 'ratra'] as const;
+export type BirthTimeOfDay = (typeof BIRTH_TIMES_OF_DAY)[number];
+
+/** The band an exact time falls in: pahate 3–6, sakal 6–12, dupar 12–4, sandhya 4–8, ratra 8–3. */
+export function timeOfDayOf(hhmm: string): BirthTimeOfDay {
+  const hour = Number(hhmm.slice(0, 2));
+  if (hour >= 3 && hour < 6) return 'pahate';
+  if (hour >= 6 && hour < 12) return 'sakal';
+  if (hour >= 12 && hour < 16) return 'dupar';
+  if (hour >= 16 && hour < 20) return 'sandhya';
+  return 'ratra';
+}
+
+/** Main education. 'other' covers anyone without a diploma or degree (12th pass, for example). */
+export const EDUCATION_LEVELS = ['master', 'bachelor', 'diploma', 'other'] as const;
+export type EducationLevel = (typeof EDUCATION_LEVELS)[number];
+
+export const EMPLOYER_TYPES = ['private', 'government', 'selfEmployed'] as const;
+export type EmployerType = (typeof EMPLOYER_TYPES)[number];
 
 export const MANGLIK = ['yes', 'no', 'dontKnow'] as const;
 export type Manglik = (typeof MANGLIK)[number];
@@ -43,6 +78,18 @@ export type MaritalStatus = (typeof MARITAL_STATUSES)[number];
 
 export const DIETS = ['vegetarian', 'eggetarian', 'nonVegetarian'] as const;
 export type Diet = (typeof DIETS)[number];
+
+/**
+ * Short prompts a family can answer, shown as cards between the photos. The
+ * question text lives in the web dictionary; the database stores the id.
+ */
+export const PROMPT_IDS = ['ourFamily', 'perfectWeekend', 'iValue', 'proudOf', 'afterMarriage', 'favouriteThings'] as const;
+export type PromptId = (typeof PROMPT_IDS)[number];
+export const MAX_PROMPTS = 3;
+
+/** A family's private note on another profile: saved for later, or not for us. The other family never sees it. */
+export const MARK_KINDS = ['shortlist', 'pass'] as const;
+export type MarkKind = (typeof MARK_KINDS)[number];
 
 /** Photos a profile may have besides the person's family photo. */
 export const MAX_PROFILE_PHOTOS = 4;
@@ -73,6 +120,24 @@ const heightSchema = z
   .nullish()
   .transform((v) => (v === null || v === undefined || String(v).trim() === '' ? null : Number(v)))
   .pipe(z.number({ error: 'validation.height' }).int('validation.height').min(120, 'validation.height').max(220, 'validation.height').nullable());
+
+const optionalPhone = z
+  .string()
+  .nullish()
+  .transform((v) => (typeof v === 'string' ? v.trim() : '') || null)
+  .pipe(phoneSchema.nullable());
+
+const pincodeSchema = z
+  .string()
+  .nullish()
+  .transform((v) => (typeof v === 'string' ? v.replace(/\s/g, '') : '') || null)
+  .pipe(z.string().regex(/^[1-9]\d{5}$/, 'validation.pincode').nullable());
+
+const monthlyIncomeSchema = z
+  .union([z.string(), z.number()])
+  .nullish()
+  .transform((v) => (v === null || v === undefined || String(v).trim() === '' ? null : Number(String(v).replace(/[,\s₹]/g, ''))))
+  .pipe(z.number({ error: 'validation.income' }).int('validation.income').min(0, 'validation.income').max(10_000_000, 'validation.income').nullable());
 
 /** A count typed into a form: blank is "not given". */
 const optionalCount = (max: number) =>
@@ -157,44 +222,142 @@ export type Preferences = z.output<typeof preferencesSchema>;
 export const EMPTY_SIBLINGS: Siblings = { brothers: null, brothersMarried: null, sisters: null, sistersMarried: null };
 export const EMPTY_PREFERENCES: Preferences = { ageMin: null, ageMax: null, heightMinCm: null, maritalStatuses: [], diets: [], branchIds: [] };
 
-/** The fields a family writes. Name, gender and birth year come from the family member record. */
+/**
+ * The fields a family writes, following the samaj's vadhu-var form. Gender
+ * and birth year come from the family member record, and kul (gotra) from
+ * the family. Everything may be left blank in a draft; profileMissingFields
+ * says what must be filled before the committee sees it.
+ */
 export const profileFieldsSchema = z.object({
+  // Identity, as written on the form: surname, given name, father's name
+  surname: optionalText(40),
+  firstName: optionalText(40),
+  fatherName: optionalText(40),
   // Personal
   heightCm: heightSchema,
   maritalStatus: optionalEnum(MARITAL_STATUSES),
   diet: optionalEnum(DIETS),
+  hasDisability: z.boolean().nullish().transform((v) => v ?? false),
+  disabilityDetail: optionalText(200),
   // Birth and horoscope
   birthDate: birthDateSchema,
+  birthTimeOfDay: optionalEnum(BIRTH_TIMES_OF_DAY),
   birthTime: birthTimeSchema,
   birthPlace: optionalText(80),
   rashi: optionalEnum(RASHI_IDS),
   nakshatra: optionalEnum(NAKSHATRA_IDS),
   manglik: optionalEnum(MANGLIK),
-  maternalGotra: optionalEnum(GOTRA_IDS),
   // Education and work
+  educationLevel: optionalEnum(EDUCATION_LEVELS),
+  /** The degree itself: B.E. Mechanical. */
   education: optionalText(120),
+  otherEducation: optionalText(120),
   occupation: optionalText(120),
+  employerType: optionalEnum(EMPLOYER_TYPES),
+  employerName: optionalText(120),
+  employerAddress: optionalText(200),
+  designation: optionalText(80),
   workLocation: optionalText(80),
-  income: optionalEnum(INCOME_RANGES),
-  // Family
-  fatherOccupation: optionalText(80),
+  monthlyIncome: monthlyIncomeSchema,
+  incomeVisibility: z.enum(INCOME_VISIBILITY, { error: 'validation.choose' }).nullish().transform((v) => v ?? 'accepted'),
+  // Parent (the guardian filling the form) and family
+  parentName: optionalText(80),
+  parentOccupation: optionalText(80),
+  parentWorkVillage: optionalText(80),
   motherOccupation: optionalText(80),
-  nativePlace: optionalText(80),
+  nativeVillage: optionalText(80),
+  nativeDistrict: optionalText(60),
   siblings: siblingsSchema.nullish().transform((v) => v ?? EMPTY_SIBLINGS),
+  // Maternal uncle (mama). His kul matters for matching, not just courtesy.
+  mamaName: optionalText(80),
+  mamaKul: optionalEnum(GOTRA_IDS),
+  mamaVillage: optionalText(80),
+  mamaNativeVillage: optionalText(80),
+  mamaNativeDistrict: optionalText(60),
+  mamaMobile: optionalPhone,
+  // Residential address
+  addressLine: optionalText(200),
+  village: optionalText(80),
+  taluka: optionalText(60),
+  district: optionalText(60),
+  pincode: pincodeSchema,
   // In their words
   about: optionalText(600),
   expectations: optionalText(600),
+  /** Up to three prompt answers, each prompt once. */
+  prompts: z
+    .array(z.object({ prompt: z.enum(PROMPT_IDS, { error: 'validation.choose' }), answer: z.string().trim().min(3, 'validation.promptAnswer').max(200, 'validation.tooLong') }))
+    .max(MAX_PROMPTS, 'validation.promptLimit')
+    .nullish()
+    .transform((v) => (v ?? []).filter((item, i, all) => all.findIndex((x) => x.prompt === item.prompt) === i)),
   preferences: preferencesSchema.nullish().transform((v) => v ?? EMPTY_PREFERENCES),
-  // Contact
+  // Contact: the family's mobile, the candidate's own, and the parent's WhatsApp the samaj writes to
   contactName: personNameSchema,
   contactPhone: phoneSchema,
+  candidateMobile: optionalPhone,
+  parentWhatsapp: optionalPhone,
 });
 export type ProfileFieldsInput = z.input<typeof profileFieldsSchema>;
+export type ProfileFields = z.output<typeof profileFieldsSchema>;
 
 export const profileCreateSchema = profileFieldsSchema.extend({
   memberId: objectIdSchema,
   consent: z.literal(true, { error: 'validation.consent' }),
+  /** Send to the committee straight away (every required field filled), or keep as a draft. */
+  submit: z.boolean().nullish().transform((v) => v ?? false),
 });
+
+/**
+ * The form's required fields, in form order. A profile can be saved without
+ * them, but can't go to the committee or a melava until they are filled.
+ */
+export const REQUIRED_FOR_REVIEW = [
+  'surname',
+  'firstName',
+  'fatherName',
+  'heightCm',
+  'maritalStatus',
+  'manglik',
+  'birthDate',
+  'birthTimeOfDay',
+  'birthPlace',
+  'educationLevel',
+  'education',
+  'occupation',
+  'employerType',
+  'monthlyIncome',
+  'parentName',
+  'nativeVillage',
+  'nativeDistrict',
+  'mamaName',
+  'mamaKul',
+  'addressLine',
+  'village',
+  'taluka',
+  'district',
+  'pincode',
+  'candidateMobile',
+  'parentWhatsapp',
+] as const satisfies readonly (keyof ProfileFields)[];
+
+/** A field that is missing, or 'gotra' when the family page has no kul yet, or 'disabilityDetail' when ticked but not described. */
+export type MissingField = (typeof REQUIRED_FOR_REVIEW)[number] | 'gotra' | 'disabilityDetail';
+
+/** What still has to be filled before the profile can be sent for approval or registered for a melava. */
+export function profileMissingFields(
+  p: Partial<Record<(typeof REQUIRED_FOR_REVIEW)[number], unknown>> & { birthTime?: string | null; hasDisability?: boolean | null; disabilityDetail?: string | null },
+  familyGotra: string | null,
+): MissingField[] {
+  const blank = (v: unknown) => v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
+  const missing: MissingField[] = REQUIRED_FOR_REVIEW.filter((key) => {
+    // An exact time is as good as a band.
+    if (key === 'birthTimeOfDay') return blank(p.birthTimeOfDay) && blank(p.birthTime);
+    return blank(p[key]);
+  });
+  if (p.hasDisability && blank(p.disabilityDetail)) missing.push('disabilityDetail');
+  if (!familyGotra) missing.unshift('gotra');
+  return missing;
+}
 export type ProfileCreateInput = z.input<typeof profileCreateSchema>;
 
 export const closeProfileSchema = z.object({ reason: z.enum(['married', 'withdrawn'], { error: 'validation.choose' }) });
@@ -206,8 +369,17 @@ export const moderationReasonSchema = z.object({
 export const SEARCH_SORTS = ['match', 'newest'] as const;
 export type SearchSort = (typeof SEARCH_SORTS)[number];
 
+/**
+ * all: every eligible profile, minus the ones the family passed on.
+ * discover: only profiles the family hasn't marked or sent interest to, best matches first.
+ * shortlist: the family's shortlist.
+ */
+export const SEARCH_VIEWS = ['all', 'discover', 'shortlist'] as const;
+export type SearchView = (typeof SEARCH_VIEWS)[number];
+
 export const profileSearchSchema = z.object({
   forProfile: objectIdSchema,
+  view: z.enum(SEARCH_VIEWS).default('all'),
   /** Best matches for the family's preferences first, or the newest profiles first. */
   sort: z.enum(SEARCH_SORTS).default('match'),
   ageMin: z.coerce.number().int().min(18).max(80).optional(),
@@ -223,6 +395,43 @@ export const profileSearchSchema = z.object({
 export type ProfileSearchQuery = z.input<typeof profileSearchSchema>;
 
 export const sendInterestSchema = z.object({ fromProfileId: objectIdSchema, toProfileId: objectIdSchema });
+
+/** Shortlist or pass on a profile, for one of the family's own profiles; null clears it. */
+export const markSchema = z.object({
+  fromProfileId: objectIdSchema,
+  profileId: objectIdSchema,
+  kind: z.enum(MARK_KINDS).nullable(),
+});
+export type MarkInput = z.input<typeof markSchema>;
+
+/**
+ * What the family page already says about someone, to start their profile
+ * with: names, parents, siblings, places and phones. Every field is only a
+ * suggestion; the form fills the empty ones.
+ */
+export type ProfilePrefill = Partial<{
+  surname: string;
+  firstName: string;
+  fatherName: string;
+  education: string;
+  occupation: string;
+  parentName: string;
+  parentOccupation: string;
+  parentWorkVillage: string;
+  motherOccupation: string;
+  nativeVillage: string;
+  nativeDistrict: string;
+  mamaKul: GotraId;
+  mamaVillage: string;
+  addressLine: string;
+  village: string;
+  district: string;
+  contactName: string;
+  contactPhone: string;
+  candidateMobile: string;
+  parentWhatsapp: string;
+  siblings: { brothers: number; brothersMarried: number; sisters: number; sistersMarried: number };
+}>;
 
 /** A profile as it appears in search results and lists. */
 export interface ProfileCard {
@@ -244,6 +453,8 @@ export interface ProfileCard {
   status: ProfileStatus;
   /** In search results: how many of the searching family's preferences this profile meets. */
   match?: { met: number; total: number };
+  /** In search results: the searching family's own mark on it. */
+  mark?: MarkKind | null;
 }
 
 export interface ProfilePreferences extends Omit<Preferences, 'branchIds'> {
@@ -256,29 +467,64 @@ export interface ProfilePhoto {
 }
 
 export interface ProfileDetail extends ProfileCard {
+  surname: string | null;
+  firstName: string | null;
+  fatherName: string | null;
   diet: Diet | null;
+  hasDisability: boolean;
+  disabilityDetail: string | null;
   birthDate: string | null;
+  birthTimeOfDay: BirthTimeOfDay | null;
   birthTime: string | null;
   birthPlace: string | null;
   rashi: RashiId | null;
   nakshatra: NakshatraId | null;
   manglik: Manglik | null;
-  maternalGotra: GotraId | null;
+  educationLevel: EducationLevel | null;
+  otherEducation: string | null;
+  employerType: EmployerType | null;
+  employerName: string | null;
+  designation: string | null;
   workLocation: string | null;
-  income: IncomeRange | null;
-  fatherOccupation: string | null;
+  /** The exact amount: only for the family itself and the committee. */
+  monthlyIncome?: number | null;
+  /** The band, when the family's visibility choice lets this viewer see it. */
+  incomeBand: IncomeBand | null;
+  incomeVisibility: IncomeVisibility;
+  parentName: string | null;
+  parentOccupation: string | null;
+  parentWorkVillage: string | null;
   motherOccupation: string | null;
-  nativePlace: string | null;
+  nativeVillage: string | null;
+  nativeDistrict: string | null;
+  mamaName: string | null;
+  mamaKul: GotraId | null;
+  mamaVillage: string | null;
+  mamaNativeVillage: string | null;
+  mamaNativeDistrict: string | null;
   siblings: Siblings;
   about: string | null;
   expectations: string | null;
+  prompts: { prompt: PromptId; answer: string }[];
+  /** The viewer family's marks on this profile, one per own profile that made one. */
+  marks: { fromProfileId: string; kind: MarkKind }[];
   preferences: ProfilePreferences;
   /** Profile photos, in order. The first is the main one. */
   photos: ProfilePhoto[];
   /** The person's photo from the family page, used when the profile has none of its own. */
   familyPhotoUrl: string | null;
-  /** Present only to the profile's own family and after an accepted interest. */
-  contact?: { name: string; phone: string };
+  /** Present only to the profile's own family, the committee, and after an accepted interest. */
+  contact?: {
+    name: string;
+    phone: string;
+    candidateMobile: string | null;
+    parentWhatsapp: string | null;
+    mamaMobile: string | null;
+    employerAddress: string | null;
+    address: { line: string | null; village: string | null; taluka: string | null; district: string | null; pincode: string | null };
+  };
+  /** For the family and the committee: what still has to be filled before approval. */
+  missing?: MissingField[];
   closeReason: CloseReason | null;
   /** The committee's note when rejecting or removing. Shown to the family and reviewers only. */
   moderationNote?: string | null;

@@ -145,3 +145,40 @@ export async function createFamily(branchId: string, fixture: FamilyFixture = {}
   }
   return { familyId: String(family._id), memberIds: members.map((m) => String(m._id)), cookie };
 }
+
+/**
+ * Every field the samaj form requires, so a test profile can go to the
+ * committee. The birth date only has to fall in the person's birth year.
+ */
+export const completeProfile = (birthYear: number, overrides: Record<string, unknown> = {}) => ({
+  surname: 'Wagh',
+  firstName: 'Test',
+  fatherName: 'Parent',
+  heightCm: '170',
+  maritalStatus: 'neverMarried',
+  manglik: 'no',
+  birthDate: `${birthYear}-06-15`,
+  birthTimeOfDay: 'sakal',
+  birthPlace: 'Jalgaon',
+  educationLevel: 'bachelor',
+  education: 'B.E. Computer',
+  occupation: 'Engineer',
+  employerType: 'private',
+  monthlyIncome: '45000',
+  parentName: 'Wagh Parent',
+  nativeVillage: 'Amalner',
+  nativeDistrict: 'Jalgaon',
+  mamaName: 'Patil Suresh',
+  mamaKul: 'shandilya',
+  addressLine: '12, Samaj Colony',
+  village: 'Amalner',
+  taluka: 'Amalner',
+  district: 'Jalgaon',
+  pincode: '425401',
+  contactName: 'Parent Name',
+  contactPhone: '98220 11111',
+  candidateMobile: '98220 22222',
+  parentWhatsapp: '98220 11111',
+  submit: true,
+  ...overrides,
+});

@@ -5,7 +5,7 @@ import { Button, Card, EmptyState, ErrorState, Icon, buttonVariants } from '@/co
 import { useMe } from '@/features/auth/api';
 import { useT } from '@/i18n';
 import { useMyMatrimony } from './api';
-import { ProfileCardSkeleton, ProfileCardView } from './ProfileCardView';
+import { PROFILE_GRID, ProfileCardSkeleton, ProfileCardView } from './ProfileCardView';
 import { type ProfileFormTarget, ProfileFormModal } from './ProfileFormModal';
 
 export function MyProfilesPage() {
@@ -16,7 +16,7 @@ export function MyProfilesPage() {
 
   if (mine.isPending) {
     return (
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4" aria-busy="true">
+      <ul className={PROFILE_GRID} aria-busy="true">
         {[0, 1].map((i) => (
           <ProfileCardSkeleton key={i} />
         ))}
@@ -48,7 +48,7 @@ export function MyProfilesPage() {
           }
         />
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        <ul className={PROFILE_GRID}>
           {profiles.map((p) => (
             <ProfileCardView key={p.id} profile={p} href={`/matrimony/profiles/${p.id}`} showStatus />
           ))}
