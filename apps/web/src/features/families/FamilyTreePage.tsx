@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Avatar, Badge, Button, Card, Chip, EmptyState, ErrorState, Icon, IconButton, Skeleton, buttonVariants, toast } from '@/components/ui';
-import { ArrowLeft, Network, Printer, Rows, SearchX, Share, UserPlus, X } from '@/components/ui/icons';
+import { ArrowLeft, ImageIcon, Network, Printer, Rows, SearchX, Share, UserPlus, X } from '@/components/ui/icons';
 import { placeLabel } from '@/features/branches/api';
 import { type MessageKey, formatNumber, isMessageKey, useLanguageStore, useT } from '@/i18n';
 import { ApiError } from '@/lib/api';
@@ -15,6 +15,11 @@ import { useFamily } from './api';
 import { useFamilyTree } from './tree-api';
 import { kinshipFrom, kinshipPath } from './kinship';
 import { type TreeShape, TREE_SHAPES, filterTree, shapePeople } from './tree-shapes';
+import { findGaps } from './tree-gaps';
+import { TreeGaps } from './TreeGaps';
+import { drawTreeImage } from './treeImage';
+import { FULL_CARD, layoutTree } from './tree-layout';
+import { shareOrDownload } from '@/features/invitations/cardImage';
 import { type Kin, TreeChart, useGenerationLabel, usePersonLine } from './TreeChart';
 import { AddRelatives, TreePersonModal } from './TreePersonModal';
 import { TreeSearch } from './TreeSearch';
@@ -207,6 +212,51 @@ export function FamilyTreePage() {
   const pidhi = activeShape === 'vanshavali' ? (g: number) => t('tree.pidhi', { n: formatNumber(g - firstGeneration + 1, language) }) : undefined;
   const surname = rootHead?.name.trim().split(/\s+/).at(-1) ?? '';
   const gotra = gotraName(family.data?.gotra, language);
+  // What's missing in the families the viewer may edit, each with its fix.
+  const gaps = useMemo(() => findGaps(tree.data?.households.map((h) => ({ familyId: h.family.id, canEdit: h.canEdit, members: h.members })) ?? []), [tree.data]);
+
+  // The tree as it is shown, as a picture for WhatsApp.
+  const personLine = usePersonLine();
+  const defaultRowLabel = useGenerationLabel();
+  const [drawing, setDrawing] = useState(false);
+  const sharePicture = async () => {
+    if (!shown.tree) return;
+    setDrawing(true);
+    try {
+      const layout = layoutTree(shown.tree, new Set(), FULL_CARD);
+      const rootFamily = tree.data?.households.find((h) => h.via === null)?.family;
+      const familyLine = rootFamily ? `${t('family.title', { name: rootFamily.headName })} · ${rootFamily.place}` : '';
+      const pathA = path && pathFrom ? people.find((p) => p.id === pathFrom) : undefined;
+      const pathB = path && focusId ? people.find((p) => p.id === focusId) : undefined;
+      const title =
+        pathA && pathB
+          ? t('tree.path.showing', { a: displayName(pathA), b: displayName(pathB) })
+          : activeShape === 'vanshavali'
+          ? t('tree.vanshavali.title', { surname })
+          : activeShape === 'ancestors' && subject
+            ? t('tree.picture.ancestors', { name: displayName(subject) })
+            : activeShape === 'descendants' && subject
+              ? t('tree.picture.descendants', { name: displayName(subject) })
+              : t('tree.title');
+      const subtitle = activeShape === 'vanshavali' ? [gotra ? t('tree.vanshavali.gotra', { gotra }) : null, familyLine].filter(Boolean).join(' · ') : familyLine;
+      const blob = await drawTreeImage(layout, {
+        title,
+        subtitle,
+        footer: t('tree.picture.footer', { date: new Intl.DateTimeFormat(language === 'mr' ? 'mr-IN' : 'en-IN', { dateStyle: 'medium' }).format(new Date()) }),
+        names: new Map(shown.people.map((p) => [p.id, displayName(p)])),
+        lines: new Map(shown.people.map((p) => [p.id, personLine(p, kin)])),
+        rowLabel: pidhi ?? defaultRowLabel,
+        path,
+      });
+      const how = await shareOrDownload(blob, `${title}.png`.replace(/[\\/:*?"<>|]/g, ''), title);
+      if (how === 'downloaded') toast.success(t('tree.picture.saved'));
+    } catch {
+      toast.error(t('tree.picture.failed'));
+    } finally {
+      setDrawing(false);
+    }
+  };
+
   const showShape = (s: TreeShape, p?: ChartPerson) => {
     setShape(s);
     if (p) setSubjectId(p.id);
@@ -319,6 +369,7 @@ export function FamilyTreePage() {
                 <span className="hidden sm:inline">{t('tree.add.someone')}</span>
               </Button>
             )}
+            <IconButton icon={ImageIcon} label={t('tree.picture.share')} onClick={() => void sharePicture()} disabled={drawing} />
             <IconButton icon={Printer} label={t('tree.print')} onClick={() => window.print()} />
             <IconButton icon={Share} label={t('tree.share')} onClick={() => void share()} />
           </div>
@@ -357,6 +408,7 @@ export function FamilyTreePage() {
             </Button>
           </div>
         )}
+        <TreeGaps gaps={gaps} onEdit={setTreeEdit} />
         {view === 'chart' ? (
           <TreeChart
             tree={shown.tree ?? tree.data}
