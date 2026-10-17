@@ -96,7 +96,7 @@ describe('links between families', () => {
 
     // The other side reads it the other way round.
     const incoming = (await requests(parents.cookie, parents.familyId)).incomingLinks;
-    expect(incoming).toMatchObject([{ kind: 'children', family: { headName: 'Rohit Wagh' }, requestedByName: 'Rohit Wagh' }]);
+    expect(incoming).toMatchObject([{ kind: 'children', family: { headName: 'Rohit Wagh' }, requestedByName: 'Rohit Wagh', through: { as: 'son', name: 'Rohit Wagh' } }]);
 
     // Only one link per pair, whichever side asks.
     expect((await api.post('/api/links').set('Cookie', parents.cookie).send({ toFamilyId: son.familyId, kind: 'children' })).status).toBe(409);
@@ -105,7 +105,9 @@ describe('links between families', () => {
     expect((await api.post(`/api/links/${incoming[0]?.id}/accept`).set('Cookie', parents.cookie)).status).toBe(200);
 
     expect((await family(son.cookie, son.familyId)).links).toMatchObject([{ kind: 'parents', family: { headName: 'Anil Wagh' }, canRemove: true }]);
-    expect((await family(parents.cookie, parents.familyId)).links).toMatchObject([{ kind: 'children', family: { headName: 'Rohit Wagh' } }]);
+    expect((await family(parents.cookie, parents.familyId)).links).toMatchObject([{ kind: 'children', family: { headName: 'Rohit Wagh' }, through: { as: 'son' } }]);
+    // A parents' family needs no "which".
+    expect((await family(son.cookie, son.familyId)).links[0]?.through).toBeUndefined();
     // Anyone who can see the family sees its links, but can't remove them.
     expect((await family(visitor.cookie, son.familyId)).links).toMatchObject([{ kind: 'parents', canRemove: false }]);
     expect((await family(son.cookie, parents.familyId)).permissions.canLink).toBe(false);
@@ -115,6 +117,23 @@ describe('links between families', () => {
     expect((await api.delete(`/api/links/${linkId}`).set('Cookie', parents.cookie)).status).toBe(204);
     expect((await family(son.cookie, son.familyId)).links).toEqual([]);
     expect((await family(son.cookie, son.familyId)).history?.[0]?.action).toBe('unlinked');
+  });
+
+  it("says a daughter's or a sister's family, from who heads it", async () => {
+    const parents = await createFamily(branches.amalner, { account: 'member', people: [{ name: 'Anil Wagh' }] });
+    const daughter = await createFamily(branches.pune, { account: 'member', people: [{ name: 'Priya Patil', gender: 'female' }] });
+    const brother = await createFamily(branches.bhusawal, { account: 'member', people: [{ name: 'Sunil Wagh' }] });
+    const link = async (from: { cookie: string }, to: { familyId: string; cookie: string }, kind: string) => {
+      const sent = await api.post('/api/links').set('Cookie', from.cookie).send({ toFamilyId: to.familyId, kind });
+      const id = (sent.body.requests as FamilyRequests).outgoingLinks[0]?.id;
+      await api.post(`/api/links/${id}/accept`).set('Cookie', to.cookie);
+    };
+    await link(parents, daughter, 'children');
+    await link(daughter, brother, 'siblings');
+    expect((await family(parents.cookie, parents.familyId)).links).toMatchObject([{ kind: 'children', through: { as: 'daughter', name: 'Priya Patil' } }]);
+    const hers = (await family(daughter.cookie, daughter.familyId)).links;
+    expect(hers.find((l) => l.kind === 'siblings')?.through).toEqual({ as: 'brother', name: 'Sunil Wagh' });
+    expect((await family(brother.cookie, brother.familyId)).links).toMatchObject([{ kind: 'siblings', through: { as: 'sister', name: 'Priya Patil' } }]);
   });
 
   it('needs both families verified', async () => {

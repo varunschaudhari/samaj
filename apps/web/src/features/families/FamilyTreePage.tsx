@@ -25,12 +25,29 @@ import { AddRelatives, TreePersonModal } from './TreePersonModal';
 import { TreeSearch } from './TreeSearch';
 import { type ChartPerson, findPeople } from './tree-layout';
 
-/** What a household is to the family the tree is drawn for. */
-function useHouseholdLabel() {
+/** A household joined through one of these people (as the head sees them) is their family: "Son's family". */
+const WHOSE: Partial<Record<MessageKey, MessageKey>> = {
+  'kin.son': 'links.kind.son',
+  'kin.daughter': 'links.kind.daughter',
+  'kin.brother': 'links.kind.brother',
+  'kin.sister': 'links.kind.sister',
+  'kin.grandson': 'tree.household.grandson',
+  'kin.granddaughter': 'tree.household.granddaughter',
+};
+
+/**
+ * What a household is to the family the tree is drawn for: "Son's family"
+ * or "Daughter's family" when someone in it is the head's son or daughter
+ * (a son who heads it, a daughter who married into it), else by generation.
+ */
+function useHouseholdLabel(headKin: Map<string, MessageKey>) {
   const t = useT();
   return (h: TreeHousehold) => {
     if (h.via === null) return t('tree.thisFamily');
     if (h.via === 'person') return t('tree.household.person', { name: h.through?.name ?? '' });
+    const head = h.members.find((m) => m.isHead);
+    const joiner = [...(head ? [head] : []), ...h.members].map((m) => WHOSE[headKin.get(m.id) ?? ('' as MessageKey)]).find(Boolean);
+    if (joiner) return t(joiner);
     if (h.generation === 0) return t('links.kind.siblings');
     const key = `tree.household.${h.generation}`;
     return isMessageKey(key) ? t(key as MessageKey) : t('links.kind.relatives');
@@ -75,16 +92,15 @@ function PersonChip({ person, kin, focused, matched, onOpen }: { person: ChartPe
 }
 
 /** One household's people in one generation. */
-function HouseholdGroup({ household, people, children }: { household: TreeHousehold; people: ChartPerson[]; children: (p: ChartPerson) => ReactNode }) {
+function HouseholdGroup({ household, label, people, children }: { household: TreeHousehold; label: string; people: ChartPerson[]; children: (p: ChartPerson) => ReactNode }) {
   const t = useT();
   const language = useLanguageStore((s) => s.language);
-  const label = useHouseholdLabel();
   const root = household.via === null;
   return (
     <div className={cn('flex w-72 max-w-full shrink-0 flex-col gap-2 rounded-md border bg-surface p-3 shadow-card md:w-auto md:min-w-64', root ? 'border-primary' : 'border-line')}>
       <div className="flex flex-col gap-0.5">
         <Badge tone={root ? 'primary' : 'neutral'} className="self-start">
-          {label(household)}
+          {label}
         </Badge>
         <Link to={`/families/${household.family.id}`} className="font-semibold break-words text-fg hover:underline">
           {t('family.title', { name: household.family.headName })}
@@ -103,9 +119,11 @@ function TreeList({
   kin,
   focusId,
   matches,
+  labelOf,
   onOpen,
 }: {
   tree: FamilyTree;
+  labelOf: (h: TreeHousehold) => string;
   people: ChartPerson[];
   kin: Kin;
   focusId: string | null;
@@ -133,7 +151,7 @@ function TreeList({
             {ordered.map((h) => {
               const here = people.filter((p) => p.household.id === h.family.id && p.generation === g);
               return here.length > 0 ? (
-                <HouseholdGroup key={h.family.id} household={h} people={here}>
+                <HouseholdGroup key={h.family.id} household={h} label={labelOf(h)} people={here}>
                   {(p) => <PersonChip key={p.id} person={p} kin={kin} focused={p.id === focusId} matched={matches.has(p.id)} onOpen={onOpen} />}
                 </HouseholdGroup>
               ) : null;
@@ -161,7 +179,6 @@ function TreeSkeleton() {
 export function FamilyTreePage() {
   const { familyId = '' } = useParams();
   const t = useT();
-  const householdLabel = useHouseholdLabel();
   const tree = useFamilyTree(familyId);
   const [params, setParams] = useSearchParams();
   const focusId = params.get('focus');
@@ -192,6 +209,9 @@ export function FamilyTreePage() {
   const rootHead = people.find((p) => p.rootHousehold && p.isHead);
   const rootEditable = Boolean(tree.data?.households.some((h) => h.via === null && h.canEdit));
   const kin = useMemo<Kin>(() => (egoId ? { map: kinshipFrom(egoId, people), viewerIsEgo: egoId === myId } : null), [egoId, people, myId]);
+  // Everyone's relation to the family's head, to name each household by who joins it.
+  const headKin = useMemo(() => (rootHead ? kinshipFrom(rootHead.id, people) : new Map<string, MessageKey>()), [rootHead, people]);
+  const householdLabel = useHouseholdLabel(headKin);
   const displayName = useDisplayName();
 
   // A path shows on the whole tree, so nobody on it is hidden.
@@ -422,7 +442,7 @@ export function FamilyTreePage() {
             onWhoseChild={(s) => setTreeEdit({ mode: 'edit', familyId: s.householdId, memberId: s.id })}
           />
         ) : (
-          <TreeList tree={shown.tree ?? tree.data} people={shown.people} kin={kin} focusId={focusId} matches={matches} onOpen={setOpened} />
+          <TreeList tree={shown.tree ?? tree.data} labelOf={householdLabel} people={shown.people} kin={kin} focusId={focusId} matches={matches} onOpen={setOpened} />
         )}
         {truncated && <p className="text-center text-sm text-fg-muted">{t('tree.truncated')}</p>}
         {side.length > 0 && (

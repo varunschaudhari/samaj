@@ -1,8 +1,8 @@
 import {
   type FamilyDetail,
   type FamilyMember,
-  LINK_KINDS,
   type LinkKind,
+  type LinkThrough,
   type LinkedFamily,
   type MemberMoveView,
   PARENT_CHOICES,
@@ -18,6 +18,22 @@ import { useMe } from '@/features/auth/api';
 import { placeLabel } from '@/features/branches/api';
 import { type MessageKey, formatDate, useErrorMessage, useLanguageStore, useT } from '@/i18n';
 import { useFamily } from './api';
+
+/** "Son's family" or "Daughter's family" when it is known which; "Son's or daughter's family" when not. */
+export function linkKindLabel(t: ReturnType<typeof useT>, kind: LinkKind, through?: LinkThrough) {
+  return through && (kind === 'children' || kind === 'siblings') ? t(`links.kind.${through.as}`) : t(`links.kind.${kind}`);
+}
+
+/** Asking to link: a son's and a daughter's family are one kind of link, picked separately. */
+const ASK_OPTIONS: { value: string; kind: LinkKind; label: MessageKey }[] = [
+  { value: 'parents', kind: 'parents', label: 'links.mine.parents' },
+  { value: 'son', kind: 'children', label: 'links.mine.son' },
+  { value: 'daughter', kind: 'children', label: 'links.mine.daughter' },
+  { value: 'brother', kind: 'siblings', label: 'links.mine.brother' },
+  { value: 'sister', kind: 'siblings', label: 'links.mine.sister' },
+  { value: 'inLaws', kind: 'inLaws', label: 'links.mine.inLaws' },
+  { value: 'relatives', kind: 'relatives', label: 'links.mine.relatives' },
+];
 import {
   useAcceptLink,
   useAcceptParentLink,
@@ -122,7 +138,7 @@ export function RelatedFamilies({ family }: { family: FamilyDetail }) {
             <li key={l.id} className="flex items-center gap-3 py-2.5">
               <Avatar name={l.family.headName} size="md" />
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-xs font-semibold tracking-wide text-primary uppercase">{t(`links.kind.${l.kind}`)}</span>
+                <span className="text-xs font-semibold tracking-wide text-primary uppercase">{linkKindLabel(t, l.kind, l.through)}</span>
                 <FamilyName family={l.family} />
               </div>
               {l.canRemove && <IconButton icon={Trash2} label={t('links.remove', { name: l.family.headName })} onClick={() => setRemoving(l.id)} />}
@@ -184,7 +200,8 @@ function LinkFamilyModal({ family, open, onClose }: { family: FamilyDetail; open
   const t = useT();
   const errorMessage = useErrorMessage();
   const request = useRequestLink();
-  const [kind, setKind] = useState<LinkKind | ''>('');
+  const [choice, setChoice] = useState('');
+  const kind = ASK_OPTIONS.find((o) => o.value === choice)?.kind ?? '';
   return (
     <Modal
       open={open}
@@ -206,7 +223,7 @@ function LinkFamilyModal({ family, open, onClose }: { family: FamilyDetail; open
                 {
                   onSuccess: () => {
                     toast.success(t('links.sent', { name: family.headName }));
-                    setKind('');
+                    setChoice('');
                     onClose();
                   },
                   onError: (err) => toast.error(errorMessage(err)),
@@ -219,11 +236,11 @@ function LinkFamilyModal({ family, open, onClose }: { family: FamilyDetail; open
         </>
       }
     >
-      <Select label={t('links.askKind')} value={kind} onChange={(e) => setKind(e.target.value as LinkKind | '')}>
+      <Select label={t('links.askKind')} value={choice} onChange={(e) => setChoice(e.target.value)}>
         <option value="">{t('links.choose')}</option>
-        {LINK_KINDS.map((k) => (
-          <option key={k} value={k}>
-            {t(`links.mine.${k}`)}
+        {ASK_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {t(o.label)}
           </option>
         ))}
       </Select>
@@ -402,7 +419,7 @@ export function FamilyRequestsPanel({ familyId }: { familyId: string }) {
         {r.incomingLinks.map((l) => (
           <li key={l.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center">
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-sm text-fg-muted">{t('links.incoming', { kind: t(`links.kind.${l.kind}`) })}</span>
+              <span className="text-sm text-fg-muted">{t('links.incoming', { kind: linkKindLabel(t, l.kind, l.through) })}</span>
               <FamilyName family={l.family} />
             </div>
             <div className="flex shrink-0 gap-2">
@@ -456,7 +473,7 @@ export function FamilyRequestsPanel({ familyId }: { familyId: string }) {
         {r.outgoingLinks.map((l) => (
           <li key={l.id} className="flex items-center gap-3 py-3">
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-sm text-fg-muted">{t('links.outgoing', { kind: t(`links.kind.${l.kind}`) })}</span>
+              <span className="text-sm text-fg-muted">{t('links.outgoing', { kind: linkKindLabel(t, l.kind, l.through) })}</span>
               <FamilyName family={l.family} />
             </div>
             <Button size="sm" variant="ghost" onClick={() => removeLink.mutate(l.id, done('links.cancelled'))}>

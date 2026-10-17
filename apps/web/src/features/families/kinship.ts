@@ -92,8 +92,8 @@ function classify(path: Hop[], ego: TreePerson): MessageKey {
     case 'PU':
       return pick(them, 'kin.fatherInLaw', 'kin.motherInLaw');
     case 'DPU':
-      // A son's or daughter's in-laws.
-      return pick(them, 'kin.vyahi', 'kin.vihin');
+      // A son's or daughter's in-laws (व्याही, विहीण): which, by the child the path goes through.
+      return male(node(0)) ? pick(them, 'kin.sonsFatherInLaw', 'kin.sonsMotherInLaw') : pick(them, 'kin.daughtersFatherInLaw', 'kin.daughtersMotherInLaw');
     case 'PUU':
       return pick(them, 'kin.grandfatherInLaw', 'kin.grandmotherInLaw');
     case 'PUD':

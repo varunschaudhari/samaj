@@ -99,11 +99,21 @@ export interface LinkedFamily {
 }
 
 /** An accepted link, from the point of view of the family whose page shows it. */
+/**
+ * For a son's or daughter's family, or a brother's or sister's: which of them
+ * it is, so it reads "Son's family" rather than "Son's or daughter's family".
+ */
+export interface LinkThrough {
+  as: 'son' | 'daughter' | 'brother' | 'sister';
+  name: string;
+}
+
 export interface FamilyLinkView {
   id: string;
   kind: LinkKind;
   family: LinkedFamily;
   canRemove: boolean;
+  through?: LinkThrough;
 }
 
 export const MOVE_STATUSES = ['awaitingFamily', 'awaitingCommittee', 'done', 'declined', 'cancelled'] as const;
@@ -137,8 +147,8 @@ export interface ParentLinkRequest {
 }
 
 export interface FamilyRequests {
-  incomingLinks: { id: string; kind: LinkKind; family: LinkedFamily; requestedByName: string; createdAt: string }[];
-  outgoingLinks: { id: string; kind: LinkKind; family: LinkedFamily; createdAt: string }[];
+  incomingLinks: { id: string; kind: LinkKind; family: LinkedFamily; requestedByName: string; createdAt: string; through?: LinkThrough }[];
+  outgoingLinks: { id: string; kind: LinkKind; family: LinkedFamily; createdAt: string; through?: LinkThrough }[];
   /** People another family asked to move out of this one, waiting for this family to agree. */
   movesOut: MemberMoveView[];
   /** People this family asked to move in, until the committee decides. */

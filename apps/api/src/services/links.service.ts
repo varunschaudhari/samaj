@@ -5,6 +5,7 @@ import {
   type FamilyRequests,
   INVERSE_LINK,
   type LinkKind,
+  type LinkThrough,
   type LinkedFamily,
   MAX_FAMILY_LINKS,
   type ParentLinkRequest,
@@ -127,6 +128,41 @@ const otherOf = (link: Pick<FamilyLinkDoc, 'fromFamilyId' | 'toFamilyId'>, famil
   isFrom(link, familyId) ? link.toFamilyId : link.fromFamilyId;
 
 /**
+ * Who a son's or daughter's (brother's or sister's) family is, seen from
+ * `familyId`: a son or daughter who moved there from this family (a daughter
+ * married into it), else that family's head, who is the child (or sibling) in
+ * the tree.
+ */
+async function throughFor(familyId: string, others: { id: string; kind: LinkKind }[]): Promise<Map<string, LinkThrough>> {
+  const wanted = others.filter((o) => o.kind === 'children' || o.kind === 'siblings');
+  if (wanted.length === 0) return new Map();
+  const ids = wanted.map((o) => new Types.ObjectId(o.id));
+  const [moves, heads] = await Promise.all([
+    MemberMoveModel.find(
+      { fromFamilyId: new Types.ObjectId(familyId), toFamilyId: { $in: ids }, status: 'done', fromRelation: { $in: ['son', 'daughter', 'brother', 'sister'] } },
+      { memberId: 1, toFamilyId: 1, fromRelation: 1 },
+    ).lean(),
+    MemberModel.find({ familyId: { $in: ids }, isHead: true }, { familyId: 1, name: 1, gender: 1 }).lean(),
+  ]);
+  const movers = await MemberModel.find({ _id: { $in: moves.map((m) => m.memberId) } }, { name: 1 }).lean();
+  const out = new Map<string, LinkThrough>();
+  for (const { id, kind } of wanted) {
+    const child = kind === 'children';
+    const move = moves.find((m) => String(m.toFamilyId) === id && (child ? ['son', 'daughter'] : ['brother', 'sister']).includes(m.fromRelation ?? ''));
+    const mover = move && movers.find((m) => String(m._id) === String(move.memberId));
+    if (move && mover) {
+      out.set(id, { as: move.fromRelation as LinkThrough['as'], name: mover.name });
+      continue;
+    }
+    const head = heads.find((h) => String(h.familyId) === id);
+    if (!head) continue;
+    const female = head.gender === 'female';
+    out.set(id, { as: child ? (female ? 'daughter' : 'son') : female ? 'sister' : 'brother', name: head.name });
+  }
+  return out;
+}
+
+/**
  * The viewer's own (verified) family may propose links to, and ask for people
  * from, this family. Families act for themselves, not through the committee.
  */
@@ -149,10 +185,12 @@ export async function linksOf(viewer: Viewer, family: FamilyDocument): Promise<F
   if (links.length === 0) return [];
   const summaries = await familySummaries(viewer, links.map((l) => otherOf(l, id)));
   const canEdit = canEditFamily(viewer, family);
+  const through = await throughFor(id, links.map((l) => ({ id: String(otherOf(l, id)), kind: kindFor(l, id) })));
   return links.flatMap((l) => {
     const other = summaries.get(String(otherOf(l, id)));
     if (!other || (!other.canView && !canEdit)) return [];
-    return [{ id: String(l._id), kind: kindFor(l, id), family: other, canRemove: canEdit }];
+    const by = through.get(other.id);
+    return [{ id: String(l._id), kind: kindFor(l, id), family: other, canRemove: canEdit, ...(by && { through: by }) }];
   });
 }
 
@@ -175,14 +213,22 @@ export async function requestsFor(viewer: Viewer, familyId: string): Promise<Fam
   const summaries = await familySummaries(viewer, [...incoming.map((l) => l.fromFamilyId), ...outgoing.map((l) => l.toFamilyId)]);
   const [out, into, parentLinks] = await Promise.all([moveViews(viewer, movesOut), moveViews(viewer, movesIn), parentLinksOf(viewer, family._id)]);
   const pick = (id: Types.ObjectId) => summaries.get(String(id));
+  const through = await throughFor(familyId, [
+    ...incoming.map((l) => ({ id: String(l.fromFamilyId), kind: kindFor(l, familyId) })),
+    ...outgoing.map((l) => ({ id: String(l.toFamilyId), kind: l.kind })),
+  ]);
+  const by = (id: Types.ObjectId) => {
+    const t = through.get(String(id));
+    return t ? { through: t } : {};
+  };
   return {
     incomingLinks: incoming.flatMap((l) => {
       const f = pick(l.fromFamilyId);
-      return f ? [{ id: String(l._id), kind: kindFor(l, familyId), family: f, requestedByName: l.requestedByName, createdAt: l.createdAt.toISOString() }] : [];
+      return f ? [{ id: String(l._id), kind: kindFor(l, familyId), family: f, requestedByName: l.requestedByName, createdAt: l.createdAt.toISOString(), ...by(l.fromFamilyId) }] : [];
     }),
     outgoingLinks: outgoing.flatMap((l) => {
       const f = pick(l.toFamilyId);
-      return f ? [{ id: String(l._id), kind: l.kind, family: f, createdAt: l.createdAt.toISOString() }] : [];
+      return f ? [{ id: String(l._id), kind: l.kind, family: f, createdAt: l.createdAt.toISOString(), ...by(l.toFamilyId) }] : [];
     }),
     movesOut: out,
     movesIn: into,

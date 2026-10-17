@@ -94,7 +94,8 @@ describe('kinshipFrom', () => {
     expect(fromAnil.get('Kavya')).toBe('kin.sonsWife');
     expect(fromAnil.get('Aarav')).toBe('kin.grandson');
     expect(fromAnil.get('Neha')).toBe('kin.grandsonsWife');
-    expect(fromAnil.get('Kishor')).toBe('kin.vyahi');
+    // Rohit's wife's father: the son's father-in-law (व्याही).
+    expect(fromAnil.get('Kishor')).toBe('kin.sonsFatherInLaw');
     expect(fromAnil.get('Vijay')).toBe('kin.brothersSon');
     expect(fromAnil.get('Amit')).toBe('kin.sistersSon');
     expect(fromAnil.get('Dilip')).toBe('kin.sistersHusband');
